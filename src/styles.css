@@ -1,1 +1,341 @@
-/* You can add global styles to this file, and also import other style files */
+/* styles.css - Global Styles */
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+
+/* Reset and Base Styles */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #fafafa;
+}
+
+body {
+  overflow: hidden; /* Prevent body scroll since we handle scrolling in components */
+}
+
+/* Material Design Overrides */
+.mat-toolbar {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.mat-sidenav {
+  box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+
+.mat-card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.mat-form-field {
+  width: 100%;
+}
+
+.mat-form-field-appearance-outline .mat-form-field-outline {
+  color: rgba(0,0,0,0.15);
+}
+
+.mat-tab-body-content {
+  overflow: visible !important;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Utility Classes */
+.full-width {
+  width: 100% !important;
+}
+
+.full-height {
+  height: 100% !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+.text-left {
+  text-align: left !important;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+.m-0 { margin: 0 !important; }
+.m-1 { margin: 8px !important; }
+.m-2 { margin: 16px !important; }
+.m-3 { margin: 24px !important; }
+.m-4 { margin: 32px !important; }
+
+.p-0 { padding: 0 !important; }
+.p-1 { padding: 8px !important; }
+.p-2 { padding: 16px !important; }
+.p-3 { padding: 24px !important; }
+.p-4 { padding: 32px !important; }
+
+.mb-1 { margin-bottom: 8px !important; }
+.mb-2 { margin-bottom: 16px !important; }
+.mb-3 { margin-bottom: 24px !important; }
+
+.mt-1 { margin-top: 8px !important; }
+.mt-2 { margin-top: 16px !important; }
+.mt-3 { margin-top: 24px !important; }
+
+.flex {
+  display: flex !important;
+}
+
+.flex-column {
+  flex-direction: column !important;
+}
+
+.align-center {
+  align-items: center !important;
+}
+
+.justify-center {
+  justify-content: center !important;
+}
+
+.justify-between {
+  justify-content: space-between !important;
+}
+
+.flex-1 {
+  flex: 1 !important;
+}
+
+/* Workflow Specific Styles */
+.workflow-grid {
+  background-image:
+    radial-gradient(circle, #ddd 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.workflow-element-shadow {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.workflow-element-hover {
+  transition: all 0.2s ease;
+}
+
+.workflow-element-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Animation Classes */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Status and State Classes */
+.success {
+  color: #4CAF50 !important;
+}
+
+.warning {
+  color: #FF9800 !important;
+}
+
+.error {
+  color: #F44336 !important;
+}
+
+.info {
+  color: #2196F3 !important;
+}
+
+.success-bg {
+  background-color: #E8F5E8 !important;
+}
+
+.warning-bg {
+  background-color: #FFF3E0 !important;
+}
+
+.error-bg {
+  background-color: #FFEBEE !important;
+}
+
+.info-bg {
+  background-color: #E3F2FD !important;
+}
+
+/* Loading States */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: block !important;
+  }
+
+  .mobile-column {
+    flex-direction: column !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+/* Dark Mode Support (Optional) */
+@media (prefers-color-scheme: dark) {
+  .auto-dark {
+    background-color: #303030;
+    color: #ffffff;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-break {
+    page-break-after: always;
+  }
+}
+
+/* Focus Styles for Accessibility */
+.mat-button:focus,
+.mat-raised-button:focus,
+.mat-icon-button:focus {
+  outline: 2px solid #2196F3;
+  outline-offset: 2px;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  .workflow-element {
+    border-width: 3px !important;
+  }
+
+  .connection-line {
+    stroke-width: 3px !important;
+  }
+}
+
+/* Angular Material Custom Theme Variables */
+:root {
+  --primary-color: #1976d2;
+  --accent-color: #ff4081;
+  --warn-color: #f44336;
+  --success-color: #4caf50;
+  --warning-color: #ff9800;
+  --info-color: #2196f3;
+
+  --background-color: #fafafa;
+  --surface-color: #ffffff;
+  --text-primary: rgba(0, 0, 0, 0.87);
+  --text-secondary: rgba(0, 0, 0, 0.54);
+  --text-disabled: rgba(0, 0, 0, 0.38);
+
+  --border-color: rgba(0, 0, 0, 0.12);
+  --divider-color: rgba(0, 0, 0, 0.12);
+
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.16);
+  --shadow-3: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-4: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Custom Property Usage Examples */
+.custom-card {
+  background-color: var(--surface-color);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-2);
+}
+
+.custom-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.custom-success {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.custom-warning {
+  background-color: var(--warning-color);
+  color: white;
+}
+
+.custom-error {
+  background-color: var(--warn-color);
+  color: white;
+}
