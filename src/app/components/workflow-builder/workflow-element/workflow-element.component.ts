@@ -66,7 +66,7 @@ import {MatDivider} from '@angular/material/divider';
             <div *ngIf="element.properties.is_repeatable" class="detail-item">
               <small><mat-icon inline="true" style="font-size: 12px;">repeat</mat-icon> Repeatable</small>
             </div>
-            <div *ngIf="element.properties.fields?.length" class="detail-item">
+            <div *ngIf="element.properties.fields && element.properties.fields.length > 0" class="detail-item">
               <small>{{ element.properties.fields.length }} fields</small>
             </div>
           </div>
@@ -81,7 +81,7 @@ import {MatDivider} from '@angular/material/divider';
           </div>
 
           <div *ngSwitchCase="'condition'" class="condition-details">
-            <div *ngIf="element.properties.condition_logic?.length" class="detail-item">
+            <div *ngIf="element.properties.condition_logic && element.properties.condition_logic.length > 0" class="detail-item">
               <small>{{ element.properties.condition_logic.length }} rule(s)</small>
             </div>
           </div>

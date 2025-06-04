@@ -276,144 +276,142 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
             <!-- Advanced Properties Tab (for Field) -->
             <mat-tab label="Validation" *ngIf="selectedElement.type === 'field' && !propertiesForm.get('useExisting')?.value">
               <div class="tab-content">
-                <mat-expansion-panel-group>
-                  <!-- Text Validation -->
-                  <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>Text Validation</mat-panel-title>
-                    </mat-expansion-panel-header>
+                <!-- Text Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Text Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
 
-                    <div class="validation-content">
-                      <div class="form-row">
-                        <mat-form-field appearance="outline">
-                          <mat-label>Min Length</mat-label>
-                          <input matInput type="number" formControlName="_min_length">
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                          <mat-label>Max Length</mat-label>
-                          <input matInput type="number" formControlName="_max_length">
-                        </mat-form-field>
-                      </div>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Regex Pattern</mat-label>
-                        <input matInput formControlName="_regex_pattern">
-                        <mat-hint>Regular expression for validation</mat-hint>
+                  <div class="validation-content">
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Min Length</mat-label>
+                        <input matInput type="number" formControlName="_min_length">
                       </mat-form-field>
 
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Allowed Characters</mat-label>
-                        <input matInput formControlName="_allowed_characters">
-                        <mat-hint>Allowed character set</mat-hint>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Forbidden Words</mat-label>
-                        <textarea matInput formControlName="_forbidden_words" rows="2"></textarea>
-                        <mat-hint>Comma-separated list of forbidden words</mat-hint>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Length</mat-label>
+                        <input matInput type="number" formControlName="_max_length">
                       </mat-form-field>
                     </div>
-                  </mat-expansion-panel>
 
-                  <!-- Number Validation -->
-                  <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>Number Validation</mat-panel-title>
-                    </mat-expansion-panel-header>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Regex Pattern</mat-label>
+                      <input matInput formControlName="_regex_pattern">
+                      <mat-hint>Regular expression for validation</mat-hint>
+                    </mat-form-field>
 
-                    <div class="validation-content">
-                      <div class="form-row">
-                        <mat-form-field appearance="outline">
-                          <mat-label>Min Value</mat-label>
-                          <input matInput type="number" formControlName="_value_greater_than">
-                        </mat-form-field>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Allowed Characters</mat-label>
+                      <input matInput formControlName="_allowed_characters">
+                      <mat-hint>Allowed character set</mat-hint>
+                    </mat-form-field>
 
-                        <mat-form-field appearance="outline">
-                          <mat-label>Max Value</mat-label>
-                          <input matInput type="number" formControlName="_value_less_than">
-                        </mat-form-field>
-                      </div>
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Forbidden Words</mat-label>
+                      <textarea matInput formControlName="_forbidden_words" rows="2"></textarea>
+                      <mat-hint>Comma-separated list of forbidden words</mat-hint>
+                    </mat-form-field>
+                  </div>
+                </mat-expansion-panel>
 
-                      <div class="form-row">
-                        <mat-form-field appearance="outline">
-                          <mat-label>Precision</mat-label>
-                          <input matInput type="number" formControlName="_precision">
-                          <mat-hint>Decimal places</mat-hint>
-                        </mat-form-field>
+                <!-- Number Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Number Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
 
-                        <mat-form-field appearance="outline">
-                          <mat-label>Default Value</mat-label>
-                          <input matInput formControlName="_default_value">
-                        </mat-form-field>
-                      </div>
-
-                      <div class="checkbox-group">
-                        <mat-checkbox formControlName="_integer_only">Integer Only</mat-checkbox>
-                        <mat-checkbox formControlName="_positive_only">Positive Only</mat-checkbox>
-                        <mat-checkbox formControlName="_unique">Unique Value</mat-checkbox>
-                      </div>
-                    </div>
-                  </mat-expansion-panel>
-
-                  <!-- Date Validation -->
-                  <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>Date Validation</mat-panel-title>
-                    </mat-expansion-panel-header>
-
-                    <div class="validation-content">
-                      <div class="form-row">
-                        <mat-form-field appearance="outline">
-                          <mat-label>Min Date</mat-label>
-                          <input matInput type="date" formControlName="_date_greater_than">
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                          <mat-label>Max Date</mat-label>
-                          <input matInput type="date" formControlName="_date_less_than">
-                        </mat-form-field>
-                      </div>
-
-                      <div class="checkbox-group">
-                        <mat-checkbox formControlName="_future_only">Future Only</mat-checkbox>
-                        <mat-checkbox formControlName="_past_only">Past Only</mat-checkbox>
-                      </div>
-                    </div>
-                  </mat-expansion-panel>
-
-                  <!-- File Validation -->
-                  <mat-expansion-panel>
-                    <mat-expansion-panel-header>
-                      <mat-panel-title>File Validation</mat-panel-title>
-                    </mat-expansion-panel-header>
-
-                    <div class="validation-content">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Allowed File Types</mat-label>
-                        <input matInput formControlName="_file_types">
-                        <mat-hint>e.g., .pdf,.doc,.jpg</mat-hint>
+                  <div class="validation-content">
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Min Value</mat-label>
+                        <input matInput type="number" formControlName="_value_greater_than">
                       </mat-form-field>
 
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Max File Size (bytes)</mat-label>
-                        <input matInput type="number" formControlName="_max_file_size">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Value</mat-label>
+                        <input matInput type="number" formControlName="_value_less_than">
+                      </mat-form-field>
+                    </div>
+
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Precision</mat-label>
+                        <input matInput type="number" formControlName="_precision">
+                        <mat-hint>Decimal places</mat-hint>
                       </mat-form-field>
 
-                      <div class="form-row">
-                        <mat-form-field appearance="outline">
-                          <mat-label>Max Image Width</mat-label>
-                          <input matInput type="number" formControlName="_image_max_width">
-                        </mat-form-field>
-
-                        <mat-form-field appearance="outline">
-                          <mat-label>Max Image Height</mat-label>
-                          <input matInput type="number" formControlName="_image_max_height">
-                        </mat-form-field>
-                      </div>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Default Value</mat-label>
+                        <input matInput formControlName="_default_value">
+                      </mat-form-field>
                     </div>
-                  </mat-expansion-panel>
-                </mat-expansion-panel-group>
+
+                    <div class="checkbox-group">
+                      <mat-checkbox formControlName="_integer_only">Integer Only</mat-checkbox>
+                      <mat-checkbox formControlName="_positive_only">Positive Only</mat-checkbox>
+                      <mat-checkbox formControlName="_unique">Unique Value</mat-checkbox>
+                    </div>
+                  </div>
+                </mat-expansion-panel>
+
+                <!-- Date Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Date Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="validation-content">
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Min Date</mat-label>
+                        <input matInput type="date" formControlName="_date_greater_than">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Date</mat-label>
+                        <input matInput type="date" formControlName="_date_less_than">
+                      </mat-form-field>
+                    </div>
+
+                    <div class="checkbox-group">
+                      <mat-checkbox formControlName="_future_only">Future Only</mat-checkbox>
+                      <mat-checkbox formControlName="_past_only">Past Only</mat-checkbox>
+                    </div>
+                  </div>
+                </mat-expansion-panel>
+
+                <!-- File Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>File Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="validation-content">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Allowed File Types</mat-label>
+                      <input matInput formControlName="_file_types">
+                      <mat-hint>e.g., .pdf,.doc,.jpg</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Max File Size (bytes)</mat-label>
+                      <input matInput type="number" formControlName="_max_file_size">
+                    </mat-form-field>
+
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Image Width</mat-label>
+                        <input matInput type="number" formControlName="_image_max_width">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Image Height</mat-label>
+                        <input matInput type="number" formControlName="_image_max_height">
+                      </mat-form-field>
+                    </div>
+                  </div>
+                </mat-expansion-panel>
               </div>
             </mat-tab>
 
@@ -1045,9 +1043,18 @@ export class PropertiesPanelComponent implements OnInit, OnChanges {
   }
 
   getElementTitle(): string {
-    return this.selectedElement?.properties.name ||
-      this.selectedElement?.type?.charAt(0).toUpperCase() +
-      this.selectedElement?.type?.slice(1) || 'Element';
+    const elementName = this.selectedElement?.properties?.name;
+    const elementType = this.selectedElement?.type;
+
+    if (elementName) {
+      return elementName;
+    }
+
+    if (elementType) {
+      return elementType.charAt(0).toUpperCase() + elementType.slice(1);
+    }
+
+    return 'Element';
   }
 
   getElementDescription(): string {

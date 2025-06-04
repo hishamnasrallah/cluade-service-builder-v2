@@ -1,7 +1,8 @@
 // components/workflow-builder/properties-panel/condition-builder/condition-builder.component.ts
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {ReactiveFormsModule, FormBuilder, FormArray, FormGroup, Validators, FormsModule} from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormArray, FormGroup, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -22,6 +23,7 @@ import { ConditionLogic } from '../../../../models/workflow.models';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -32,8 +34,7 @@ import { ConditionLogic } from '../../../../models/workflow.models';
     MatChipsModule,
     MatDividerModule,
     MatTooltipModule,
-    DragDropModule,
-    FormsModule
+    DragDropModule
   ],
   template: `
     <div class="condition-builder">
