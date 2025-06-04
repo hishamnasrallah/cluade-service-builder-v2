@@ -10,10 +10,10 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
   imports: [CommonModule],
   template: `
     <div class="minimap" (click)="onMinimapClick($event)">
-      <div class="minimap-header">
-        <span>Overview</span>
-        <span class="zoom-level">{{ Math.round(canvasState.zoom * 100) }}%</span>
-      </div>
+<!--      <div class="minimap-header">-->
+<!--&lt;!&ndash;        <span>Overview</span>&ndash;&gt;-->
+<!--&lt;!&ndash;        <span class="zoom-level">{{ Math.round(canvasState.zoom * 100) }}%</span>&ndash;&gt;-->
+<!--      </div>-->
 
       <div class="minimap-canvas" #minimapCanvas>
         <!-- Elements -->

@@ -47,744 +47,8 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
     MatProgressSpinnerModule,
     ConditionBuilderComponent
   ],
-  template: `
-    <div class="properties-panel" *ngIf="selectedElement || selectedConnection">
-      <!-- Element Properties -->
-      <div *ngIf="selectedElement" class="element-properties">
-        <div class="panel-header">
-          <h3>
-            <mat-icon>{{ getElementIcon() }}</mat-icon>
-            {{ getElementTitle() }}
-          </h3>
-          <p>{{ getElementDescription() }}</p>
-        </div>
-
-        <!-- Loading Spinner -->
-        <div *ngIf="isLoading" class="loading-container">
-          <mat-spinner diameter="40"></mat-spinner>
-          <p>Loading data...</p>
-        </div>
-
-        <!-- Error Message -->
-        <div *ngIf="errorMessage" class="error-container">
-          <mat-icon color="warn">error</mat-icon>
-          <p>{{ errorMessage }}</p>
-          <div class="error-actions">
-            <button mat-button (click)="loadLookupData()" color="primary">
-              <mat-icon>refresh</mat-icon>
-              Retry Loading Data
-            </button>
-            <button mat-button (click)="testApiConnection()" color="accent">
-              <mat-icon>wifi</mat-icon>
-              Test API Connection
-            </button>
-            <button mat-button (click)="forceReloadData()">
-              <mat-icon>refresh</mat-icon>
-              Force Reload All
-            </button>
-          </div>
-        </div>
-
-        <!-- Debug Info (only show in development) -->
-        <div class="debug-info" *ngIf="!isLoading && !errorMessage">
-          <details>
-            <summary>Debug Info (Click to expand)</summary>
-            <div class="debug-content">
-              <p><strong>API Configuration:</strong></p>
-              <ul>
-                <li>Base URL: {{ apiService.getBaseUrl() || 'Not configured' }}</li>
-                <li>Configured: {{ apiService.isConfigured() ? 'Yes' : 'No' }}</li>
-              </ul>
-
-              <p><strong>Data Status:</strong></p>
-              <ul>
-                <li>Services: {{ services.length }} loaded</li>
-                <li>Flow Steps: {{ flowSteps.length }} loaded</li>
-                <li>Applicant Types: {{ applicantTypes.length }} loaded</li>
-                <li>Field Types: {{ fieldTypes.length }} loaded</li>
-                <li>Existing Pages: {{ existingPages.length }} loaded</li>
-                <li>Existing Categories: {{ existingCategories.length }} loaded</li>
-                <li>Existing Fields: {{ existingFields.length }} loaded</li>
-              </ul>
-
-              <div class="debug-actions">
-                <button mat-button (click)="testApiConnection()" size="small">
-                  <mat-icon>wifi</mat-icon>
-                  Test API
-                </button>
-                <button mat-button (click)="forceReloadData()" size="small">
-                  <mat-icon>refresh</mat-icon>
-                  Reload Data
-                </button>
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <form [formGroup]="propertiesForm" (ngSubmit)="saveProperties()" *ngIf="!isLoading && !errorMessage">
-          <mat-tab-group *ngIf="selectedElement.type !== 'start'" animationDuration="200ms">
-            <!-- Basic Properties Tab -->
-            <mat-tab label="Basic">
-              <div class="tab-content">
-                <ng-container [ngSwitch]="selectedElement.type">
-
-                  <!-- Page Properties -->
-                  <div *ngSwitchCase="'page'">
-                    <mat-checkbox formControlName="useExisting" class="use-existing-checkbox">
-                      Use existing page
-                    </mat-checkbox>
-
-                    <div *ngIf="propertiesForm.get('useExisting')?.value">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Select Existing Page</mat-label>
-                        <mat-select formControlName="existingPageId" (selectionChange)="onExistingPageSelected($event.value)" (openedChange)="onExistingPageDropdownOpen($event)">
-                          <mat-option *ngFor="let page of existingPages" [value]="page.id">
-                            {{ page.name }} - {{ getServiceName(page.service) }}
-                          </mat-option>
-                          <mat-option *ngIf="existingPages.length === 0" [value]="" disabled>
-                            No existing pages available
-                          </mat-option>
-                        </mat-select>
-                      </mat-form-field>
-                    </div>
-
-                    <div *ngIf="!propertiesForm.get('useExisting')?.value">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Service</mat-label>
-                        <mat-select formControlName="service" (openedChange)="onServiceDropdownOpen($event)">
-                          <mat-option *ngFor="let service of services" [value]="service.id">
-                            {{ service.name }} ({{ service.name_ara }})
-                          </mat-option>
-                          <mat-option *ngIf="services.length === 0" [value]="" disabled>
-                            {{ isLoading ? 'Loading services...' : 'No services available' }}
-                          </mat-option>
-                        </mat-select>
-                        <mat-error>Service is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Sequence Number</mat-label>
-                        <mat-select formControlName="sequence_number" (openedChange)="onFlowStepDropdownOpen($event)">
-                          <mat-option *ngFor="let step of flowSteps" [value]="step.id">
-                            {{ step.name }} ({{ step.name_ara }})
-                          </mat-option>
-                          <mat-option *ngIf="flowSteps.length === 0" [value]="" disabled>
-                            {{ isLoading ? 'Loading flow steps...' : 'No flow steps available' }}
-                          </mat-option>
-                        </mat-select>
-                        <mat-error>Sequence number is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Applicant Type</mat-label>
-                        <mat-select formControlName="applicant_type" (openedChange)="onApplicantTypeDropdownOpen($event)">
-                          <mat-option *ngFor="let type of applicantTypes" [value]="type.id">
-                            {{ type.name }} ({{ type.name_ara }})
-                          </mat-option>
-                          <mat-option *ngIf="applicantTypes.length === 0" [value]="" disabled>
-                            {{ isLoading ? 'Loading applicant types...' : 'No applicant types available' }}
-                          </mat-option>
-                        </mat-select>
-                        <mat-error>Applicant type is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" required>
-                        <mat-error>Name is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Arabic Name</mat-label>
-                        <input matInput formControlName="name_ara">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Description</mat-label>
-                        <textarea matInput formControlName="description" rows="3"></textarea>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Arabic Description</mat-label>
-                        <textarea matInput formControlName="description_ara" rows="3"></textarea>
-                      </mat-form-field>
-                    </div>
-                  </div>
-
-                  <!-- Category Properties -->
-                  <div *ngSwitchCase="'category'">
-                    <mat-checkbox formControlName="useExisting" class="use-existing-checkbox">
-                      Use existing category
-                    </mat-checkbox>
-
-                    <div *ngIf="propertiesForm.get('useExisting')?.value">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Select Existing Category</mat-label>
-                        <mat-select formControlName="existingCategoryId" (selectionChange)="onExistingCategorySelected($event.value)" (openedChange)="onExistingCategoryDropdownOpen($event)">
-                          <mat-option *ngFor="let category of existingCategories" [value]="category.id">
-                            {{ category.name }}
-                          </mat-option>
-                          <mat-option *ngIf="existingCategories.length === 0" [value]="" disabled>
-                            No existing categories available
-                          </mat-option>
-                        </mat-select>
-                      </mat-form-field>
-                    </div>
-
-                    <div *ngIf="!propertiesForm.get('useExisting')?.value">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Name</mat-label>
-                        <input matInput formControlName="name" required>
-                        <mat-error>Name is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Arabic Name</mat-label>
-                        <input matInput formControlName="name_ara">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Code</mat-label>
-                        <input matInput formControlName="code">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Description</mat-label>
-                        <textarea matInput formControlName="description" rows="3"></textarea>
-                      </mat-form-field>
-
-                      <mat-checkbox formControlName="is_repeatable">
-                        Is Repeatable
-                      </mat-checkbox>
-                    </div>
-                  </div>
-
-                  <!-- Field Properties -->
-                  <div *ngSwitchCase="'field'">
-                    <mat-checkbox formControlName="useExisting" class="use-existing-checkbox">
-                      Use existing field
-                    </mat-checkbox>
-
-                    <div *ngIf="propertiesForm.get('useExisting')?.value">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Select Existing Field</mat-label>
-                        <mat-select formControlName="existingFieldId" (selectionChange)="onExistingFieldSelected($event.value)" (openedChange)="onExistingFieldDropdownOpen($event)">
-                          <mat-option *ngFor="let field of existingFields" [value]="field.id">
-                            {{ field._field_display_name }} ({{ field._field_name }})
-                          </mat-option>
-                          <mat-option *ngIf="existingFields.length === 0" [value]="" disabled>
-                            No existing fields available
-                          </mat-option>
-                        </mat-select>
-                      </mat-form-field>
-                    </div>
-
-                    <div *ngIf="!propertiesForm.get('useExisting')?.value">
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Field Name</mat-label>
-                        <input matInput formControlName="_field_name" required>
-                        <mat-hint>Internal field name (snake_case)</mat-hint>
-                        <mat-error>Field name is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Display Name</mat-label>
-                        <input matInput formControlName="_field_display_name" required>
-                        <mat-error>Display name is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Arabic Display Name</mat-label>
-                        <input matInput formControlName="_field_display_name_ara">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Field Type</mat-label>
-                        <mat-select formControlName="_field_type" required (openedChange)="onFieldTypeDropdownOpen($event)">
-                          <mat-option *ngFor="let type of fieldTypes" [value]="type.id">
-                            {{ type.name }} ({{ type.name_ara }})
-                          </mat-option>
-                          <mat-option *ngIf="fieldTypes.length === 0" [value]="" disabled>
-                            {{ isLoading ? 'Loading field types...' : 'No field types available' }}
-                          </mat-option>
-                        </mat-select>
-                        <mat-error>Field type is required</mat-error>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Sequence</mat-label>
-                        <input matInput type="number" formControlName="_sequence">
-                      </mat-form-field>
-
-                      <div class="checkbox-group">
-                        <mat-checkbox formControlName="_mandatory">Mandatory</mat-checkbox>
-                        <mat-checkbox formControlName="_is_hidden">Hidden</mat-checkbox>
-                        <mat-checkbox formControlName="_is_disabled">Disabled</mat-checkbox>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Condition Properties -->
-                  <div *ngSwitchCase="'condition'">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Name</mat-label>
-                      <input matInput formControlName="name" required>
-                      <mat-error>Name is required</mat-error>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Description</mat-label>
-                      <textarea matInput formControlName="description" rows="2"></textarea>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Target Field</mat-label>
-                      <input matInput formControlName="target_field">
-                      <mat-hint>Field to show when condition is true</mat-hint>
-                    </mat-form-field>
-                  </div>
-
-                  <!-- End Properties -->
-                  <div *ngSwitchCase="'end'">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Name</mat-label>
-                      <input matInput formControlName="name" required>
-                      <mat-error>Name is required</mat-error>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Action</mat-label>
-                      <mat-select formControlName="action">
-                        <mat-option value="submit">Submit Form</mat-option>
-                        <mat-option value="save_draft">Save as Draft</mat-option>
-                        <mat-option value="cancel">Cancel</mat-option>
-                        <mat-option value="redirect">Redirect</mat-option>
-                      </mat-select>
-                    </mat-form-field>
-                  </div>
-                </ng-container>
-              </div>
-            </mat-tab>
-
-            <!-- Advanced Properties Tab (for Field) -->
-            <mat-tab label="Validation" *ngIf="selectedElement.type === 'field' && !propertiesForm.get('useExisting')?.value">
-              <div class="tab-content">
-                <!-- Text Validation -->
-                <mat-expansion-panel>
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>Text Validation</mat-panel-title>
-                  </mat-expansion-panel-header>
-
-                  <div class="validation-content">
-                    <div class="form-row">
-                      <mat-form-field appearance="outline">
-                        <mat-label>Min Length</mat-label>
-                        <input matInput type="number" formControlName="_min_length">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline">
-                        <mat-label>Max Length</mat-label>
-                        <input matInput type="number" formControlName="_max_length">
-                      </mat-form-field>
-                    </div>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Regex Pattern</mat-label>
-                      <input matInput formControlName="_regex_pattern">
-                      <mat-hint>Regular expression for validation</mat-hint>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Allowed Characters</mat-label>
-                      <input matInput formControlName="_allowed_characters">
-                      <mat-hint>Allowed character set</mat-hint>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Forbidden Words</mat-label>
-                      <textarea matInput formControlName="_forbidden_words" rows="2"></textarea>
-                      <mat-hint>Comma-separated list of forbidden words</mat-hint>
-                    </mat-form-field>
-                  </div>
-                </mat-expansion-panel>
-
-                <!-- Number Validation -->
-                <mat-expansion-panel>
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>Number Validation</mat-panel-title>
-                  </mat-expansion-panel-header>
-
-                  <div class="validation-content">
-                    <div class="form-row">
-                      <mat-form-field appearance="outline">
-                        <mat-label>Min Value</mat-label>
-                        <input matInput type="number" formControlName="_value_greater_than">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline">
-                        <mat-label>Max Value</mat-label>
-                        <input matInput type="number" formControlName="_value_less_than">
-                      </mat-form-field>
-                    </div>
-
-                    <div class="form-row">
-                      <mat-form-field appearance="outline">
-                        <mat-label>Precision</mat-label>
-                        <input matInput type="number" formControlName="_precision">
-                        <mat-hint>Decimal places</mat-hint>
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline">
-                        <mat-label>Default Value</mat-label>
-                        <input matInput formControlName="_default_value">
-                      </mat-form-field>
-                    </div>
-
-                    <div class="checkbox-group">
-                      <mat-checkbox formControlName="_integer_only">Integer Only</mat-checkbox>
-                      <mat-checkbox formControlName="_positive_only">Positive Only</mat-checkbox>
-                      <mat-checkbox formControlName="_unique">Unique Value</mat-checkbox>
-                    </div>
-                  </div>
-                </mat-expansion-panel>
-
-                <!-- Date Validation -->
-                <mat-expansion-panel>
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>Date Validation</mat-panel-title>
-                  </mat-expansion-panel-header>
-
-                  <div class="validation-content">
-                    <div class="form-row">
-                      <mat-form-field appearance="outline">
-                        <mat-label>Min Date</mat-label>
-                        <input matInput type="date" formControlName="_date_greater_than">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline">
-                        <mat-label>Max Date</mat-label>
-                        <input matInput type="date" formControlName="_date_less_than">
-                      </mat-form-field>
-                    </div>
-
-                    <div class="checkbox-group">
-                      <mat-checkbox formControlName="_future_only">Future Only</mat-checkbox>
-                      <mat-checkbox formControlName="_past_only">Past Only</mat-checkbox>
-                    </div>
-                  </div>
-                </mat-expansion-panel>
-
-                <!-- File Validation -->
-                <mat-expansion-panel>
-                  <mat-expansion-panel-header>
-                    <mat-panel-title>File Validation</mat-panel-title>
-                  </mat-expansion-panel-header>
-
-                  <div class="validation-content">
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Allowed File Types</mat-label>
-                      <input matInput formControlName="_file_types">
-                      <mat-hint>e.g., .pdf,.doc,.jpg</mat-hint>
-                    </mat-form-field>
-
-                    <mat-form-field appearance="outline" class="full-width">
-                      <mat-label>Max File Size (bytes)</mat-label>
-                      <input matInput type="number" formControlName="_max_file_size">
-                    </mat-form-field>
-
-                    <div class="form-row">
-                      <mat-form-field appearance="outline">
-                        <mat-label>Max Image Width</mat-label>
-                        <input matInput type="number" formControlName="_image_max_width">
-                      </mat-form-field>
-
-                      <mat-form-field appearance="outline">
-                        <mat-label>Max Image Height</mat-label>
-                        <input matInput type="number" formControlName="_image_max_height">
-                      </mat-form-field>
-                    </div>
-                  </div>
-                </mat-expansion-panel>
-              </div>
-            </mat-tab>
-
-            <!-- Condition Logic Tab (for Condition) -->
-            <mat-tab label="Logic" *ngIf="selectedElement.type === 'condition'">
-              <div class="tab-content">
-                <app-condition-builder
-                  [conditionLogic]="propertiesForm.get('condition_logic')?.value || []"
-                  (conditionChanged)="onConditionLogicChanged($event)">
-                </app-condition-builder>
-              </div>
-            </mat-tab>
-          </mat-tab-group>
-
-          <!-- Start Element (No Tabs) -->
-          <div *ngIf="selectedElement.type === 'start'" class="start-properties">
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>Name</mat-label>
-              <input matInput formControlName="name" required>
-              <mat-error>Name is required</mat-error>
-            </mat-form-field>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="action-buttons">
-            <button mat-raised-button color="primary" type="submit" [disabled]="propertiesForm.invalid || isLoading">
-              <mat-icon>save</mat-icon>
-              Save Properties
-            </button>
-
-            <button mat-button type="button" (click)="resetForm()" [disabled]="isLoading">
-              <mat-icon>refresh</mat-icon>
-              Reset
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Connection Properties -->
-      <div *ngIf="selectedConnection" class="connection-properties">
-        <div class="panel-header">
-          <h3>
-            <mat-icon>arrow_forward</mat-icon>
-            Connection Properties
-          </h3>
-          <p>Configure connection settings</p>
-        </div>
-
-        <div class="connection-info">
-          <p><strong>Source:</strong> {{ getSourceElementName() }}</p>
-          <p><strong>Target:</strong> {{ getTargetElementName() }}</p>
-        </div>
-
-        <button mat-raised-button color="warn" (click)="deleteConnection()">
-          <mat-icon>delete</mat-icon>
-          Delete Connection
-        </button>
-      </div>
-    </div>
-
-    <!-- No Selection State -->
-    <div *ngIf="!selectedElement && !selectedConnection" class="no-selection">
-      <mat-icon>info</mat-icon>
-      <h3>No Element Selected</h3>
-      <p>Select an element or connection to view and edit its properties.</p>
-    </div>
-  `,
-  styles: [`
-    .properties-panel {
-      height: 100%;
-      overflow-y: auto;
-      padding: 16px;
-    }
-
-    .panel-header {
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .panel-header h3 {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      margin: 0 0 8px 0;
-      color: #333;
-    }
-
-    .panel-header p {
-      margin: 0;
-      color: #666;
-      font-size: 14px;
-    }
-
-    .loading-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 20px;
-      text-align: center;
-    }
-
-    .loading-container p {
-      margin-top: 16px;
-      color: #666;
-    }
-
-    .error-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      text-align: center;
-      background: #ffebee;
-      border-radius: 4px;
-      margin-bottom: 20px;
-    }
-
-    .error-container p {
-      margin: 8px 0;
-      color: #c62828;
-    }
-
-    .error-actions {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .debug-info {
-      margin: 16px 0;
-      font-size: 12px;
-    }
-
-    .debug-info details {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 4px;
-      padding: 8px;
-    }
-
-    .debug-info summary {
-      cursor: pointer;
-      font-weight: 500;
-      color: #6c757d;
-      padding: 4px;
-    }
-
-    .debug-info summary:hover {
-      background: #e9ecef;
-    }
-
-    .debug-content {
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid #e9ecef;
-    }
-
-    .debug-content ul {
-      margin: 8px 0;
-      padding-left: 20px;
-    }
-
-    .debug-content li {
-      margin: 4px 0;
-    }
-
-    .debug-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .tab-content {
-      padding: 16px 0;
-    }
-
-    .full-width {
-      width: 100%;
-      margin-bottom: 16px;
-    }
-
-    .use-existing-checkbox {
-      margin-bottom: 16px;
-      font-weight: 500;
-    }
-
-    .form-row {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .form-row mat-form-field {
-      flex: 1;
-    }
-
-    .checkbox-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin: 16px 0;
-    }
-
-    .validation-content {
-      padding: 16px 0;
-    }
-
-    .action-buttons {
-      display: flex;
-      gap: 12px;
-      margin-top: 24px;
-      padding-top: 16px;
-      border-top: 1px solid #e0e0e0;
-    }
-
-    .start-properties {
-      padding: 16px 0;
-    }
-
-    .connection-properties {
-      padding: 16px 0;
-    }
-
-    .connection-info {
-      background: #f5f5f5;
-      padding: 16px;
-      border-radius: 4px;
-      margin: 16px 0;
-    }
-
-    .connection-info p {
-      margin: 4px 0;
-    }
-
-    .no-selection {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      text-align: center;
-      color: #666;
-    }
-
-    .no-selection mat-icon {
-      font-size: 48px;
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
-      color: #ccc;
-    }
-
-    .no-selection h3 {
-      margin: 0 0 8px 0;
-    }
-
-    .no-selection p {
-      margin: 0;
-      max-width: 200px;
-    }
-
-    @media (max-width: 768px) {
-      .properties-panel {
-        padding: 12px;
-      }
-
-      .form-row {
-        flex-direction: column;
-        gap: 8px;
-      }
-
-      .action-buttons {
-        flex-direction: column;
-      }
-    }
-  `]
+  templateUrl:"properties-panel.component.html",
+  styleUrls: ['properties-panel.component.css']
 })
 export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedElement?: WorkflowElement;
@@ -799,6 +63,11 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   // Loading and error states
   isLoading = false;
   errorMessage = '';
+
+  // Auto-save status
+  showAutoSaveStatus = false;
+  autoSaveStatus: 'saved' | 'saving' | 'error' = 'saved';
+  private autoSaveTimeout?: any;
 
   // Lookup Data
   services: LookupItem[] = [];
@@ -822,6 +91,22 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   ngOnInit(): void {
     // Don't auto-load data here, wait for element selection
     console.log('Properties panel initialized');
+
+    // Set up auto-save on form changes
+    this.setupAutoSave();
+  }
+
+  private setupAutoSave(): void {
+    this.propertiesForm.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((formValue) => {
+        // Only auto-save if we have a selected element, form is valid, and auto-save is enabled
+        if (this.selectedElement &&
+          this.propertiesForm.valid &&
+          this.showAutoSaveStatus) { // Only save when auto-save status is visible (form is ready)
+          this.autoSaveProperties(formValue);
+        }
+      });
   }
 
   // Ensure data is loaded when needed
@@ -919,6 +204,15 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['selectedElement']) {
+      // Cancel any pending auto-save from previous element
+      if (this.autoSaveTimeout) {
+        clearTimeout(this.autoSaveTimeout);
+        this.autoSaveTimeout = undefined;
+      }
+
+      // Hide auto-save status when switching elements
+      this.showAutoSaveStatus = false;
+
       // Ensure data is loaded before updating form
       this.ensureDataLoaded().then(() => {
         this.updateFormForElement();
@@ -929,6 +223,11 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+
+    // Clear auto-save timeout
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+    }
   }
 
   private initializeForm(): void {
@@ -1132,20 +431,55 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private updateFormForElement(): void {
-    if (!this.selectedElement) return;
+    if (!this.selectedElement) {
+      // Clear form if no element selected
+      this.propertiesForm.reset();
+      this.showAutoSaveStatus = false;
+      return;
+    }
 
-    const properties = this.selectedElement.properties;
+    console.log('Updating form for element:', this.selectedElement.id, this.selectedElement.properties);
 
-    // Reset form
+    // Temporarily disable auto-save while updating form
+    this.showAutoSaveStatus = false;
+
+    // Cancel any pending auto-save
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+      this.autoSaveTimeout = undefined;
+    }
+
+    // Get the current element's properties (ensure we have a clean copy)
+    const properties = JSON.parse(JSON.stringify(this.selectedElement.properties || {})); // Deep copy
+
+    // Completely reset the form first
     this.propertiesForm.reset();
 
-    // Set common properties
-    this.propertiesForm.patchValue({
-      name: properties.name || '',
-      description: properties.description || ''
-    });
+    // Wait for form to fully reset before setting new values
+    setTimeout(() => {
+      // Set common properties with defaults
+      this.propertiesForm.patchValue({
+        name: properties.name || '',
+        description: properties.description || ''
+      });
 
-    // Set element-specific properties
+      // Set element-specific properties
+      this.setElementSpecificProperties(properties);
+
+      // Update validators based on element type
+      this.updateValidators();
+
+      // Re-enable auto-save status after form is populated
+      setTimeout(() => {
+        this.showAutoSaveStatus = true;
+        this.autoSaveStatus = 'saved';
+      }, 200);
+    }, 50);
+  }
+
+  private setElementSpecificProperties(properties: any): void {
+    if (!this.selectedElement) return;
+
     switch (this.selectedElement.type) {
       case ElementType.PAGE:
         this.propertiesForm.patchValue({
@@ -1164,6 +498,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           useExisting: properties.useExisting || false,
           existingCategoryId: properties.existingCategoryId || '',
           code: properties.code || '',
+          name_ara: properties.name_ara || '',
           is_repeatable: properties.is_repeatable || false
         });
         break;
@@ -1217,9 +552,87 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         });
         break;
     }
+  }
 
-    // Update validators based on element type
-    this.updateValidators();
+  private autoSaveProperties(formValue: any): void {
+    // Guard against saving when no element is selected
+    if (!this.selectedElement) {
+      console.log('Auto-save cancelled: No element selected');
+      return;
+    }
+
+    // Guard against saving invalid forms
+    if (!this.propertiesForm.valid) {
+      console.log('Auto-save cancelled: Form is invalid');
+      return;
+    }
+
+    // Store the current element ID to prevent race conditions
+    const currentElementId = this.selectedElement.id;
+
+    // Clear existing timeout
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+    }
+
+    // Show saving status
+    this.autoSaveStatus = 'saving';
+    this.showAutoSaveStatus = true;
+
+    // Debounce auto-save by 500ms
+    this.autoSaveTimeout = setTimeout(() => {
+      // Double-check that we're still on the same element
+      if (!this.selectedElement || this.selectedElement.id !== currentElementId) {
+        console.log('Auto-save cancelled: Element changed during timeout');
+        return;
+      }
+
+      try {
+        // Clean up the form value based on element type
+        const cleanedProperties = this.cleanFormValue(formValue);
+
+        console.log('Auto-saving for element:', currentElementId, cleanedProperties);
+
+        this.elementUpdated.emit({
+          id: currentElementId,
+          properties: cleanedProperties
+        });
+
+        this.autoSaveStatus = 'saved';
+
+        // Hide status after 2 seconds
+        setTimeout(() => {
+          this.showAutoSaveStatus = false;
+        }, 2000);
+
+      } catch (error) {
+        console.error('Auto-save error:', error);
+        this.autoSaveStatus = 'error';
+
+        // Show error for longer
+        setTimeout(() => {
+          this.showAutoSaveStatus = false;
+        }, 5000);
+      }
+    }, 500);
+  }
+
+  getAutoSaveIcon(): string {
+    switch (this.autoSaveStatus) {
+      case 'saving': return 'sync';
+      case 'saved': return 'check_circle';
+      case 'error': return 'error';
+      default: return 'check_circle';
+    }
+  }
+
+  getAutoSaveMessage(): string {
+    switch (this.autoSaveStatus) {
+      case 'saving': return 'Saving...';
+      case 'saved': return 'Changes saved';
+      case 'error': return 'Save failed';
+      default: return 'Changes saved';
+    }
   }
 
   private updateValidators(): void {
@@ -1300,49 +713,44 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   onConditionLogicChanged(conditionLogic: any[]): void {
-    this.propertiesForm.patchValue({ condition_logic: conditionLogic });
-  }
+    // Update the form control with a copy of the condition logic
+    const currentElement = this.selectedElement;
+    if (currentElement && currentElement.type === ElementType.CONDITION) {
+      console.log('Condition logic changed for element:', currentElement.id, conditionLogic);
 
-  saveProperties(): void {
-    if (this.propertiesForm.valid && this.selectedElement) {
-      const formValue = this.propertiesForm.value;
-
-      // Clean up the form value based on element type
-      const cleanedProperties = this.cleanFormValue(formValue);
-
-      this.elementUpdated.emit({
-        id: this.selectedElement.id,
-        properties: cleanedProperties
-      });
-
-      this.snackBar.open('Properties saved', 'Close', { duration: 2000 });
-    } else {
-      this.snackBar.open('Please fix validation errors', 'Close', { duration: 3000 });
+      // Create a deep copy to prevent reference sharing
+      const conditionLogicCopy = JSON.parse(JSON.stringify(conditionLogic));
+      this.propertiesForm.patchValue({ condition_logic: conditionLogicCopy });
     }
   }
 
   private cleanFormValue(formValue: any): any {
-    if (!this.selectedElement) return formValue;
+    if (!this.selectedElement) return {};
 
+    // Create a clean copy to avoid reference sharing
     const cleaned: any = {};
 
     // Include common properties
-    if (formValue.name) cleaned.name = formValue.name;
-    if (formValue.description) cleaned.description = formValue.description;
+    if (formValue.name !== null && formValue.name !== undefined) {
+      cleaned.name = formValue.name;
+    }
+    if (formValue.description !== null && formValue.description !== undefined) {
+      cleaned.description = formValue.description;
+    }
 
     // Include element-specific properties
     switch (this.selectedElement.type) {
       case ElementType.PAGE:
         if (formValue.useExisting) {
           cleaned.useExisting = true;
-          cleaned.existingPageId = formValue.existingPageId;
+          if (formValue.existingPageId) {
+            cleaned.existingPageId = formValue.existingPageId;
+          }
         } else {
-          Object.keys(formValue).forEach(key => {
-            if (key.startsWith('service') || key.startsWith('sequence') ||
-              key.startsWith('applicant') || key.includes('ara')) {
-              if (formValue[key] !== null && formValue[key] !== '') {
-                cleaned[key] = formValue[key];
-              }
+          // Only include properties that have values
+          ['service', 'sequence_number', 'applicant_type', 'name_ara', 'description_ara'].forEach(key => {
+            if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
+              cleaned[key] = formValue[key];
             }
           });
         }
@@ -1351,10 +759,12 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       case ElementType.CATEGORY:
         if (formValue.useExisting) {
           cleaned.useExisting = true;
-          cleaned.existingCategoryId = formValue.existingCategoryId;
+          if (formValue.existingCategoryId) {
+            cleaned.existingCategoryId = formValue.existingCategoryId;
+          }
         } else {
-          ['code', 'is_repeatable'].forEach(key => {
-            if (formValue[key] !== null && formValue[key] !== '') {
+          ['code', 'name_ara', 'is_repeatable'].forEach(key => {
+            if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
               cleaned[key] = formValue[key];
             }
           });
@@ -1364,37 +774,49 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       case ElementType.FIELD:
         if (formValue.useExisting) {
           cleaned.useExisting = true;
-          cleaned.existingFieldId = formValue.existingFieldId;
+          if (formValue.existingFieldId) {
+            cleaned.existingFieldId = formValue.existingFieldId;
+          }
         } else {
+          // Include all field properties that have values
           Object.keys(formValue).forEach(key => {
-            if (key.startsWith('_')) {
-              if (formValue[key] !== null && formValue[key] !== '') {
-                cleaned[key] = formValue[key];
-              }
+            if (key.startsWith('_') && formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
+              cleaned[key] = formValue[key];
             }
           });
         }
         break;
 
       case ElementType.CONDITION:
-        ['target_field', 'condition_logic'].forEach(key => {
-          if (formValue[key] !== null && formValue[key] !== '') {
+        ['target_field'].forEach(key => {
+          if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
             cleaned[key] = formValue[key];
           }
         });
+
+        // Special handling for condition logic array
+        if (formValue.condition_logic && Array.isArray(formValue.condition_logic)) {
+          cleaned.condition_logic = [...formValue.condition_logic]; // Create a copy
+        }
         break;
 
       case ElementType.END:
-        if (formValue.action) cleaned.action = formValue.action;
+        if (formValue.action) {
+          cleaned.action = formValue.action;
+        }
         break;
     }
 
+    console.log('Cleaned form value for', this.selectedElement.type, ':', cleaned);
     return cleaned;
   }
 
   resetForm(): void {
-    this.updateFormForElement();
-    this.snackBar.open('Form reset', 'Close', { duration: 2000 });
+    if (this.selectedElement) {
+      console.log('Resetting form for element:', this.selectedElement.id);
+      this.updateFormForElement();
+      this.snackBar.open('Form reset to saved values', 'Close', { duration: 2000 });
+    }
   }
 
   deleteConnection(): void {

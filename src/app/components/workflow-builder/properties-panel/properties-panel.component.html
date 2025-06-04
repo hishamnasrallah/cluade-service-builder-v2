@@ -1,0 +1,542 @@
+<div class="properties-panel" *ngIf="selectedElement || selectedConnection">
+  <!-- Element Properties -->
+  <div *ngIf="selectedElement" class="element-properties">
+    <div class="properties-content">
+      <div class="panel-header">
+        <div class="header-content">
+          <div class="header-text">
+            <h3>
+              <mat-icon>{{ getElementIcon() }}</mat-icon>
+              {{ getElementTitle() }}
+            </h3>
+            <p>{{ getElementDescription() }}</p>
+          </div>
+          <button mat-icon-button
+                  (click)="resetForm()"
+                  [disabled]="isLoading"
+                  title="Reset to saved values"
+                  class="reset-button">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <!-- Scrollable Content Area -->
+      <div class="scrollable-content">
+        <!-- Loading Spinner -->
+        <div *ngIf="isLoading" class="loading-container">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading data...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div *ngIf="errorMessage" class="error-container">
+          <mat-icon color="warn">error</mat-icon>
+          <p>{{ errorMessage }}</p>
+          <div class="error-actions">
+            <button mat-button (click)="loadLookupData()" color="primary">
+              <mat-icon>refresh</mat-icon>
+              Retry Loading Data
+            </button>
+            <button mat-button (click)="testApiConnection()" color="accent">
+              <mat-icon>wifi</mat-icon>
+              Test API Connection
+            </button>
+            <button mat-button (click)="forceReloadData()">
+              <mat-icon>refresh</mat-icon>
+              Force Reload All
+            </button>
+          </div>
+        </div>
+
+        <!-- Debug Info (only show in development) -->
+        <div class="debug-info" *ngIf="!isLoading && !errorMessage">
+          <details>
+            <summary>Debug Info (Click to expand)</summary>
+            <div class="debug-content">
+              <p><strong>API Configuration:</strong></p>
+              <ul>
+                <li>Base URL: {{ apiService.getBaseUrl() || 'Not configured' }}</li>
+                <li>Configured: {{ apiService.isConfigured() ? 'Yes' : 'No' }}</li>
+              </ul>
+
+              <p><strong>Data Status:</strong></p>
+              <ul>
+                <li>Services: {{ services.length }} loaded</li>
+                <li>Flow Steps: {{ flowSteps.length }} loaded</li>
+                <li>Applicant Types: {{ applicantTypes.length }} loaded</li>
+                <li>Field Types: {{ fieldTypes.length }} loaded</li>
+                <li>Existing Pages: {{ existingPages.length }} loaded</li>
+                <li>Existing Categories: {{ existingCategories.length }} loaded</li>
+                <li>Existing Fields: {{ existingFields.length }} loaded</li>
+              </ul>
+
+              <div class="debug-actions">
+                <button mat-button (click)="testApiConnection()" size="small">
+                  <mat-icon>wifi</mat-icon>
+                  Test API
+                </button>
+                <button mat-button (click)="forceReloadData()" size="small">
+                  <mat-icon>refresh</mat-icon>
+                  Reload Data
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <form [formGroup]="propertiesForm" *ngIf="!isLoading && !errorMessage">
+          <mat-tab-group *ngIf="selectedElement.type !== 'start'" animationDuration="200ms">
+            <!-- Basic Properties Tab -->
+            <mat-tab label="Basic">
+              <div class="tab-content">
+                <ng-container [ngSwitch]="selectedElement.type">
+
+                  <!-- Page Properties -->
+                  <div *ngSwitchCase="'page'">
+                    <mat-checkbox formControlName="useExisting" class="use-existing-checkbox">
+                      Use existing page
+                    </mat-checkbox>
+
+                    <div *ngIf="propertiesForm.get('useExisting')?.value">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Select Existing Page</mat-label>
+                        <mat-select formControlName="existingPageId" (selectionChange)="onExistingPageSelected($event.value)" (openedChange)="onExistingPageDropdownOpen($event)">
+                          <mat-option *ngFor="let page of existingPages" [value]="page.id">
+                            {{ page.name }} - {{ getServiceName(page.service) }}
+                          </mat-option>
+                          <mat-option *ngIf="existingPages.length === 0" [value]="" disabled>
+                            No existing pages available
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <div *ngIf="!propertiesForm.get('useExisting')?.value">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Service</mat-label>
+                        <mat-select formControlName="service" (openedChange)="onServiceDropdownOpen($event)">
+                          <mat-option *ngFor="let service of services" [value]="service.id">
+                            {{ service.name }} ({{ service.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="services.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading services...' : 'No services available' }}
+                          </mat-option>
+                        </mat-select>
+                        <mat-error>Service is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Sequence Number</mat-label>
+                        <mat-select formControlName="sequence_number" (openedChange)="onFlowStepDropdownOpen($event)">
+                          <mat-option *ngFor="let step of flowSteps" [value]="step.id">
+                            {{ step.name }} ({{ step.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="flowSteps.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading flow steps...' : 'No flow steps available' }}
+                          </mat-option>
+                        </mat-select>
+                        <mat-error>Sequence number is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Applicant Type</mat-label>
+                        <mat-select formControlName="applicant_type" (openedChange)="onApplicantTypeDropdownOpen($event)">
+                          <mat-option *ngFor="let type of applicantTypes" [value]="type.id">
+                            {{ type.name }} ({{ type.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="applicantTypes.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading applicant types...' : 'No applicant types available' }}
+                          </mat-option>
+                        </mat-select>
+                        <mat-error>Applicant type is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Name</mat-label>
+                        <input matInput formControlName="name" required>
+                        <mat-error>Name is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Arabic Name</mat-label>
+                        <input matInput formControlName="name_ara">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Description</mat-label>
+                        <textarea matInput formControlName="description" rows="3"></textarea>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Arabic Description</mat-label>
+                        <textarea matInput formControlName="description_ara" rows="3"></textarea>
+                      </mat-form-field>
+                    </div>
+                  </div>
+
+                  <!-- Category Properties -->
+                  <div *ngSwitchCase="'category'">
+                    <mat-checkbox formControlName="useExisting" class="use-existing-checkbox">
+                      Use existing category
+                    </mat-checkbox>
+
+                    <div *ngIf="propertiesForm.get('useExisting')?.value">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Select Existing Category</mat-label>
+                        <mat-select formControlName="existingCategoryId" (selectionChange)="onExistingCategorySelected($event.value)" (openedChange)="onExistingCategoryDropdownOpen($event)">
+                          <mat-option *ngFor="let category of existingCategories" [value]="category.id">
+                            {{ category.name }}
+                          </mat-option>
+                          <mat-option *ngIf="existingCategories.length === 0" [value]="" disabled>
+                            No existing categories available
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <div *ngIf="!propertiesForm.get('useExisting')?.value">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Name</mat-label>
+                        <input matInput formControlName="name" required>
+                        <mat-error>Name is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Arabic Name</mat-label>
+                        <input matInput formControlName="name_ara">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Code</mat-label>
+                        <input matInput formControlName="code">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Description</mat-label>
+                        <textarea matInput formControlName="description" rows="3"></textarea>
+                      </mat-form-field>
+
+                      <mat-checkbox formControlName="is_repeatable">
+                        Is Repeatable
+                      </mat-checkbox>
+                    </div>
+                  </div>
+
+                  <!-- Field Properties -->
+                  <div *ngSwitchCase="'field'">
+                    <mat-checkbox formControlName="useExisting" class="use-existing-checkbox">
+                      Use existing field
+                    </mat-checkbox>
+
+                    <div *ngIf="propertiesForm.get('useExisting')?.value">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Select Existing Field</mat-label>
+                        <mat-select formControlName="existingFieldId" (selectionChange)="onExistingFieldSelected($event.value)" (openedChange)="onExistingFieldDropdownOpen($event)">
+                          <mat-option *ngFor="let field of existingFields" [value]="field.id">
+                            {{ field._field_display_name }} ({{ field._field_name }})
+                          </mat-option>
+                          <mat-option *ngIf="existingFields.length === 0" [value]="" disabled>
+                            No existing fields available
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <div *ngIf="!propertiesForm.get('useExisting')?.value">
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Field Name</mat-label>
+                        <input matInput formControlName="_field_name" required>
+                        <mat-hint>Internal field name (snake_case)</mat-hint>
+                        <mat-error>Field name is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Display Name</mat-label>
+                        <input matInput formControlName="_field_display_name" required>
+                        <mat-error>Display name is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Arabic Display Name</mat-label>
+                        <input matInput formControlName="_field_display_name_ara">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Field Type</mat-label>
+                        <mat-select formControlName="_field_type" required (openedChange)="onFieldTypeDropdownOpen($event)">
+                          <mat-option *ngFor="let type of fieldTypes" [value]="type.id">
+                            {{ type.name }} ({{ type.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="fieldTypes.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading field types...' : 'No field types available' }}
+                          </mat-option>
+                        </mat-select>
+                        <mat-error>Field type is required</mat-error>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Sequence</mat-label>
+                        <input matInput type="number" formControlName="_sequence">
+                      </mat-form-field>
+
+                      <div class="checkbox-group">
+                        <mat-checkbox formControlName="_mandatory">Mandatory</mat-checkbox>
+                        <mat-checkbox formControlName="_is_hidden">Hidden</mat-checkbox>
+                        <mat-checkbox formControlName="_is_disabled">Disabled</mat-checkbox>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Condition Properties -->
+                  <div *ngSwitchCase="'condition'">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Name</mat-label>
+                      <input matInput formControlName="name" required>
+                      <mat-error>Name is required</mat-error>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Description</mat-label>
+                      <textarea matInput formControlName="description" rows="2"></textarea>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Target Field</mat-label>
+                      <input matInput formControlName="target_field">
+                      <mat-hint>Field to show when condition is true</mat-hint>
+                    </mat-form-field>
+                  </div>
+
+                  <!-- End Properties -->
+                  <div *ngSwitchCase="'end'">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Name</mat-label>
+                      <input matInput formControlName="name" required>
+                      <mat-error>Name is required</mat-error>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Action</mat-label>
+                      <mat-select formControlName="action">
+                        <mat-option value="submit">Submit Form</mat-option>
+                        <mat-option value="save_draft">Save as Draft</mat-option>
+                        <mat-option value="cancel">Cancel</mat-option>
+                        <mat-option value="redirect">Redirect</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                </ng-container>
+              </div>
+            </mat-tab>
+
+            <!-- Advanced Properties Tab (for Field) -->
+            <mat-tab label="Validation" *ngIf="selectedElement.type === 'field' && !propertiesForm.get('useExisting')?.value">
+              <div class="tab-content">
+                <!-- Text Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Text Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="validation-content">
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Min Length</mat-label>
+                        <input matInput type="number" formControlName="_min_length">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Length</mat-label>
+                        <input matInput type="number" formControlName="_max_length">
+                      </mat-form-field>
+                    </div>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Regex Pattern</mat-label>
+                      <input matInput formControlName="_regex_pattern">
+                      <mat-hint>Regular expression for validation</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Allowed Characters</mat-label>
+                      <input matInput formControlName="_allowed_characters">
+                      <mat-hint>Allowed character set</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Forbidden Words</mat-label>
+                      <textarea matInput formControlName="_forbidden_words" rows="2"></textarea>
+                      <mat-hint>Comma-separated list of forbidden words</mat-hint>
+                    </mat-form-field>
+                  </div>
+                </mat-expansion-panel>
+
+                <!-- Number Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Number Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="validation-content">
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Min Value</mat-label>
+                        <input matInput type="number" formControlName="_value_greater_than">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Value</mat-label>
+                        <input matInput type="number" formControlName="_value_less_than">
+                      </mat-form-field>
+                    </div>
+
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Precision</mat-label>
+                        <input matInput type="number" formControlName="_precision">
+                        <mat-hint>Decimal places</mat-hint>
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Default Value</mat-label>
+                        <input matInput formControlName="_default_value">
+                      </mat-form-field>
+                    </div>
+
+                    <div class="checkbox-group">
+                      <mat-checkbox formControlName="_integer_only">Integer Only</mat-checkbox>
+                      <mat-checkbox formControlName="_positive_only">Positive Only</mat-checkbox>
+                      <mat-checkbox formControlName="_unique">Unique Value</mat-checkbox>
+                    </div>
+                  </div>
+                </mat-expansion-panel>
+
+                <!-- Date Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Date Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="validation-content">
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Min Date</mat-label>
+                        <input matInput type="date" formControlName="_date_greater_than">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Date</mat-label>
+                        <input matInput type="date" formControlName="_date_less_than">
+                      </mat-form-field>
+                    </div>
+
+                    <div class="checkbox-group">
+                      <mat-checkbox formControlName="_future_only">Future Only</mat-checkbox>
+                      <mat-checkbox formControlName="_past_only">Past Only</mat-checkbox>
+                    </div>
+                  </div>
+                </mat-expansion-panel>
+
+                <!-- File Validation -->
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>File Validation</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <div class="validation-content">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Allowed File Types</mat-label>
+                      <input matInput formControlName="_file_types">
+                      <mat-hint>e.g., .pdf,.doc,.jpg</mat-hint>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Max File Size (bytes)</mat-label>
+                      <input matInput type="number" formControlName="_max_file_size">
+                    </mat-form-field>
+
+                    <div class="form-row">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Image Width</mat-label>
+                        <input matInput type="number" formControlName="_image_max_width">
+                      </mat-form-field>
+
+                      <mat-form-field appearance="outline">
+                        <mat-label>Max Image Height</mat-label>
+                        <input matInput type="number" formControlName="_image_max_height">
+                      </mat-form-field>
+                    </div>
+                  </div>
+                </mat-expansion-panel>
+              </div>
+            </mat-tab>
+
+            <!-- Condition Logic Tab (for Condition) -->
+            <mat-tab label="Logic" *ngIf="selectedElement.type === 'condition'">
+              <div class="tab-content">
+                <app-condition-builder
+                  [conditionLogic]="propertiesForm.get('condition_logic')?.value || []"
+                  (conditionChanged)="onConditionLogicChanged($event)">
+                </app-condition-builder>
+              </div>
+            </mat-tab>
+          </mat-tab-group>
+
+          <!-- Start Element (No Tabs) -->
+          <div *ngIf="selectedElement.type === 'start'" class="start-properties">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Name</mat-label>
+              <input matInput formControlName="name" required>
+              <mat-error>Name is required</mat-error>
+            </mat-form-field>
+          </div>
+        </form>
+      </div>
+
+      <!-- Auto-save Status (Optional) -->
+      <div class="auto-save-status" *ngIf="!isLoading && !errorMessage && showAutoSaveStatus">
+        <div class="status-indicator">
+          <mat-icon [ngClass]="autoSaveStatus">{{ getAutoSaveIcon() }}</mat-icon>
+          <span>{{ getAutoSaveMessage() }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection Properties -->
+  <div *ngIf="selectedConnection" class="connection-properties">
+    <div class="panel-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h3>
+            <mat-icon>arrow_forward</mat-icon>
+            Connection Properties
+          </h3>
+          <p>Configure connection settings</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="scrollable-content">
+      <div class="connection-info">
+        <p><strong>Source:</strong> {{ getSourceElementName() }}</p>
+        <p><strong>Target:</strong> {{ getTargetElementName() }}</p>
+      </div>
+
+      <button mat-raised-button color="warn" (click)="deleteConnection()">
+        <mat-icon>delete</mat-icon>
+        Delete Connection
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- No Selection State -->
+<div *ngIf="!selectedElement && !selectedConnection" class="no-selection">
+  <div class="no-selection-content">
+    <mat-icon>info</mat-icon>
+    <h3>No Element Selected</h3>
+    <p>Select an element or connection to view and edit its properties.</p>
+  </div>
+</div>
