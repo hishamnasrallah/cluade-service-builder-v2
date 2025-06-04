@@ -1,23 +1,33 @@
-// guards/auth.guard.ts
-import { inject } from '@angular/core';
-import { Router } from '@angular/router';
+// guards/auth.guard.ts - Class-based guard for NgModule approach
+import { Injectable } from '@angular/core';
+import { CanActivate, Router, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { ConfigService } from '../services/config.service';
 
-export const AuthGuard = () => {
-  const authService = inject(AuthService);
-  const configService = inject(ConfigService);
-  const router = inject(Router);
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+    private router: Router
+  ) {}
 
-  if (!configService.isConfigured()) {
-    router.navigate(['/config']);
-    return false;
+  canActivate(
+    route: ActivatedRouteSnapshot,
+    state: RouterStateSnapshot
+  ): boolean {
+    if (!this.configService.isConfigured()) {
+      this.router.navigate(['/config']);
+      return false;
+    }
+
+    if (!this.authService.isAuthenticated()) {
+      this.router.navigate(['/login']);
+      return false;
+    }
+
+    return true;
   }
-
-  if (!authService.isAuthenticated()) {
-    router.navigate(['/login']);
-    return false;
-  }
-
-  return true;
-};
+}

@@ -1,13 +1,12 @@
 // components/workflow-builder/workflow-element/workflow-element.component.ts
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
-import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
+import { MatDividerModule } from '@angular/material/divider';
 
 import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../../models/workflow.models';
-import {MatDivider} from '@angular/material/divider';
 
 @Component({
   selector: 'app-workflow-element',
@@ -17,19 +16,18 @@ import {MatDivider} from '@angular/material/divider';
     MatIconModule,
     MatButtonModule,
     MatMenuModule,
-    DragDropModule,
-    MatDivider
+    MatDividerModule
   ],
   template: `
     <div class="workflow-element"
+         #elementRef
          [class.selected]="isSelected"
          [class.connecting]="isConnecting"
+         [class.dragging]="isDragging"
          [style.background-color]="elementConfig?.color"
+         (mousedown)="onMouseDown($event)"
          (click)="onElementClick($event)"
-         (dblclick)="onElementDoubleClick($event)"
-         cdkDrag
-         (cdkDragMoved)="onDragMoved($event)"
-         (cdkDragEnded)="onDragEnded($event)">
+         (dblclick)="onElementDoubleClick($event)">
 
       <!-- Element Header -->
       <div class="element-header">
@@ -40,7 +38,8 @@ import {MatDivider} from '@angular/material/divider';
         <button mat-icon-button
                 class="element-menu-btn"
                 [matMenuTriggerFor]="elementMenu"
-                (click)="$event.stopPropagation()">
+                (click)="$event.stopPropagation()"
+                (mousedown)="$event.stopPropagation()">
           <mat-icon>more_vert</mat-icon>
         </button>
       </div>
@@ -93,7 +92,8 @@ import {MatDivider} from '@angular/material/divider';
         <!-- Input connection point -->
         <div *ngIf="elementConfig?.canReceiveConnections"
              class="connection-point input"
-             (mouseup)="onConnectionEnd($event)">
+             (mouseup)="onConnectionEnd($event)"
+             (mousedown)="$event.stopPropagation()">
           <div class="connection-dot"></div>
         </div>
 
@@ -166,6 +166,13 @@ import {MatDivider} from '@angular/material/divider';
       box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.3);
     }
 
+    .workflow-element.dragging {
+      cursor: grabbing;
+      transform: rotate(2deg);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
     .element-header {
       display: flex;
       align-items: center;
@@ -173,6 +180,11 @@ import {MatDivider} from '@angular/material/divider';
       background: rgba(255, 255, 255, 0.9);
       border-radius: 6px 6px 0 0;
       border-bottom: 1px solid rgba(0,0,0,0.1);
+      cursor: grab;
+    }
+
+    .element-header:active {
+      cursor: grabbing;
     }
 
     .element-icon {
@@ -237,6 +249,7 @@ import {MatDivider} from '@angular/material/divider';
       height: 16px;
       pointer-events: all;
       cursor: crosshair;
+      z-index: 10;
     }
 
     .connection-point.input {
@@ -271,6 +284,7 @@ import {MatDivider} from '@angular/material/divider';
       right: 4px;
       display: flex;
       gap: 2px;
+      pointer-events: none;
     }
 
     .status-icon {
@@ -328,10 +342,13 @@ import {MatDivider} from '@angular/material/divider';
     }
   `]
 })
-export class WorkflowElementComponent implements OnInit {
+export class WorkflowElementComponent implements OnInit, OnDestroy {
+  @ViewChild('elementRef') elementRef!: ElementRef<HTMLDivElement>;
+
   @Input() element!: WorkflowElement;
   @Input() isSelected = false;
   @Input() isConnecting = false;
+  @Input() canvasZoom = 1;
 
   @Output() elementClick = new EventEmitter<MouseEvent>();
   @Output() elementDoubleClick = new EventEmitter<MouseEvent>();
@@ -339,8 +356,15 @@ export class WorkflowElementComponent implements OnInit {
   @Output() connectionStart = new EventEmitter<MouseEvent>();
   @Output() connectionEnd = new EventEmitter<MouseEvent>();
   @Output() deleteElement = new EventEmitter<void>();
+  @Output() dragStart = new EventEmitter<void>();
+  @Output() dragEnd = new EventEmitter<void>();
 
   elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element?.type);
+
+  // Drag state
+  isDragging = false;
+  dragStartPos = { x: 0, y: 0 };
+  elementStartPos = { x: 0, y: 0 };
 
   // Mock data for display purposes (in real app, would come from services)
   private serviceNames: { [key: number]: string } = {
@@ -365,11 +389,68 @@ export class WorkflowElementComponent implements OnInit {
 
   ngOnInit(): void {
     this.elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element.type);
+    this.setupDragListeners();
+  }
+
+  ngOnDestroy(): void {
+    this.removeDragListeners();
+  }
+
+  private setupDragListeners(): void {
+    document.addEventListener('mousemove', this.onMouseMove.bind(this));
+    document.addEventListener('mouseup', this.onMouseUp.bind(this));
+  }
+
+  private removeDragListeners(): void {
+    document.removeEventListener('mousemove', this.onMouseMove.bind(this));
+    document.removeEventListener('mouseup', this.onMouseUp.bind(this));
+  }
+
+  onMouseDown(event: MouseEvent): void {
+    // Don't start drag if clicking on menu button or connection points
+    const target = event.target as HTMLElement;
+    if (target.closest('.element-menu-btn') || target.closest('.connection-point')) {
+      return;
+    }
+
+    // Only allow dragging from header or main element
+    if (target.closest('.element-header') || target.classList.contains('workflow-element')) {
+      this.isDragging = true;
+      this.dragStartPos = { x: event.clientX, y: event.clientY };
+      this.elementStartPos = { ...this.element.position };
+
+      this.dragStart.emit();
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
+  private onMouseMove(event: MouseEvent): void {
+    if (!this.isDragging) return;
+
+    const deltaX = (event.clientX - this.dragStartPos.x) / this.canvasZoom;
+    const deltaY = (event.clientY - this.dragStartPos.y) / this.canvasZoom;
+
+    const newPosition: Position = {
+      x: Math.max(0, this.elementStartPos.x + deltaX),
+      y: Math.max(0, this.elementStartPos.y + deltaY)
+    };
+
+    this.positionChanged.emit(newPosition);
+  }
+
+  private onMouseUp(event: MouseEvent): void {
+    if (this.isDragging) {
+      this.isDragging = false;
+      this.dragEnd.emit();
+    }
   }
 
   onElementClick(event: MouseEvent): void {
-    event.stopPropagation();
-    this.elementClick.emit(event);
+    if (!this.isDragging) {
+      event.stopPropagation();
+      this.elementClick.emit(event);
+    }
   }
 
   onElementDoubleClick(event: MouseEvent): void {
@@ -377,31 +458,15 @@ export class WorkflowElementComponent implements OnInit {
     this.elementDoubleClick.emit(event);
   }
 
-  onDragMoved(event: any): void {
-    // Real-time position update during drag
-    const newPosition: Position = {
-      x: this.element.position.x + event.distance.x,
-      y: this.element.position.y + event.distance.y
-    };
-    this.positionChanged.emit(newPosition);
-  }
-
-  onDragEnded(event: any): void {
-    // Final position update after drag
-    const newPosition: Position = {
-      x: this.element.position.x + event.distance.x,
-      y: this.element.position.y + event.distance.y
-    };
-    this.positionChanged.emit(newPosition);
-  }
-
   onConnectionStart(event: MouseEvent): void {
     event.stopPropagation();
+    event.preventDefault();
     this.connectionStart.emit(event);
   }
 
   onConnectionEnd(event: MouseEvent): void {
     event.stopPropagation();
+    event.preventDefault();
     this.connectionEnd.emit(event);
   }
 
@@ -410,7 +475,6 @@ export class WorkflowElementComponent implements OnInit {
   }
 
   onDuplicate(): void {
-    // Emit element click to select it, then parent component can handle duplication
     this.elementClick.emit(new MouseEvent('click'));
   }
 
@@ -426,14 +490,24 @@ export class WorkflowElementComponent implements OnInit {
         return !!this.element.properties.name;
 
       case ElementType.PAGE:
+        if (this.element.properties.useExisting) {
+          return !!this.element.properties.existingPageId;
+        }
         return !!(this.element.properties.name &&
           this.element.properties.service &&
-          this.element.properties.sequence_number);
+          this.element.properties.sequence_number &&
+          this.element.properties.applicant_type);
 
       case ElementType.CATEGORY:
+        if (this.element.properties.useExisting) {
+          return !!this.element.properties.existingCategoryId;
+        }
         return !!this.element.properties.name;
 
       case ElementType.FIELD:
+        if (this.element.properties.useExisting) {
+          return !!this.element.properties.existingFieldId;
+        }
         return !!(this.element.properties._field_name &&
           this.element.properties._field_display_name &&
           this.element.properties._field_type);
@@ -451,8 +525,10 @@ export class WorkflowElementComponent implements OnInit {
   }
 
   hasWarnings(): boolean {
-    // Add warning logic based on element configuration
     if (this.element.type === ElementType.PAGE && !this.element.properties.description) {
+      return true;
+    }
+    if (this.element.type === ElementType.FIELD && !this.element.properties._mandatory) {
       return true;
     }
     return false;

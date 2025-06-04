@@ -21,32 +21,68 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatListModule } from '@angular/material/list';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
+// Components
 import { AppComponent } from './components/app.component';
 import { LoginComponent } from './components/login/login.component';
 import { ConfigComponent } from './components/config/config.component';
-// import { DashboardComponent } from './components/dashboard/dashboard.component';
-// import { ApplicationDetailComponent } from './components/application-detail/application-detail.component';
-// import { AuthInterceptor } from './interceptors/auth.interceptor';
+import { WorkflowBuilderComponent } from './components/workflow-builder/workflow-builder.component';
+
+// Services and Guards
+import { AuthService } from './services/auth.service';
+import { ConfigService } from './services/config.service';
+import { ApiService } from './services/api.service';
+import { WorkflowService } from './services/workflow.service';
 import { AuthGuard } from './guards/auth.guard';
-import {authInterceptor} from './interceptors/auth.interceptor';
+
+// Create a class-based interceptor wrapper for the functional interceptor
+import { Injectable } from '@angular/core';
+import { HttpRequest, HttpHandler, HttpEvent, HttpInterceptor } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class AuthInterceptorClass implements HttpInterceptor {
+  constructor(private authService: AuthService) {}
+
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = this.authService.getToken();
+
+    if (token) {
+      const authReq = req.clone({
+        headers: req.headers.set('Authorization', `Bearer ${token}`)
+      });
+      return next.handle(authReq);
+    }
+
+    return next.handle(req);
+  }
+}
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'config', component: ConfigComponent },
-  // { path: 'dashboard', component: DashboardComponent, canActivate: [AuthGuard] },
-  // { path: 'app/:appName', component: ApplicationDetailComponent, canActivate: [AuthGuard] },
-  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
-  { path: '**', redirectTo: '/dashboard' }
+  {
+    path: 'workflow',
+    component: WorkflowBuilderComponent,
+    canActivate: [AuthGuard]
+  },
+  { path: '', redirectTo: '/workflow', pathMatch: 'full' },
+  { path: '**', redirectTo: '/workflow' }
 ];
 
 @NgModule({
   declarations: [
-    AppComponent,
-    LoginComponent,
-    ConfigComponent,
-    // DashboardComponent,
-    // ApplicationDetailComponent
+    // AppComponent,
+    // LoginComponent,
+    // ConfigComponent,
+    // WorkflowBuilderComponent
   ],
   imports: [
     BrowserModule,
@@ -55,6 +91,8 @@ const routes: Routes = [
     ReactiveFormsModule,
     BrowserAnimationsModule,
     RouterModule.forRoot(routes),
+
+    // Material Modules
     MatToolbarModule,
     MatButtonModule,
     MatInputModule,
@@ -68,15 +106,29 @@ const routes: Routes = [
     MatSelectModule,
     MatFormFieldModule,
     MatExpansionModule,
-    MatChipsModule
+    MatChipsModule,
+    MatSidenavModule,
+    MatListModule,
+    MatMenuModule,
+    MatCheckboxModule,
+    MatDividerModule,
+    MatTooltipModule,
+    DragDropModule
   ],
   providers: [
+    // Services
+    AuthService,
+    ConfigService,
+    ApiService,
+    WorkflowService,
+    AuthGuard,
+
+    // HTTP Interceptor
     {
       provide: HTTP_INTERCEPTORS,
-      useClass: authInterceptor,
+      useClass: AuthInterceptorClass,
       multi: true
-    },
-    AuthGuard
+    }
   ],
   bootstrap: [AppComponent]
 })

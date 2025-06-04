@@ -90,7 +90,9 @@ import { MinimapComponent } from './minimap/minimap.component';
                  (mousedown)="onCanvasMouseDown($event)"
                  (mousemove)="onCanvasMouseMove($event)"
                  (mouseup)="onCanvasMouseUp($event)"
-                 (wheel)="onCanvasWheel($event)">
+                 (mouseleave)="onCanvasMouseUp($event)"
+                 (wheel)="onCanvasWheel($event)"
+                 (click)="onCanvasClick($event)">
 
               <div class="canvas"
                    #canvas
@@ -109,6 +111,17 @@ import { MinimapComponent } from './minimap/minimap.component';
                     </marker>
                   </defs>
 
+                  <!-- Invisible wider stroke for easier clicking -->
+                  <path *ngFor="let connection of workflow.connections; trackBy: trackConnection"
+                        [attr.d]="getConnectionPath(connection)"
+                        stroke="transparent"
+                        stroke-width="12"
+                        fill="none"
+                        (click)="selectConnection(connection.id, $event)"
+                        class="connection-clickable">
+                  </path>
+
+                  <!-- Visible connection lines -->
                   <path *ngFor="let connection of workflow.connections; trackBy: trackConnection"
                         [attr.d]="getConnectionPath(connection)"
                         stroke="#666"
@@ -116,7 +129,6 @@ import { MinimapComponent } from './minimap/minimap.component';
                         fill="none"
                         marker-end="url(#arrowhead)"
                         [class.selected]="selectedConnectionId === connection.id"
-                        (click)="selectConnection(connection.id)"
                         class="connection-line">
                   </path>
 
@@ -142,12 +154,15 @@ import { MinimapComponent } from './minimap/minimap.component';
                     [element]="element"
                     [isSelected]="selectedElementId === element.id"
                     [isConnecting]="!!connectingFrom"
+                    [canvasZoom]="canvasState.zoom"
                     (elementClick)="selectElement(element.id)"
                     (elementDoubleClick)="editElement(element.id)"
                     (positionChanged)="updateElementPosition(element.id, $event)"
                     (connectionStart)="startConnection(element.id, $event)"
                     (connectionEnd)="endConnection(element.id)"
-                    (deleteElement)="deleteElement(element.id)">
+                    (deleteElement)="deleteElement(element.id)"
+                    (dragStart)="onElementDragStart()"
+                    (dragEnd)="onElementDragEnd()">
                   </app-workflow-element>
                 </div>
               </div>
@@ -182,6 +197,7 @@ import { MinimapComponent } from './minimap/minimap.component';
       height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     .workflow-toolbar {
@@ -227,10 +243,11 @@ import { MinimapComponent } from './minimap/minimap.component';
       cursor: grab;
       background:
         radial-gradient(circle, #ccc 1px, transparent 1px),
-        linear-gradient(#eee 1px, transparent 1px),
-        linear-gradient(90deg, #eee 1px, transparent 1px);
+        linear-gradient(#f0f0f0 1px, transparent 1px),
+        linear-gradient(90deg, #f0f0f0 1px, transparent 1px);
       background-size: 20px 20px, 20px 20px, 20px 20px;
       background-position: 0 0, 0 0, 0 0;
+      user-select: none;
     }
 
     .canvas-wrapper.panning {
@@ -242,30 +259,29 @@ import { MinimapComponent } from './minimap/minimap.component';
       width: 5000px;
       height: 5000px;
       transform-origin: 0 0;
+      pointer-events: none;
     }
 
     .connections-layer {
       position: absolute;
       top: 0;
       left: 0;
-      pointer-events: none;
       z-index: 1;
     }
 
-    .connection-line {
+    .connection-clickable {
       pointer-events: stroke;
       cursor: pointer;
-      transition: stroke-width 0.2s;
     }
 
-    .connection-line:hover {
-      stroke-width: 3;
-      stroke: #007bff;
+    .connection-line {
+      pointer-events: none;
+      transition: stroke-width 0.2s, stroke 0.2s;
     }
 
     .connection-line.selected {
-      stroke: #007bff;
-      stroke-width: 3;
+      stroke: #007bff !important;
+      stroke-width: 3px;
     }
 
     .temp-connection {
@@ -275,6 +291,7 @@ import { MinimapComponent } from './minimap/minimap.component';
     .element-container {
       position: absolute;
       z-index: 2;
+      pointer-events: all;
     }
 
     .minimap-container {
@@ -283,10 +300,12 @@ import { MinimapComponent } from './minimap/minimap.component';
       right: 20px;
       width: 200px;
       height: 150px;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.95);
       border: 1px solid #ddd;
       border-radius: 4px;
       overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
     }
 
     @media (max-width: 768px) {
@@ -329,6 +348,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   // Pan state
   isPanning = false;
   lastPanPoint = { x: 0, y: 0 };
+  isDraggingElement = false;
 
   private destroy$ = new Subject<void>();
 
@@ -349,8 +369,8 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   ngAfterViewInit(): void {
     // Initialize canvas pan to center
-    this.canvasState.panX = -100;
-    this.canvasState.panY = -100;
+    this.canvasState.panX = 100;
+    this.canvasState.panY = 100;
   }
 
   ngOnDestroy(): void {
@@ -363,33 +383,68 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     return `translate(${this.canvasState.panX}px, ${this.canvasState.panY}px) scale(${this.canvasState.zoom})`;
   }
 
+  // Convert screen coordinates to canvas coordinates
+  screenToCanvas(screenX: number, screenY: number): { x: number; y: number } {
+    const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
+    const canvasX = (screenX - rect.left - this.canvasState.panX) / this.canvasState.zoom;
+    const canvasY = (screenY - rect.top - this.canvasState.panY) / this.canvasState.zoom;
+    return { x: canvasX, y: canvasY };
+  }
+
   // Zoom Controls
   zoomIn(): void {
+    const oldZoom = this.canvasState.zoom;
     this.canvasState.zoom = Math.min(this.canvasState.zoom * 1.2, 3);
+
+    // Zoom towards center
+    const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const zoomRatio = this.canvasState.zoom / oldZoom;
+    this.canvasState.panX = centerX - (centerX - this.canvasState.panX) * zoomRatio;
+    this.canvasState.panY = centerY - (centerY - this.canvasState.panY) * zoomRatio;
   }
 
   zoomOut(): void {
+    const oldZoom = this.canvasState.zoom;
     this.canvasState.zoom = Math.max(this.canvasState.zoom / 1.2, 0.2);
+
+    // Zoom towards center
+    const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+
+    const zoomRatio = this.canvasState.zoom / oldZoom;
+    this.canvasState.panX = centerX - (centerX - this.canvasState.panX) * zoomRatio;
+    this.canvasState.panY = centerY - (centerY - this.canvasState.panY) * zoomRatio;
   }
 
   resetZoom(): void {
     this.canvasState.zoom = 1;
-    this.canvasState.panX = -100;
-    this.canvasState.panY = -100;
+    this.canvasState.panX = 100;
+    this.canvasState.panY = 100;
   }
 
   // Mouse Events
   onCanvasMouseDown(event: MouseEvent): void {
-    if (event.target === this.canvasWrapperRef.nativeElement) {
+    // Don't start panning if clicking on an element or if we're connecting
+    if (this.connectingFrom || this.isDraggingElement) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    if (target === this.canvasWrapperRef.nativeElement || target === this.canvasRef.nativeElement) {
       this.isPanning = true;
       this.lastPanPoint = { x: event.clientX, y: event.clientY };
       this.canvasWrapperRef.nativeElement.classList.add('panning');
       event.preventDefault();
+      event.stopPropagation();
     }
   }
 
   onCanvasMouseMove(event: MouseEvent): void {
-    if (this.isPanning) {
+    if (this.isPanning && !this.isDraggingElement) {
       const deltaX = event.clientX - this.lastPanPoint.x;
       const deltaY = event.clientY - this.lastPanPoint.y;
 
@@ -399,17 +454,15 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       this.lastPanPoint = { x: event.clientX, y: event.clientY };
     } else if (this.connectingFrom) {
       // Update temporary connection line
-      const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
-      const x = (event.clientX - rect.left - this.canvasState.panX) / this.canvasState.zoom;
-      const y = (event.clientY - rect.top - this.canvasState.panY) / this.canvasState.zoom;
-
+      const canvasPos = this.screenToCanvas(event.clientX, event.clientY);
       const sourceElement = this.workflow.elements.find(el => el.id === this.connectingFrom);
+
       if (sourceElement) {
         this.tempConnection = this.createCurvedPath(
           sourceElement.position.x + 100,
           sourceElement.position.y + 30,
-          x,
-          y
+          canvasPos.x,
+          canvasPos.y
         );
       }
     }
@@ -422,20 +475,32 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
   }
 
+  onCanvasClick(event: MouseEvent): void {
+    // Clear selection if clicking on empty canvas
+    const target = event.target as HTMLElement;
+    if (target === this.canvasWrapperRef.nativeElement || target === this.canvasRef.nativeElement) {
+      this.selectedElementId = undefined;
+      this.selectedConnectionId = undefined;
+    }
+  }
+
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+    const oldZoom = this.canvasState.zoom;
     const newZoom = Math.max(0.2, Math.min(3, this.canvasState.zoom * zoomFactor));
 
-    // Zoom towards mouse position
-    const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
+    if (newZoom !== oldZoom) {
+      // Zoom towards mouse position
+      const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
 
-    const zoomRatio = newZoom / this.canvasState.zoom;
-    this.canvasState.panX = mouseX - (mouseX - this.canvasState.panX) * zoomRatio;
-    this.canvasState.panY = mouseY - (mouseY - this.canvasState.panY) * zoomRatio;
-    this.canvasState.zoom = newZoom;
+      const zoomRatio = newZoom / oldZoom;
+      this.canvasState.panX = mouseX - (mouseX - this.canvasState.panX) * zoomRatio;
+      this.canvasState.panY = mouseY - (mouseY - this.canvasState.panY) * zoomRatio;
+      this.canvasState.zoom = newZoom;
+    }
   }
 
   // Drag and Drop
@@ -448,14 +513,10 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     const elementType = event.dataTransfer?.getData('text/plain') as ElementType;
 
     if (elementType) {
-      const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-      const position: Position = {
-        x: (event.clientX - rect.left) / this.canvasState.zoom,
-        y: (event.clientY - rect.top) / this.canvasState.zoom
-      };
+      const canvasPos = this.screenToCanvas(event.clientX, event.clientY);
 
       try {
-        const element = this.workflowService.addElement(elementType, position);
+        const element = this.workflowService.addElement(elementType, canvasPos);
         this.selectedElementId = element.id;
         this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
       } catch (error) {
@@ -487,7 +548,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   editElement(elementId: string): void {
     this.selectedElementId = elementId;
-    // Properties panel will handle the editing
   }
 
   updateElementPosition(elementId: string, position: Position): void {
@@ -504,6 +564,15 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     } catch (error) {
       this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
     }
+  }
+
+  // Element drag state management
+  onElementDragStart(): void {
+    this.isDraggingElement = true;
+  }
+
+  onElementDragEnd(): void {
+    this.isDraggingElement = false;
   }
 
   // Connection Management
@@ -526,9 +595,10 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.tempConnection = undefined;
   }
 
-  selectConnection(connectionId: string): void {
+  selectConnection(connectionId: string, event?: MouseEvent): void {
     this.selectedConnectionId = connectionId;
     this.selectedElementId = undefined;
+    event?.stopPropagation();
   }
 
   getConnectionPath(connection: any): string {
@@ -546,8 +616,16 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   private createCurvedPath(x1: number, y1: number, x2: number, y2: number): string {
-    const midX = (x1 + x2) / 2;
-    return `M ${x1} ${y1} Q ${midX} ${y1} ${midX} ${(y1 + y2) / 2} Q ${midX} ${y2} ${x2} ${y2}`;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    // Create a smooth curve
+    const controlPoint1X = x1 + dx * 0.3;
+    const controlPoint1Y = y1;
+    const controlPoint2X = x2 - dx * 0.3;
+    const controlPoint2Y = y2;
+
+    return `M ${x1} ${y1} C ${controlPoint1X} ${controlPoint1Y} ${controlPoint2X} ${controlPoint2Y} ${x2} ${y2}`;
   }
 
   // Workflow Operations
@@ -563,7 +641,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   loadWorkflow(): void {
-    // In a real implementation, this would open a dialog to select a workflow
     this.workflowService.loadWorkflow();
     this.snackBar.open('Workflow loaded', 'Close', { duration: 2000 });
   }
@@ -601,13 +678,15 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   onConnectionUpdated(update: any): void {
-    // Handle connection updates if needed
+    if (update.action === 'delete' && update.connection) {
+      this.workflowService.removeConnection(update.connection.id);
+      this.selectedConnectionId = undefined;
+      this.snackBar.open('Connection deleted', 'Close', { duration: 2000 });
+    }
   }
 
-  updateViewport(viewport: any): void {
-    this.canvasState.panX = viewport.panX;
-    this.canvasState.panY = viewport.panY;
-    this.canvasState.zoom = viewport.zoom;
+  updateViewport(viewport: CanvasState): void {
+    this.canvasState = { ...viewport };
   }
 
   // Track Functions for ngFor
