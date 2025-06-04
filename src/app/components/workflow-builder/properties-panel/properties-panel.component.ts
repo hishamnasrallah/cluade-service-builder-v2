@@ -1,5 +1,5 @@
 // components/workflow-builder/properties-panel/properties-panel.component.ts
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -12,11 +12,20 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Observable, of } from 'rxjs';
+import { Subject, takeUntil, forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 import { WorkflowElement, ElementType } from '../../../models/workflow.models';
-import { ApiService, LookupItem, Page, Category, Field, FieldType } from '../../../services/api.service';
+import {
+  ApiService,
+  LookupItem,
+  Page,
+  Category,
+  Field,
+  FieldType
+} from '../../../services/api.service';
 import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
 
 @Component({
@@ -35,6 +44,7 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
     MatExpansionModule,
     MatChipsModule,
     MatDividerModule,
+    MatProgressSpinnerModule,
     ConditionBuilderComponent
   ],
   template: `
@@ -49,7 +59,69 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
           <p>{{ getElementDescription() }}</p>
         </div>
 
-        <form [formGroup]="propertiesForm" (ngSubmit)="saveProperties()">
+        <!-- Loading Spinner -->
+        <div *ngIf="isLoading" class="loading-container">
+          <mat-spinner diameter="40"></mat-spinner>
+          <p>Loading data...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div *ngIf="errorMessage" class="error-container">
+          <mat-icon color="warn">error</mat-icon>
+          <p>{{ errorMessage }}</p>
+          <div class="error-actions">
+            <button mat-button (click)="loadLookupData()" color="primary">
+              <mat-icon>refresh</mat-icon>
+              Retry Loading Data
+            </button>
+            <button mat-button (click)="testApiConnection()" color="accent">
+              <mat-icon>wifi</mat-icon>
+              Test API Connection
+            </button>
+            <button mat-button (click)="forceReloadData()">
+              <mat-icon>refresh</mat-icon>
+              Force Reload All
+            </button>
+          </div>
+        </div>
+
+        <!-- Debug Info (only show in development) -->
+        <div class="debug-info" *ngIf="!isLoading && !errorMessage">
+          <details>
+            <summary>Debug Info (Click to expand)</summary>
+            <div class="debug-content">
+              <p><strong>API Configuration:</strong></p>
+              <ul>
+                <li>Base URL: {{ apiService.getBaseUrl() || 'Not configured' }}</li>
+                <li>Configured: {{ apiService.isConfigured() ? 'Yes' : 'No' }}</li>
+              </ul>
+
+              <p><strong>Data Status:</strong></p>
+              <ul>
+                <li>Services: {{ services.length }} loaded</li>
+                <li>Flow Steps: {{ flowSteps.length }} loaded</li>
+                <li>Applicant Types: {{ applicantTypes.length }} loaded</li>
+                <li>Field Types: {{ fieldTypes.length }} loaded</li>
+                <li>Existing Pages: {{ existingPages.length }} loaded</li>
+                <li>Existing Categories: {{ existingCategories.length }} loaded</li>
+                <li>Existing Fields: {{ existingFields.length }} loaded</li>
+              </ul>
+
+              <div class="debug-actions">
+                <button mat-button (click)="testApiConnection()" size="small">
+                  <mat-icon>wifi</mat-icon>
+                  Test API
+                </button>
+                <button mat-button (click)="forceReloadData()" size="small">
+                  <mat-icon>refresh</mat-icon>
+                  Reload Data
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <form [formGroup]="propertiesForm" (ngSubmit)="saveProperties()" *ngIf="!isLoading && !errorMessage">
           <mat-tab-group *ngIf="selectedElement.type !== 'start'" animationDuration="200ms">
             <!-- Basic Properties Tab -->
             <mat-tab label="Basic">
@@ -65,9 +137,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
                     <div *ngIf="propertiesForm.get('useExisting')?.value">
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Select Existing Page</mat-label>
-                        <mat-select formControlName="existingPageId" (selectionChange)="onExistingPageSelected($event.value)">
+                        <mat-select formControlName="existingPageId" (selectionChange)="onExistingPageSelected($event.value)" (openedChange)="onExistingPageDropdownOpen($event)">
                           <mat-option *ngFor="let page of existingPages" [value]="page.id">
                             {{ page.name }} - {{ getServiceName(page.service) }}
+                          </mat-option>
+                          <mat-option *ngIf="existingPages.length === 0" [value]="" disabled>
+                            No existing pages available
                           </mat-option>
                         </mat-select>
                       </mat-form-field>
@@ -76,9 +151,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
                     <div *ngIf="!propertiesForm.get('useExisting')?.value">
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Service</mat-label>
-                        <mat-select formControlName="service">
+                        <mat-select formControlName="service" (openedChange)="onServiceDropdownOpen($event)">
                           <mat-option *ngFor="let service of services" [value]="service.id">
                             {{ service.name }} ({{ service.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="services.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading services...' : 'No services available' }}
                           </mat-option>
                         </mat-select>
                         <mat-error>Service is required</mat-error>
@@ -86,9 +164,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Sequence Number</mat-label>
-                        <mat-select formControlName="sequence_number">
+                        <mat-select formControlName="sequence_number" (openedChange)="onFlowStepDropdownOpen($event)">
                           <mat-option *ngFor="let step of flowSteps" [value]="step.id">
                             {{ step.name }} ({{ step.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="flowSteps.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading flow steps...' : 'No flow steps available' }}
                           </mat-option>
                         </mat-select>
                         <mat-error>Sequence number is required</mat-error>
@@ -96,9 +177,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Applicant Type</mat-label>
-                        <mat-select formControlName="applicant_type">
+                        <mat-select formControlName="applicant_type" (openedChange)="onApplicantTypeDropdownOpen($event)">
                           <mat-option *ngFor="let type of applicantTypes" [value]="type.id">
                             {{ type.name }} ({{ type.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="applicantTypes.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading applicant types...' : 'No applicant types available' }}
                           </mat-option>
                         </mat-select>
                         <mat-error>Applicant type is required</mat-error>
@@ -136,9 +220,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
                     <div *ngIf="propertiesForm.get('useExisting')?.value">
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Select Existing Category</mat-label>
-                        <mat-select formControlName="existingCategoryId" (selectionChange)="onExistingCategorySelected($event.value)">
+                        <mat-select formControlName="existingCategoryId" (selectionChange)="onExistingCategorySelected($event.value)" (openedChange)="onExistingCategoryDropdownOpen($event)">
                           <mat-option *ngFor="let category of existingCategories" [value]="category.id">
                             {{ category.name }}
+                          </mat-option>
+                          <mat-option *ngIf="existingCategories.length === 0" [value]="" disabled>
+                            No existing categories available
                           </mat-option>
                         </mat-select>
                       </mat-form-field>
@@ -181,9 +268,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
                     <div *ngIf="propertiesForm.get('useExisting')?.value">
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Select Existing Field</mat-label>
-                        <mat-select formControlName="existingFieldId" (selectionChange)="onExistingFieldSelected($event.value)">
+                        <mat-select formControlName="existingFieldId" (selectionChange)="onExistingFieldSelected($event.value)" (openedChange)="onExistingFieldDropdownOpen($event)">
                           <mat-option *ngFor="let field of existingFields" [value]="field.id">
                             {{ field._field_display_name }} ({{ field._field_name }})
+                          </mat-option>
+                          <mat-option *ngIf="existingFields.length === 0" [value]="" disabled>
+                            No existing fields available
                           </mat-option>
                         </mat-select>
                       </mat-form-field>
@@ -210,9 +300,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Field Type</mat-label>
-                        <mat-select formControlName="_field_type" required>
+                        <mat-select formControlName="_field_type" required (openedChange)="onFieldTypeDropdownOpen($event)">
                           <mat-option *ngFor="let type of fieldTypes" [value]="type.id">
                             {{ type.name }} ({{ type.name_ara }})
+                          </mat-option>
+                          <mat-option *ngIf="fieldTypes.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading field types...' : 'No field types available' }}
                           </mat-option>
                         </mat-select>
                         <mat-error>Field type is required</mat-error>
@@ -437,12 +530,12 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
 
           <!-- Action Buttons -->
           <div class="action-buttons">
-            <button mat-raised-button color="primary" type="submit" [disabled]="propertiesForm.invalid">
+            <button mat-raised-button color="primary" type="submit" [disabled]="propertiesForm.invalid || isLoading">
               <mat-icon>save</mat-icon>
               Save Properties
             </button>
 
-            <button mat-button type="button" (click)="resetForm()">
+            <button mat-button type="button" (click)="resetForm()" [disabled]="isLoading">
               <mat-icon>refresh</mat-icon>
               Reset
             </button>
@@ -504,6 +597,88 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
       margin: 0;
       color: #666;
       font-size: 14px;
+    }
+
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .loading-container p {
+      margin-top: 16px;
+      color: #666;
+    }
+
+    .error-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      text-align: center;
+      background: #ffebee;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+
+    .error-container p {
+      margin: 8px 0;
+      color: #c62828;
+    }
+
+    .error-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .debug-info {
+      margin: 16px 0;
+      font-size: 12px;
+    }
+
+    .debug-info details {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 4px;
+      padding: 8px;
+    }
+
+    .debug-info summary {
+      cursor: pointer;
+      font-weight: 500;
+      color: #6c757d;
+      padding: 4px;
+    }
+
+    .debug-info summary:hover {
+      background: #e9ecef;
+    }
+
+    .debug-content {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .debug-content ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .debug-content li {
+      margin: 4px 0;
+    }
+
+    .debug-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
     }
 
     .tab-content {
@@ -611,7 +786,7 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
     }
   `]
 })
-export class PropertiesPanelComponent implements OnInit, OnChanges {
+export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedElement?: WorkflowElement;
   @Input() selectedConnection?: any;
 
@@ -619,6 +794,11 @@ export class PropertiesPanelComponent implements OnInit, OnChanges {
   @Output() connectionUpdated = new EventEmitter<any>();
 
   propertiesForm!: FormGroup;
+  private destroy$ = new Subject<void>();
+
+  // Loading and error states
+  isLoading = false;
+  errorMessage = '';
 
   // Lookup Data
   services: LookupItem[] = [];
@@ -633,21 +813,122 @@ export class PropertiesPanelComponent implements OnInit, OnChanges {
 
   constructor(
     private fb: FormBuilder,
-    private apiService: ApiService,
+    public apiService: ApiService,
     private snackBar: MatSnackBar
   ) {
     this.initializeForm();
   }
 
   ngOnInit(): void {
-    this.loadLookupData();
-    this.loadExistingData();
+    // Don't auto-load data here, wait for element selection
+    console.log('Properties panel initialized');
+  }
+
+  // Ensure data is loaded when needed
+  private async ensureDataLoaded(): Promise<void> {
+    // Check if we have any data loaded
+    const hasLookupData = this.services.length > 0 || this.flowSteps.length > 0 ||
+      this.applicantTypes.length > 0 || this.fieldTypes.length > 0;
+
+    const hasExistingData = this.existingPages.length > 0 || this.existingCategories.length > 0 ||
+      this.existingFields.length > 0;
+
+    console.log('Data check:', { hasLookupData, hasExistingData });
+
+    if (!hasLookupData) {
+      console.log('Loading lookup data...');
+      await this.loadLookupDataAsync();
+    }
+
+    if (!hasExistingData) {
+      console.log('Loading existing data...');
+      this.loadExistingData(); // This can be async, doesn't need to block
+    }
+  }
+
+  private async loadLookupDataAsync(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.apiService.isConfigured()) {
+        this.errorMessage = 'API not configured. Please configure the base URL first.';
+        console.error('API not configured');
+        reject(new Error('API not configured'));
+        return;
+      }
+
+      this.isLoading = true;
+      this.errorMessage = '';
+      console.log('Starting lookup data load...');
+
+      // Load all lookup data in parallel
+      const loadOperations = {
+        services: this.apiService.getServices().pipe(catchError((error) => {
+          console.error('Services loading failed:', error);
+          return of({ count: 0, results: [] as LookupItem[] });
+        })),
+        flowSteps: this.apiService.getFlowSteps().pipe(catchError((error) => {
+          console.error('Flow steps loading failed:', error);
+          return of({ count: 0, results: [] as LookupItem[] });
+        })),
+        applicantTypes: this.apiService.getApplicantTypes().pipe(catchError((error) => {
+          console.error('Applicant types loading failed:', error);
+          return of({ count: 0, results: [] as LookupItem[] });
+        })),
+        fieldTypes: this.apiService.getFieldTypes().pipe(catchError((error) => {
+          console.error('Field types loading failed:', error);
+          return of({ count: 0, results: [] as FieldType[] });
+        }))
+      };
+
+      forkJoin(loadOperations)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (responses) => {
+            console.log('Raw responses:', responses);
+
+            this.services = responses.services.results || [];
+            this.flowSteps = responses.flowSteps.results || [];
+            this.applicantTypes = responses.applicantTypes.results || [];
+            this.fieldTypes = responses.fieldTypes.results || [];
+
+            this.isLoading = false;
+            console.log('Lookup data loaded successfully:', {
+              services: this.services.length,
+              flowSteps: this.flowSteps.length,
+              applicantTypes: this.applicantTypes.length,
+              fieldTypes: this.fieldTypes.length
+            });
+
+            // Check if we actually got data
+            if (this.services.length === 0 && this.flowSteps.length === 0 &&
+              this.applicantTypes.length === 0 && this.fieldTypes.length === 0) {
+              this.errorMessage = 'No data received from API. Please check your API endpoints.';
+              reject(new Error('No data received'));
+            } else {
+              resolve();
+            }
+          },
+          error: (error) => {
+            this.isLoading = false;
+            this.errorMessage = `Failed to load lookup data: ${error.message}`;
+            console.error('Error loading lookup data:', error);
+            reject(error);
+          }
+        });
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['selectedElement']) {
-      this.updateFormForElement();
+      // Ensure data is loaded before updating form
+      this.ensureDataLoaded().then(() => {
+        this.updateFormForElement();
+      });
     }
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private initializeForm(): void {
@@ -710,6 +991,144 @@ export class PropertiesPanelComponent implements OnInit, OnChanges {
       // End properties
       action: ['submit']
     });
+  }
+
+  loadLookupData(): void {
+    this.loadLookupDataAsync().catch(error => {
+      console.error('Failed to load lookup data:', error);
+    });
+  }
+
+  loadExistingData(): void {
+    if (!this.apiService.isConfigured()) {
+      console.log('API not configured, skipping existing data load');
+      return;
+    }
+
+    console.log('Loading existing data...');
+
+    // Load existing data in parallel (don't block UI if these fail)
+    const existingDataOperations = {
+      pages: this.apiService.getPages().pipe(catchError((error) => {
+        console.error('Pages loading failed:', error);
+        return of({ count: 0, results: [] as Page[] });
+      })),
+      categories: this.apiService.getCategories().pipe(catchError((error) => {
+        console.error('Categories loading failed:', error);
+        return of({ count: 0, results: [] as Category[] });
+      })),
+      fields: this.apiService.getFields().pipe(catchError((error) => {
+        console.error('Fields loading failed:', error);
+        return of({ count: 0, results: [] as Field[] });
+      }))
+    };
+
+    forkJoin(existingDataOperations)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (responses) => {
+          this.existingPages = responses.pages.results || [];
+          this.existingCategories = responses.categories.results || [];
+          this.existingFields = responses.fields.results || [];
+
+          console.log('Existing data loaded successfully:', {
+            pages: this.existingPages.length,
+            categories: this.existingCategories.length,
+            fields: this.existingFields.length
+          });
+        },
+        error: (error) => {
+          console.warn('Some existing data could not be loaded:', error);
+        }
+      });
+  }
+
+  // Debug methods callable from template
+  testApiConnection(): void {
+    console.log('Testing API connection...');
+    console.log('Base URL:', this.apiService.getBaseUrl());
+    console.log('Is configured:', this.apiService.isConfigured());
+
+    if (this.apiService.isConfigured()) {
+      this.apiService.getServices().subscribe({
+        next: (response) => {
+          console.log('API test successful:', response);
+          this.snackBar.open('API connection successful!', 'Close', { duration: 3000 });
+        },
+        error: (error) => {
+          console.error('API test failed:', error);
+          this.snackBar.open(`API test failed: ${error.message}`, 'Close', { duration: 5000 });
+        }
+      });
+    } else {
+      this.snackBar.open('API not configured. Please configure base URL first.', 'Close', { duration: 5000 });
+    }
+  }
+
+  // Force reload all data
+  forceReloadData(): void {
+    console.log('Force reloading all data...');
+    this.services = [];
+    this.flowSteps = [];
+    this.applicantTypes = [];
+    this.fieldTypes = [];
+    this.existingPages = [];
+    this.existingCategories = [];
+    this.existingFields = [];
+
+    this.loadLookupData();
+    this.loadExistingData();
+  }
+
+  // Dropdown open handlers to ensure data is loaded
+  onServiceDropdownOpen(opened: boolean): void {
+    if (opened && this.services.length === 0 && !this.isLoading) {
+      console.log('Service dropdown opened with no data, loading...');
+      this.loadLookupData();
+    }
+  }
+
+  onFlowStepDropdownOpen(opened: boolean): void {
+    if (opened && this.flowSteps.length === 0 && !this.isLoading) {
+      console.log('Flow step dropdown opened with no data, loading...');
+      this.loadLookupData();
+    }
+  }
+
+  onApplicantTypeDropdownOpen(opened: boolean): void {
+    if (opened && this.applicantTypes.length === 0 && !this.isLoading) {
+      console.log('Applicant type dropdown opened with no data, loading...');
+      this.loadLookupData();
+    }
+  }
+
+  onFieldTypeDropdownOpen(opened: boolean): void {
+    if (opened && this.fieldTypes.length === 0 && !this.isLoading) {
+      console.log('Field type dropdown opened with no data, loading...');
+      this.loadLookupData();
+    }
+  }
+
+  // Existing data dropdown handlers
+  onExistingPageDropdownOpen(opened: boolean): void {
+    if (opened && this.existingPages.length === 0) {
+      console.log('Existing page dropdown opened with no data, loading...');
+      this.loadExistingData();
+    }
+  }
+
+  onExistingCategoryDropdownOpen(opened: boolean): void {
+    if (opened && this.existingCategories.length === 0) {
+      console.log('Existing category dropdown opened with no data, loading...');
+      this.loadExistingData();
+    }
+  }
+
+  onExistingFieldDropdownOpen(opened: boolean): void {
+    if (opened && this.existingFields.length === 0) {
+      console.log('Existing field dropdown opened with no data, loading...');
+      this.loadExistingData();
+    }
   }
 
   private updateFormForElement(): void {
@@ -834,52 +1253,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges {
 
     // Update form validation
     this.propertiesForm.updateValueAndValidity();
-  }
-
-  private loadLookupData(): void {
-    // Load Services
-    this.apiService.getLookups('Service').subscribe({
-      next: (response) => this.services = response.results,
-      error: (error) => console.error('Error loading services:', error)
-    });
-
-    // Load Flow Steps
-    this.apiService.getLookups('Flow Step').subscribe({
-      next: (response) => this.flowSteps = response.results,
-      error: (error) => console.error('Error loading flow steps:', error)
-    });
-
-    // Load Applicant Types
-    this.apiService.getLookups('Applicant Type').subscribe({
-      next: (response) => this.applicantTypes = response.results,
-      error: (error) => console.error('Error loading applicant types:', error)
-    });
-
-    // Load Field Types
-    this.apiService.getFieldTypes().subscribe({
-      next: (response) => this.fieldTypes = response.results,
-      error: (error) => console.error('Error loading field types:', error)
-    });
-  }
-
-  private loadExistingData(): void {
-    // Load existing pages
-    this.apiService.getPages().subscribe({
-      next: (response) => this.existingPages = response.results,
-      error: (error) => console.error('Error loading pages:', error)
-    });
-
-    // Load existing categories
-    this.apiService.getCategories().subscribe({
-      next: (response) => this.existingCategories = response.results,
-      error: (error) => console.error('Error loading categories:', error)
-    });
-
-    // Load existing fields
-    this.apiService.getFields().subscribe({
-      next: (response) => this.existingFields = response.results,
-      error: (error) => console.error('Error loading fields:', error)
-    });
   }
 
   onExistingPageSelected(pageId: number): void {

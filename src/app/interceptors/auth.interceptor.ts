@@ -1,17 +1,33 @@
-
 // interceptors/auth.interceptor.ts
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { AuthService } from '../services/auth.service';
+import { ConfigService } from '../services/config.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
-  const token = authService.getToken();
+  const configService = inject(ConfigService);
 
-  if (token) {
+  // Get the token
+  const token = authService.getToken();
+  const baseUrl = configService.getBaseUrl();
+
+  // Only add auth header if:
+  // 1. We have a token
+  // 2. The request is to our API (matches base URL)
+  // 3. Request doesn't have 'No-Auth' header
+  if (token &&
+    baseUrl &&
+    req.url.startsWith(baseUrl) &&
+    !req.headers.has('No-Auth')) {
+
     const authReq = req.clone({
-      headers: req.headers.set('Authorization', `Bearer ${token}`)
+      setHeaders: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
+
     return next(authReq);
   }
 
