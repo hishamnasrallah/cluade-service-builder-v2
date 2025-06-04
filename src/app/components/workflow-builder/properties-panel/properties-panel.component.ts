@@ -47,8 +47,8 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
     MatProgressSpinnerModule,
     ConditionBuilderComponent
   ],
-  templateUrl:"properties-panel.component.html",
-  styleUrls: ['properties-panel.component.css']
+  templateUrl:'properties-panel.component.html',
+  styleUrl:'properties-panel.component.scss'
 })
 export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedElement?: WorkflowElement;
