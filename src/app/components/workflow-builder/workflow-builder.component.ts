@@ -1,4 +1,4 @@
-// components/workflow-builder/workflow-builder.component.ts
+// components/workflow-builder/workflow-builder.component.ts - Updated for service flows
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -18,6 +18,10 @@ import { WorkflowElementComponent } from './workflow-element/workflow-element.co
 import { PropertiesPanelComponent } from './properties-panel/properties-panel.component';
 import { ElementPaletteComponent } from './element-palette/element-palette.component';
 import { MinimapComponent } from './minimap/minimap.component';
+import {
+  ServiceFlowSelectionResult,
+  ServiceFlowSelectorDialogComponent
+} from './workflow-selector-dialog/workflow-selector-dialog.component';
 
 @Component({
   selector: 'app-workflow-builder',
@@ -39,8 +43,25 @@ import { MinimapComponent } from './minimap/minimap.component';
     <div class="workflow-builder">
       <!-- Top Toolbar -->
       <mat-toolbar class="workflow-toolbar">
-        <span>{{ workflow.name }}</span>
+        <button mat-icon-button (click)="showServiceFlowSelector()" title="Select Service Flow">
+          <mat-icon>account_tree</mat-icon>
+        </button>
+
+        <span class="workflow-title">{{ workflow.name }}</span>
+        <span class="workflow-status" *ngIf="currentServiceCode">
+          <mat-icon>cloud</mat-icon>
+          Service: {{ currentServiceCode }}
+        </span>
+        <span class="workflow-status unsaved" *ngIf="!currentServiceCode">
+          <mat-icon>cloud_off</mat-icon>
+          Local Only
+        </span>
+
         <span class="spacer"></span>
+
+        <button mat-icon-button (click)="autoOrganize()" title="Auto-organize Layout">
+          <mat-icon>auto_fix_high</mat-icon>
+        </button>
 
         <button mat-icon-button (click)="zoomIn()" title="Zoom In">
           <mat-icon>zoom_in</mat-icon>
@@ -64,12 +85,16 @@ import { MinimapComponent } from './minimap/minimap.component';
           <mat-icon>save</mat-icon>
         </button>
 
-        <button mat-icon-button (click)="loadWorkflow()" title="Load">
+        <button mat-icon-button (click)="showServiceFlowSelector()" title="Load Service Flow">
           <mat-icon>folder_open</mat-icon>
         </button>
 
-        <button mat-icon-button (click)="resetWorkflow()" title="New Workflow">
+        <button mat-icon-button (click)="createNewWorkflow()" title="New Workflow">
           <mat-icon>add</mat-icon>
+        </button>
+
+        <button mat-icon-button (click)="exportServiceFlow()" title="Export Service Flow" [disabled]="!currentServiceCode">
+          <mat-icon>download</mat-icon>
         </button>
       </mat-toolbar>
 
@@ -177,6 +202,19 @@ import { MinimapComponent } from './minimap/minimap.component';
                 (viewportChanged)="updateViewport($event)">
               </app-minimap>
             </div>
+
+            <!-- Service Flow Info Panel -->
+            <div class="info-panel" *ngIf="currentServiceCode">
+              <div class="info-header">
+                <mat-icon>info</mat-icon>
+                <span>Service Flow: {{ currentServiceCode }}</span>
+              </div>
+              <div class="info-stats">
+                <span>{{ getElementCount('page') }} Pages</span>
+                <span>{{ getElementCount('category') }} Categories</span>
+                <span>{{ getElementCount('field') }} Fields</span>
+              </div>
+            </div>
           </mat-sidenav-content>
 
           <!-- Right Sidebar - Properties Panel -->
@@ -204,6 +242,32 @@ import { MinimapComponent } from './minimap/minimap.component';
       flex-shrink: 0;
       background: #1976d2;
       color: white;
+    }
+
+    .workflow-title {
+      font-weight: 500;
+      margin-left: 8px;
+    }
+
+    .workflow-status {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 12px;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .workflow-status.unsaved {
+      background: rgba(255, 152, 0, 0.3);
+    }
+
+    .workflow-status mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
     }
 
     .spacer {
@@ -308,6 +372,41 @@ import { MinimapComponent } from './minimap/minimap.component';
       z-index: 1000;
     }
 
+    .info-panel {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1000;
+      min-width: 200px;
+    }
+
+    .info-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .info-header mat-icon {
+      font-size: 18px;
+      color: #1976d2;
+    }
+
+    .info-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: #666;
+    }
+
     @media (max-width: 768px) {
       .element-palette {
         width: 60px;
@@ -321,6 +420,22 @@ import { MinimapComponent } from './minimap/minimap.component';
         width: 150px;
         height: 100px;
       }
+
+      .workflow-title {
+        display: none;
+      }
+
+      .workflow-status {
+        margin-left: 4px;
+        padding: 2px 4px;
+      }
+
+      .info-panel {
+        top: 10px;
+        right: 10px;
+        padding: 8px;
+        min-width: 150px;
+      }
     }
   `]
 })
@@ -332,6 +447,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   selectedElementId?: string;
   selectedConnectionId?: string;
   availableElements = ELEMENT_CONFIGS;
+  currentServiceCode?: string;
 
   canvasState: CanvasState = {
     zoom: 1,
@@ -365,6 +481,16 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       .subscribe(workflow => {
         this.workflow = workflow;
       });
+
+    // Track current service code
+    this.currentServiceCode = this.workflowService.getCurrentServiceCode();
+
+    // Show service flow selector on startup if API is configured
+    if (this.apiService.isConfigured()) {
+      setTimeout(() => {
+        this.showServiceFlowSelector();
+      }, 500);
+    }
   }
 
   ngAfterViewInit(): void {
@@ -376,6 +502,106 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  showServiceFlowSelector(): void {
+    if (!this.apiService.isConfigured()) {
+      this.snackBar.open('API not configured. Please configure the base URL first.', 'Close', {
+        duration: 5000
+      });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(ServiceFlowSelectorDialogComponent, {
+      width: '90vw',
+      maxWidth: '900px',
+      height: '80vh',
+      disableClose: false,
+      data: {}
+    });
+
+    dialogRef.afterClosed().subscribe((result: ServiceFlowSelectionResult) => {
+      if (result) {
+        this.handleServiceFlowSelection(result);
+      }
+    });
+  }
+
+  private handleServiceFlowSelection(result: ServiceFlowSelectionResult): void {
+    if (result.action === 'create') {
+      this.createNewWorkflow();
+    } else if (result.action === 'load' && result.serviceCode) {
+      this.loadServiceFlowFromApi(result.serviceCode, result.serviceName || 'Service Flow');
+    }
+  }
+
+  private loadServiceFlowFromApi(serviceCode: string, serviceName: string): void {
+    this.snackBar.open(`Loading ${serviceName}...`, '', { duration: 2000 });
+
+    this.workflowService.loadServiceFlowFromApi(serviceCode).subscribe({
+      next: (workflow) => {
+        this.currentServiceCode = serviceCode;
+        this.selectedElementId = undefined;
+        this.selectedConnectionId = undefined;
+
+        // Center the view on the workflow
+        this.resetZoom();
+
+        this.snackBar.open(`${serviceName} loaded successfully!`, 'Close', {
+          duration: 3000
+        });
+      },
+      error: (error) => {
+        console.error('Error loading service flow:', error);
+        this.snackBar.open(`Failed to load ${serviceName}: ${error.message}`, 'Close', {
+          duration: 5000
+        });
+      }
+    });
+  }
+
+  createNewWorkflow(): void {
+    const newName = `New Workflow ${new Date().toLocaleDateString()}`;
+    this.workflowService.createNewWorkflow(newName);
+    this.currentServiceCode = undefined;
+    this.selectedElementId = undefined;
+    this.selectedConnectionId = undefined;
+    this.resetZoom();
+    this.snackBar.open('New workflow created', 'Close', { duration: 2000 });
+  }
+
+  autoOrganize(): void {
+    this.workflowService.autoOrganizeElements();
+    this.resetZoom();
+    this.snackBar.open('Elements auto-organized', 'Close', { duration: 2000 });
+  }
+
+  exportServiceFlow(): void {
+    if (!this.currentServiceCode) {
+      this.snackBar.open('No service flow loaded to export', 'Close', { duration: 3000 });
+      return;
+    }
+
+    const serviceFlow = this.workflowService.convertWorkflowToServiceFlow();
+    if (serviceFlow) {
+      const dataStr = JSON.stringify({ service_flow: [serviceFlow] }, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `service-flow-${this.currentServiceCode}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      this.snackBar.open('Service flow exported', 'Close', { duration: 3000 });
+    } else {
+      this.snackBar.open('Failed to export service flow', 'Close', { duration: 3000 });
+    }
+  }
+
+  getElementCount(type: string): number {
+    return this.workflow.elements.filter(el => el.type === type).length;
   }
 
   // Canvas Transform
@@ -426,12 +652,9 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.canvasState.panY = 100;
   }
 
-  // Mouse Events
+  // Mouse Events (keeping existing implementation)
   onCanvasMouseDown(event: MouseEvent): void {
-    // Don't start panning if clicking on an element or if we're connecting
-    if (this.connectingFrom || this.isDraggingElement) {
-      return;
-    }
+    if (this.connectingFrom || this.isDraggingElement) return;
 
     const target = event.target as HTMLElement;
     if (target === this.canvasWrapperRef.nativeElement || target === this.canvasRef.nativeElement) {
@@ -453,7 +676,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
       this.lastPanPoint = { x: event.clientX, y: event.clientY };
     } else if (this.connectingFrom) {
-      // Update temporary connection line
       const canvasPos = this.screenToCanvas(event.clientX, event.clientY);
       const sourceElement = this.workflow.elements.find(el => el.id === this.connectingFrom);
 
@@ -476,7 +698,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   onCanvasClick(event: MouseEvent): void {
-    // Clear selection if clicking on empty canvas
     const target = event.target as HTMLElement;
     if (target === this.canvasWrapperRef.nativeElement || target === this.canvasRef.nativeElement) {
       this.selectedElementId = undefined;
@@ -491,7 +712,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     const newZoom = Math.max(0.2, Math.min(3, this.canvasState.zoom * zoomFactor));
 
     if (newZoom !== oldZoom) {
-      // Zoom towards mouse position
       const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;
@@ -540,7 +760,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
   }
 
-  // Element Management
+  // Element Management (keeping existing implementation)
   selectElement(elementId: string): void {
     this.selectedElementId = elementId;
     this.selectedConnectionId = undefined;
@@ -566,7 +786,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
   }
 
-  // Element drag state management
   onElementDragStart(): void {
     this.isDraggingElement = true;
   }
@@ -575,7 +794,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.isDraggingElement = false;
   }
 
-  // Connection Management
+  // Connection Management (keeping existing implementation)
   startConnection(elementId: string, event: MouseEvent): void {
     this.connectingFrom = elementId;
     event.stopPropagation();
@@ -619,7 +838,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     const dx = x2 - x1;
     const dy = y2 - y1;
 
-    // Create a smooth curve
     const controlPoint1X = x1 + dx * 0.3;
     const controlPoint1Y = y1;
     const controlPoint2X = x2 - dx * 0.3;
@@ -638,20 +856,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         this.snackBar.open('Error saving workflow', 'Close', { duration: 3000 });
       }
     });
-  }
-
-  loadWorkflow(): void {
-    this.workflowService.loadWorkflow();
-    this.snackBar.open('Workflow loaded', 'Close', { duration: 2000 });
-  }
-
-  resetWorkflow(): void {
-    if (confirm('Are you sure you want to create a new workflow? All unsaved changes will be lost.')) {
-      this.workflowService.resetWorkflow();
-      this.selectedElementId = undefined;
-      this.selectedConnectionId = undefined;
-      this.snackBar.open('New workflow created', 'Close', { duration: 2000 });
-    }
   }
 
   validateWorkflow(): void {

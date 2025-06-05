@@ -1,4 +1,4 @@
-// app.module.ts
+// app.module.ts - Updated with dialog component
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
@@ -34,6 +34,9 @@ import { AppComponent } from './components/app.component';
 import { LoginComponent } from './components/login/login.component';
 import { ConfigComponent } from './components/config/config.component';
 import { WorkflowBuilderComponent } from './components/workflow-builder/workflow-builder.component';
+
+// Dialog Components
+import { WorkflowSelectorDialogComponent } from './components/workflow-builder/workflow-selector-dialog/workflow-selector-dialog.component';
 
 // Services and Guards
 import { AuthService } from './services/auth.service';
@@ -79,10 +82,12 @@ const routes: Routes = [
 
 @NgModule({
   declarations: [
+    // Components are now standalone, so we don't declare them here
     // AppComponent,
     // LoginComponent,
     // ConfigComponent,
-    // WorkflowBuilderComponent
+    // WorkflowBuilderComponent,
+    // WorkflowSelectorDialogComponent
   ],
   imports: [
     BrowserModule,
@@ -113,7 +118,14 @@ const routes: Routes = [
     MatCheckboxModule,
     MatDividerModule,
     MatTooltipModule,
-    DragDropModule
+    DragDropModule,
+
+    // Standalone Components
+    AppComponent,
+    LoginComponent,
+    ConfigComponent,
+    WorkflowBuilderComponent,
+    WorkflowSelectorDialogComponent
   ],
   providers: [
     // Services
