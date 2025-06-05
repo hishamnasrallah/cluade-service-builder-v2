@@ -54,10 +54,10 @@ import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../.
         <div [ngSwitch]="element.type" class="element-details">
           <div *ngSwitchCase="'page'" class="page-details">
             <div *ngIf="element.properties.service" class="detail-item">
-              <small>Service: {{ getServiceName(element.properties.service) }}</small>
+              <small>Service: {{ getServiceName(convertToNumber(element.properties.service)) }}</small>
             </div>
             <div *ngIf="element.properties.sequence_number" class="detail-item">
-              <small>Step: {{ getSequenceName(element.properties.sequence_number) }}</small>
+              <small>Step: {{ getSequenceName(convertToNumber(element.properties.sequence_number)) }}</small>
             </div>
           </div>
 
@@ -72,7 +72,7 @@ import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../.
 
           <div *ngSwitchCase="'field'" class="field-details">
             <div *ngIf="element.properties._field_type" class="detail-item">
-              <small>Type: {{ getFieldTypeName(element.properties._field_type) }}</small>
+              <small>Type: {{ getFieldTypeName(convertToNumber(element.properties._field_type)) }}</small>
             </div>
             <div *ngIf="element.properties._mandatory" class="detail-item">
               <small><mat-icon inline="true" style="font-size: 12px;">star</mat-icon> Required</small>
@@ -404,6 +404,18 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
   private removeDragListeners(): void {
     document.removeEventListener('mousemove', this.onMouseMove.bind(this));
     document.removeEventListener('mouseup', this.onMouseUp.bind(this));
+  }
+
+  // Helper method to convert string | number to number
+  convertToNumber(value: string | number | undefined | null): number {
+    if (value === undefined || value === null) {
+      return 0;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? 0 : parsed;
   }
 
   onMouseDown(event: MouseEvent): void {

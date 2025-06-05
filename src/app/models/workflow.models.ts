@@ -1,4 +1,4 @@
-// models/workflow.models.ts - Updated with service flow field types
+// models/workflow.models.ts - Fixed duplicate properties and index signature
 export interface WorkflowElement {
   id: string;
   type: ElementType;
@@ -30,6 +30,7 @@ export interface Connection {
 }
 
 export interface ElementProperties {
+  [key: string]: any; // Add index signature to allow string indexing
   name?: string;
   description?: string;
 
@@ -52,7 +53,6 @@ export interface ElementProperties {
   fields?: FieldElementProperties[];
 
   // Field properties (using underscore prefix to match API)
-  useExisting?: boolean;
   existingFieldId?: number;
   _field_id?: number;
   _field_name?: string;
@@ -615,41 +615,40 @@ export class WorkflowService {
                 const fieldElementId = `field-${field.field_id || fieldIndex}`;
                 fieldYPosition += 100;
 
+                const fieldProperties: ElementProperties = {
+                  name: field.display_name || field.name || `Field ${fieldIndex + 1}`,
+                  _field_name: field.name,
+                  _field_display_name: field.display_name,
+                  _field_display_name_ara: field.display_name_ara,
+                  _field_type: field.field_type,
+                  _field_id: field.field_id,
+                  _mandatory: field.mandatory || false,
+                  _is_hidden: field.is_hidden || false,
+                  _is_disabled: field.is_disabled || false,
+                  _lookup: field.lookup
+                };
+
+                // Add validation properties with explicit key checking
+                const validationKeys = [
+                  'max_length', 'min_length', 'regex_pattern', 'allowed_characters',
+                  'forbidden_words', 'value_greater_than', 'value_less_than',
+                  'integer_only', 'positive_only', 'precision', 'default_boolean',
+                  'file_types', 'max_file_size', 'image_max_width', 'image_max_height',
+                  'max_selections', 'min_selections'
+                ];
+
+                validationKeys.forEach(key => {
+                  const apiKey = `_${key}`;
+                  if (field[key] !== undefined && field[key] !== null) {
+                    fieldProperties[apiKey] = field[key];
+                  }
+                });
+
                 workflowData.elements.push({
                   id: fieldElementId,
                   type: ElementType.FIELD,
                   position: { x: xPosition + 200, y: fieldYPosition },
-                  properties: {
-                    name: field.display_name || field.name || `Field ${fieldIndex + 1}`,
-                    _field_name: field.name,
-                    _field_display_name: field.display_name,
-                    _field_display_name_ara: field.display_name_ara,
-                    _field_type: field.field_type,
-                    _field_id: field.field_id,
-                    _mandatory: field.mandatory || false,
-                    _is_hidden: field.is_hidden || false,
-                    _is_disabled: field.is_disabled || false,
-                    _lookup: field.lookup,
-
-                    // Validation properties
-                    _max_length: field.max_length,
-                    _min_length: field.min_length,
-                    _regex_pattern: field.regex_pattern,
-                    _allowed_characters: field.allowed_characters,
-                    _forbidden_words: field.forbidden_words,
-                    _value_greater_than: field.value_greater_than,
-                    _value_less_than: field.value_less_than,
-                    _integer_only: field.integer_only,
-                    _positive_only: field.positive_only,
-                    _precision: field.precision,
-                    _default_boolean: field.default_boolean,
-                    _file_types: field.file_types,
-                    _max_file_size: field.max_file_size,
-                    _image_max_width: field.image_max_width,
-                    _image_max_height: field.image_max_height,
-                    _max_selections: field.max_selections,
-                    _min_selections: field.min_selections
-                  },
+                  properties: fieldProperties,
                   connections: []
                 });
 
@@ -969,15 +968,20 @@ export class WorkflowService {
                 visibility_conditions: []
               };
 
-              // Add field type specific properties
-              Object.keys(fieldEl.properties).forEach(key => {
-                if (key.startsWith('_') && key !== '_field_name' && key !== '_field_display_name' &&
-                  key !== '_field_display_name_ara' && key !== '_field_type' && key !== '_field_id' &&
-                  key !== '_mandatory' && key !== '_is_hidden' && key !== '_is_disabled' && key !== '_lookup') {
-                  const apiKey = key.substring(1); // Remove underscore
-                  if (fieldEl.properties[key] !== undefined && fieldEl.properties[key] !== null) {
-                    field[apiKey] = fieldEl.properties[key];
-                  }
+              // Add field type specific properties - safer property access
+              const fieldProps = fieldEl.properties;
+              const validationKeys = [
+                'max_length', 'min_length', 'regex_pattern', 'allowed_characters',
+                'forbidden_words', 'value_greater_than', 'value_less_than',
+                'integer_only', 'positive_only', 'precision', 'default_boolean',
+                'file_types', 'max_file_size', 'image_max_width', 'image_max_height',
+                'max_selections', 'min_selections'
+              ];
+
+              validationKeys.forEach(key => {
+                const apiKey = `_${key}`;
+                if (fieldProps && fieldProps[apiKey] !== undefined && fieldProps[apiKey] !== null) {
+                  field[key] = fieldProps[apiKey];
                 }
               });
 

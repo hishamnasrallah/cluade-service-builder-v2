@@ -1,0 +1,189 @@
+<div class="workflow-builder">
+  <!-- Top Toolbar -->
+  <mat-toolbar class="workflow-toolbar">
+    <button mat-icon-button (click)="showServiceFlowSelector()" title="Select Service Flow">
+      <mat-icon>account_tree</mat-icon>
+    </button>
+
+    <span class="workflow-title">{{ workflow.name }}</span>
+    <span class="workflow-status" *ngIf="currentServiceCode">
+          <mat-icon>cloud</mat-icon>
+          Service: {{ currentServiceCode }}
+        </span>
+    <span class="workflow-status unsaved" *ngIf="!currentServiceCode">
+          <mat-icon>cloud_off</mat-icon>
+          Local Only
+        </span>
+
+    <span class="spacer"></span>
+
+    <button mat-icon-button (click)="autoOrganize()" title="Auto-organize Layout">
+      <mat-icon>auto_fix_high</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="zoomIn()" title="Zoom In">
+      <mat-icon>zoom_in</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="zoomOut()" title="Zoom Out">
+      <mat-icon>zoom_out</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="resetZoom()" title="Reset Zoom">
+      <mat-icon>center_focus_strong</mat-icon>
+    </button>
+
+    <mat-divider vertical></mat-divider>
+
+    <button mat-icon-button (click)="validateWorkflow()" title="Validate">
+      <mat-icon>check_circle</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="saveWorkflow()" title="Save">
+      <mat-icon>save</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="showServiceFlowSelector()" title="Load Service Flow">
+      <mat-icon>folder_open</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="createNewWorkflow()" title="New Workflow">
+      <mat-icon>add</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="exportServiceFlow()" title="Export Service Flow" [disabled]="!currentServiceCode">
+      <mat-icon>download</mat-icon>
+    </button>
+  </mat-toolbar>
+
+  <div class="workflow-content">
+    <!-- Left Sidebar - Element Palette -->
+    <mat-sidenav-container class="sidenav-container">
+      <mat-sidenav mode="side" opened class="element-palette">
+        <app-element-palette
+          (elementSelected)="onElementSelected($event)"
+          [availableElements]="availableElements">
+        </app-element-palette>
+      </mat-sidenav>
+
+      <!-- Main Canvas Area -->
+      <mat-sidenav-content class="canvas-container">
+        <div class="canvas-wrapper"
+             #canvasWrapper
+             (mousedown)="onCanvasMouseDown($event)"
+             (mousemove)="onCanvasMouseMove($event)"
+             (mouseup)="onCanvasMouseUp($event)"
+             (mouseleave)="onCanvasMouseUp($event)"
+             (wheel)="onCanvasWheel($event)"
+             (click)="onCanvasClick($event)">
+
+          <div class="canvas"
+               #canvas
+               [style.transform]="getCanvasTransform()"
+               (drop)="onElementDrop($event)"
+               (dragover)="onDragOver($event)">
+
+            <!-- SVG for Connections -->
+            <svg class="connections-layer"
+                 [attr.width]="canvasSize.width"
+                 [attr.height]="canvasSize.height">
+              <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                        refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+                </marker>
+              </defs>
+
+              <!-- Invisible wider stroke for easier clicking -->
+              <path *ngFor="let connection of workflow.connections; trackBy: trackConnection"
+                    [attr.d]="getConnectionPath(connection)"
+                    stroke="transparent"
+                    stroke-width="12"
+                    fill="none"
+                    (click)="selectConnection(connection.id, $event)"
+                    class="connection-clickable">
+              </path>
+
+              <!-- Visible connection lines -->
+              <path *ngFor="let connection of workflow.connections; trackBy: trackConnection"
+                    [attr.d]="getConnectionPath(connection)"
+                    stroke="#666"
+                    stroke-width="2"
+                    fill="none"
+                    marker-end="url(#arrowhead)"
+                    [class.selected]="selectedConnectionId === connection.id"
+                    class="connection-line">
+              </path>
+
+              <!-- Temporary connection line while dragging -->
+              <path *ngIf="tempConnection"
+                    [attr.d]="tempConnection"
+                    stroke="#007bff"
+                    stroke-width="2"
+                    stroke-dasharray="5,5"
+                    fill="none"
+                    marker-end="url(#arrowhead)"
+                    class="temp-connection">
+              </path>
+            </svg>
+
+            <!-- Workflow Elements -->
+            <div *ngFor="let element of workflow.elements; trackBy: trackElement"
+                 class="element-container"
+                 [style.left.px]="element.position.x"
+                 [style.top.px]="element.position.y">
+
+              <app-workflow-element
+                [element]="element"
+                [isSelected]="selectedElementId === element.id"
+                [isConnecting]="!!connectingFrom"
+                [canvasZoom]="canvasState.zoom"
+                (elementClick)="selectElement(element.id)"
+                (elementDoubleClick)="editElement(element.id)"
+                (positionChanged)="updateElementPosition(element.id, $event)"
+                (connectionStart)="startConnection(element.id, $event)"
+                (connectionEnd)="endConnection(element.id)"
+                (deleteElement)="deleteElement(element.id)"
+                (dragStart)="onElementDragStart()"
+                (dragEnd)="onElementDragEnd()">
+              </app-workflow-element>
+            </div>
+          </div>
+        </div>
+
+        <!-- Minimap -->
+        <div class="minimap-container">
+          <app-minimap
+            [workflow]="workflow"
+            [canvasState]="canvasState"
+            [canvasSize]="canvasSize"
+            (viewportChanged)="updateViewport($event)">
+          </app-minimap>
+        </div>
+
+        <!-- Service Flow Info Panel -->
+        <div class="info-panel" *ngIf="currentServiceCode">
+          <div class="info-header">
+            <mat-icon>info</mat-icon>
+            <span>Service Flow: {{ currentServiceCode }}</span>
+          </div>
+          <div class="info-stats">
+            <span>{{ getElementCount('page') }} Pages</span>
+            <span>{{ getElementCount('category') }} Categories</span>
+            <span>{{ getElementCount('field') }} Fields</span>
+          </div>
+        </div>
+      </mat-sidenav-content>
+
+      <!-- Right Sidebar - Properties Panel -->
+      <mat-sidenav mode="side" opened position="end" class="properties-panel">
+        <app-properties-panel
+          [selectedElement]="getSelectedElement()"
+          [selectedConnection]="getSelectedConnection()"
+          (elementUpdated)="onElementUpdated($event)"
+          (connectionUpdated)="onConnectionUpdated($event)">
+        </app-properties-panel>
+      </mat-sidenav>
+    </mat-sidenav-container>
+  </div>
+</div>
