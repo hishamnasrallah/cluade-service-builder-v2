@@ -371,7 +371,7 @@ export class ApprovalFlowApiService {
       position: { x: 100, y: yPosition },
       properties: {
         name: 'End',
-        action: 'complete'
+        action: 1
       },
       connections: []
     });
@@ -443,7 +443,7 @@ export class ApprovalFlowApiService {
       name: lookup.name,
       name_ara: lookup.name_ara,
       code: lookup.code,
-      icon: lookup.icon,
+      icon: lookup.icon || undefined, // Fix: handle null values
       active_ind: lookup.active_ind
     }));
   }

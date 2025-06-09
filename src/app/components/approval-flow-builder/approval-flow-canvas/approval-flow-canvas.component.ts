@@ -853,4 +853,6 @@ export class ApprovalFlowCanvasComponent implements OnInit, OnDestroy, AfterView
   trackConnection(index: number, connection: ApprovalConnection): string {
     return connection.id;
   }
+
+  protected readonly Math = Math;
 }

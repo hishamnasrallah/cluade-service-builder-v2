@@ -475,7 +475,7 @@ export class ActionDialogComponent implements OnInit, OnDestroy {
             name: lookup.name,
             name_ara: lookup.name_ara,
             code: lookup.code,
-            icon: lookup.icon,
+            icon: lookup.icon || undefined, // Fix: handle null values
             active_ind: lookup.active_ind
           }));
 

@@ -94,8 +94,7 @@ import {
               </div>
             </div>
 
-            <div class="priority-groups" *ngIf="element.properties.priority_approver_groups?.length > 0">
-              <mat-chip-set>
+            <div class="priority-groups" *ngIf="element.properties.priority_approver_groups && element.properties.priority_approver_groups.length > 0">              <mat-chip-set>
                 <mat-chip *ngFor="let groupId of element.properties.priority_approver_groups">
                   Priority: {{ getGroupName(groupId) }}
                 </mat-chip>
@@ -759,7 +758,9 @@ export class ApprovalElementComponent implements OnInit, OnDestroy {
   hasWarnings(): boolean {
     if (this.element.type === ApprovalElementType.APPROVAL_STEP) {
       // Warning if no required approvals specified for parallel approval
-      if (this.element.properties.priority_approver_groups?.length > 0 && !this.element.properties.required_approvals) {
+      if (this.element.properties.priority_approver_groups &&
+        this.element.properties.priority_approver_groups.length > 0 &&
+        !this.element.properties.required_approvals) {
         return true;
       }
     }

@@ -959,7 +959,7 @@ export class ApprovalPropertiesPanelComponent implements OnInit, OnChanges, OnDe
       parallel_groups: [[]],
 
       // End properties
-      action: ['complete'],
+      // action: ['complete'],
 
       // Advanced properties
       timeout_hours: [''],

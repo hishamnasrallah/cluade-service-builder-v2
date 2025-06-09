@@ -571,8 +571,10 @@ export class ApprovalFlowService {
     const sequences = approvalSteps
       .map(el => el.properties.seq)
       .filter(seq => typeof seq === 'number')
-      .sort((a, b) => a - b);
+      .sort((a, b) => (a || 0) - (b || 0));
 
-    return sequences.length > 0 ? Math.max(...sequences) + 1 : 1;
+
+    const validSequences = sequences.filter((seq): seq is number => typeof seq === 'number');
+    return validSequences.length > 0 ? Math.max(...validSequences) + 1 : 1;
   }
 }
