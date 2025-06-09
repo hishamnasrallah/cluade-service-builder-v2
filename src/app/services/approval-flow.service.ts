@@ -1,7 +1,7 @@
-// services/approval-flow.service.ts
+// services/approval-flow.service.ts - Updated with enhanced API integration
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { map, catchError, tap } from 'rxjs/operators';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
@@ -340,14 +340,154 @@ export class ApprovalFlowService {
     return masterStep;
   }
 
-  // Save current approval flow
+  // Enhanced save method using the new API
   saveApprovalFlow(): Observable<any> {
+    console.log('Saving approval flow...', this.currentApprovalFlow);
+
+    // Validate before saving
+    const validation = this.validateApprovalFlow();
+    if (!validation.isValid) {
+      return throwError(() => new Error(`Validation failed: ${validation.errors.join(', ')}`));
+    }
+
     if (this.approvalFlowApiService.isConfigured()) {
-      return this.approvalFlowApiService.saveApprovalFlow(this.currentApprovalFlow);
+      return this.approvalFlowApiService.saveApprovalFlow(this.currentApprovalFlow).pipe(
+        tap(result => {
+          console.log('Approval flow saved successfully:', result);
+
+          // Update metadata with save timestamp
+          this.currentApprovalFlow.metadata = {
+            ...this.currentApprovalFlow.metadata,
+            updated_at: new Date().toISOString()
+          };
+          this.updateApprovalFlow();
+        }),
+        catchError(error => {
+          console.error('Failed to save approval flow:', error);
+          return throwError(() => error);
+        })
+      );
     } else {
-      // Fallback to localStorage
       return this.saveToLocalStorage();
     }
+  }
+
+  // Enhanced save method for creating new approval flows
+  saveAsNewApprovalFlow(serviceCode: string, serviceName: string): Observable<any> {
+    console.log('Saving as new approval flow:', serviceCode, serviceName);
+
+    // Update current flow metadata
+    this.currentApprovalFlow.name = `Approval Flow - ${serviceName}`;
+    this.currentApprovalFlow.metadata = {
+      ...this.currentApprovalFlow.metadata,
+      service_code: serviceCode,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    this.currentServiceCode = serviceCode;
+
+    // Validate before saving
+    const validation = this.validateApprovalFlow();
+    if (!validation.isValid) {
+      return throwError(() => new Error(`Validation failed: ${validation.errors.join(', ')}`));
+    }
+
+    if (this.approvalFlowApiService.isConfigured()) {
+      return this.approvalFlowApiService.saveApprovalFlow(this.currentApprovalFlow).pipe(
+        tap(result => {
+          console.log('New approval flow saved successfully:', result);
+          this.updateApprovalFlow();
+        }),
+        catchError(error => {
+          console.error('Failed to save new approval flow:', error);
+          return throwError(() => error);
+        })
+      );
+    } else {
+      return this.saveToLocalStorage();
+    }
+  }
+
+  // Delete approval flow
+  deleteApprovalFlow(serviceCode: string): Observable<any> {
+    if (this.approvalFlowApiService.isConfigured()) {
+      return this.approvalFlowApiService.deleteMasterStep(serviceCode).pipe(
+        tap(() => {
+          console.log('Approval flow deleted successfully:', serviceCode);
+
+          // If we're deleting the current flow, reset it
+          if (this.currentServiceCode === serviceCode) {
+            this.resetApprovalFlow();
+          }
+        }),
+        catchError(error => {
+          console.error('Failed to delete approval flow:', error);
+          return throwError(() => error);
+        })
+      );
+    } else {
+      // Remove from localStorage
+      localStorage.removeItem(`approval_flow_${serviceCode}`);
+
+      if (this.currentServiceCode === serviceCode) {
+        this.resetApprovalFlow();
+      }
+
+      return new Observable(observer => {
+        setTimeout(() => {
+          observer.next({ success: true });
+          observer.complete();
+        }, 100);
+      });
+    }
+  }
+
+  // Duplicate approval flow
+  duplicateApprovalFlow(sourceServiceCode: string, newServiceCode: string, newServiceName: string): Observable<any> {
+    return this.loadApprovalFlowFromApi(sourceServiceCode).pipe(
+      map(originalFlow => {
+        // Create a copy with new metadata
+        const duplicatedFlow: ApprovalFlowData = {
+          ...originalFlow,
+          id: newServiceCode,
+          name: `Approval Flow - ${newServiceName}`,
+          metadata: {
+            ...originalFlow.metadata,
+            service_code: newServiceCode,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        };
+
+        // Generate new IDs for all elements and connections
+        const idMap = new Map<string, string>();
+        duplicatedFlow.elements.forEach(element => {
+          const newId = uuidv4();
+          idMap.set(element.id, newId);
+          element.id = newId;
+        });
+
+        duplicatedFlow.connections.forEach(connection => {
+          connection.id = uuidv4();
+          connection.sourceId = idMap.get(connection.sourceId) || connection.sourceId;
+          connection.targetId = idMap.get(connection.targetId) || connection.targetId;
+        });
+
+        return duplicatedFlow;
+      }),
+      map(duplicatedFlow => {
+        // Save the duplicated flow
+        this.currentApprovalFlow = duplicatedFlow;
+        this.currentServiceCode = newServiceCode;
+        this.updateApprovalFlow();
+
+        return this.saveApprovalFlow();
+      }),
+      catchError(error => {
+        console.error('Failed to duplicate approval flow:', error);
+        return throwError(() => error);
+      })
+    );
   }
 
   private saveToLocalStorage(): Observable<any> {
@@ -405,7 +545,12 @@ export class ApprovalFlowService {
     this.currentApprovalFlow = {
       name,
       elements: [],
-      connections: []
+      connections: [],
+      metadata: {
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        version: '1.0'
+      }
     };
     this.currentServiceCode = undefined;
     this.initializeWithStartElement();
@@ -493,6 +638,20 @@ export class ApprovalFlowService {
       }
     });
 
+    // Check that action steps have required properties
+    const actionStepElements = this.currentApprovalFlow.elements.filter(
+      el => el.type === ApprovalElementType.ACTION_STEP
+    );
+
+    actionStepElements.forEach((element, index) => {
+      if (!element.properties.action) {
+        errors.push(`Action step ${index + 1} is missing action`);
+      }
+      if (!element.properties.to_status) {
+        errors.push(`Action step ${index + 1} is missing target status`);
+      }
+    });
+
     return {
       isValid: errors.length === 0,
       errors
@@ -573,8 +732,57 @@ export class ApprovalFlowService {
       .filter(seq => typeof seq === 'number')
       .sort((a, b) => (a || 0) - (b || 0));
 
-
     const validSequences = sequences.filter((seq): seq is number => typeof seq === 'number');
     return validSequences.length > 0 ? Math.max(...validSequences) + 1 : 1;
+  }
+
+  // Get approval flow summary
+  getApprovalFlowSummary(): any {
+    const stats = this.getElementStatistics();
+    const validation = this.validateApprovalFlow();
+
+    return {
+      name: this.currentApprovalFlow.name,
+      serviceCode: this.currentServiceCode,
+      totalElements: this.currentApprovalFlow.elements.length,
+      totalConnections: this.currentApprovalFlow.connections.length,
+      approvalSteps: stats[ApprovalElementType.APPROVAL_STEP] || 0,
+      actionSteps: stats[ApprovalElementType.ACTION_STEP] || 0,
+      conditionSteps: stats[ApprovalElementType.CONDITION_STEP] || 0,
+      parallelGroups: stats[ApprovalElementType.PARALLEL_GROUP] || 0,
+      isValid: validation.isValid,
+      validationErrors: validation.errors,
+      lastUpdated: this.currentApprovalFlow.metadata?.updated_at,
+      version: this.currentApprovalFlow.metadata?.version || '1.0'
+    };
+  }
+
+  // Export approval flow as JSON
+  exportApprovalFlowAsJson(): string {
+    return JSON.stringify(this.currentApprovalFlow, null, 2);
+  }
+
+  // Import approval flow from JSON
+  importApprovalFlowFromJson(jsonData: string): Observable<any> {
+    try {
+      const approvalFlowData: ApprovalFlowData = JSON.parse(jsonData);
+
+      // Validate the imported data
+      if (!approvalFlowData.elements || !approvalFlowData.connections) {
+        throw new Error('Invalid approval flow data: missing elements or connections');
+      }
+
+      // Load the imported data
+      this.loadApprovalFlow(approvalFlowData);
+
+      return new Observable(observer => {
+        setTimeout(() => {
+          observer.next({ success: true, data: approvalFlowData });
+          observer.complete();
+        }, 100);
+      });
+    } catch (error) {
+      return throwError(() => new Error(`Failed to import approval flow: ${error}`));
+    }
   }
 }

@@ -1,4 +1,4 @@
-// services/approval-flow-api.service.ts
+// services/approval-flow-api.service.ts - Enhanced with POST/PUT/DELETE methods
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
@@ -12,7 +12,10 @@ import {
   Group,
   Service,
   Status,
-  ApprovalFlowData
+  ApprovalFlowData,
+  ActionStep,
+  ApprovalStepCondition,
+  ParallelApprovalGroup
 } from '../models/approval-flow.models';
 
 // API Response interfaces
@@ -56,6 +59,79 @@ export interface ApprovalFlowSummary {
   action_count: number;
   last_updated?: string;
   is_active: boolean;
+}
+
+// Request/Response interfaces for Master Steps CRUD
+export interface CreateMasterStepRequest {
+  service: {
+    id: number;
+    code: string;
+    name: string;
+    name_ara?: string;
+  };
+  steps: CreateApprovalStepRequest[];
+}
+
+export interface CreateApprovalStepRequest {
+  service_type: number;
+  seq: number;
+  step_type: number;
+  status: number;
+  group: number;
+  required_approvals?: number;
+  priority_approver_groups?: number[];
+  active_ind: boolean;
+  actions: CreateActionStepRequest[];
+  parallel_approval_groups?: CreateParallelApprovalGroupRequest[];
+  conditions?: CreateApprovalStepConditionRequest[];
+}
+
+export interface CreateActionStepRequest {
+  action: number;
+  to_status: number;
+  sub_status?: number;
+  active_ind: boolean;
+}
+
+export interface CreateApprovalStepConditionRequest {
+  type: number;
+  condition_logic: any[];
+  to_status?: number;
+  sub_status?: number;
+  active_ind: boolean;
+}
+
+export interface CreateParallelApprovalGroupRequest {
+  group: number;
+}
+
+export interface UpdateMasterStepRequest {
+  service?: {
+    id: number;
+    code: string;
+    name: string;
+    name_ara?: string;
+  };
+  steps: UpdateApprovalStepRequest[];
+}
+
+export interface UpdateApprovalStepRequest extends CreateApprovalStepRequest {
+  id?: number; // Include ID for updates
+  actions: UpdateActionStepRequest[];
+  parallel_approval_groups?: UpdateParallelApprovalGroupRequest[];
+  conditions?: UpdateApprovalStepConditionRequest[];
+}
+
+export interface UpdateActionStepRequest extends CreateActionStepRequest {
+  id?: number; // Include ID for updates
+}
+
+export interface UpdateApprovalStepConditionRequest extends CreateApprovalStepConditionRequest {
+  id?: number; // Include ID for updates
+}
+
+export interface UpdateParallelApprovalGroupRequest extends CreateParallelApprovalGroupRequest {
+  id?: number; // Include ID for updates
 }
 
 @Injectable({
@@ -109,7 +185,7 @@ export class ApprovalFlowApiService {
     return throwError(() => ({ ...error, message: errorMessage }));
   };
 
-  // Actions API
+  // Actions API (existing methods)
   getActions(): Observable<ActionResponse> {
     return this.http.get<ActionResponse>(this.getApiUrl('/conditional_approvals/actions/'))
       .pipe(
@@ -142,7 +218,7 @@ export class ApprovalFlowApiService {
       );
   }
 
-  // Master Steps API (existing approval flows)
+  // Master Steps API - READ operations (existing)
   getMasterSteps(): Observable<MasterStepResponse> {
     return this.http.get<MasterStepResponse>(this.getApiUrl('/conditional_approvals/master-steps/'))
       .pipe(
@@ -160,7 +236,243 @@ export class ApprovalFlowApiService {
       );
   }
 
-  // Lookup APIs
+  // Master Steps API - CREATE/UPDATE/DELETE operations (NEW)
+  createMasterStep(masterStepData: CreateMasterStepRequest): Observable<MasterStepData> {
+    return this.http.post<MasterStepData>(this.getApiUrl('/conditional_approvals/master-steps/'), masterStepData)
+      .pipe(
+        tap(response => console.log('Created master step:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateMasterStep(serviceCode: string, masterStepData: UpdateMasterStepRequest): Observable<MasterStepData> {
+    return this.http.put<MasterStepData>(this.getApiUrl(`/conditional_approvals/master-steps/${serviceCode}/`), masterStepData)
+      .pipe(
+        tap(response => console.log('Updated master step:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteMasterStep(serviceCode: string): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/conditional_approvals/master-steps/${serviceCode}/`))
+      .pipe(
+        tap(() => console.log('Deleted master step:', serviceCode)),
+        catchError(this.handleError)
+      );
+  }
+
+  // Individual Approval Steps API (NEW)
+  createApprovalStep(approvalStepData: CreateApprovalStepRequest): Observable<ApprovalStep> {
+    return this.http.post<ApprovalStep>(this.getApiUrl('/conditional_approvals/approval-steps/'), approvalStepData)
+      .pipe(
+        tap(response => console.log('Created approval step:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateApprovalStep(id: number, approvalStepData: UpdateApprovalStepRequest): Observable<ApprovalStep> {
+    return this.http.put<ApprovalStep>(this.getApiUrl(`/conditional_approvals/approval-steps/${id}/`), approvalStepData)
+      .pipe(
+        tap(response => console.log('Updated approval step:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteApprovalStep(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/conditional_approvals/approval-steps/${id}/`))
+      .pipe(
+        tap(() => console.log('Deleted approval step:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // Action Steps API (NEW)
+  createActionStep(actionStepData: CreateActionStepRequest & { approval_step: number }): Observable<ActionStep> {
+    return this.http.post<ActionStep>(this.getApiUrl('/conditional_approvals/action-steps/'), actionStepData)
+      .pipe(
+        tap(response => console.log('Created action step:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateActionStep(id: number, actionStepData: UpdateActionStepRequest): Observable<ActionStep> {
+    return this.http.put<ActionStep>(this.getApiUrl(`/conditional_approvals/action-steps/${id}/`), actionStepData)
+      .pipe(
+        tap(response => console.log('Updated action step:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteActionStep(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/conditional_approvals/action-steps/${id}/`))
+      .pipe(
+        tap(() => console.log('Deleted action step:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // Approval Step Conditions API (NEW)
+  createApprovalStepCondition(conditionData: CreateApprovalStepConditionRequest & { approval_step: number }): Observable<ApprovalStepCondition> {
+    return this.http.post<ApprovalStepCondition>(this.getApiUrl('/conditional_approvals/approval-step-conditions/'), conditionData)
+      .pipe(
+        tap(response => console.log('Created approval step condition:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateApprovalStepCondition(id: number, conditionData: UpdateApprovalStepConditionRequest): Observable<ApprovalStepCondition> {
+    return this.http.put<ApprovalStepCondition>(this.getApiUrl(`/conditional_approvals/approval-step-conditions/${id}/`), conditionData)
+      .pipe(
+        tap(response => console.log('Updated approval step condition:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteApprovalStepCondition(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/conditional_approvals/approval-step-conditions/${id}/`))
+      .pipe(
+        tap(() => console.log('Deleted approval step condition:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // Parallel Approval Groups API (NEW)
+  createParallelApprovalGroup(groupData: CreateParallelApprovalGroupRequest & { approval_step: number }): Observable<ParallelApprovalGroup> {
+    return this.http.post<ParallelApprovalGroup>(this.getApiUrl('/conditional_approvals/parallel-approval-groups/'), groupData)
+      .pipe(
+        tap(response => console.log('Created parallel approval group:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateParallelApprovalGroup(id: number, groupData: UpdateParallelApprovalGroupRequest): Observable<ParallelApprovalGroup> {
+    return this.http.put<ParallelApprovalGroup>(this.getApiUrl(`/conditional_approvals/parallel-approval-groups/${id}/`), groupData)
+      .pipe(
+        tap(response => console.log('Updated parallel approval group:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteParallelApprovalGroup(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/conditional_approvals/parallel-approval-groups/${id}/`))
+      .pipe(
+        tap(() => console.log('Deleted parallel approval group:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // Batch Operations (NEW) - for creating/updating entire approval flows
+  saveCompleteApprovalFlow(serviceCode: string, approvalFlowData: ApprovalFlowData): Observable<MasterStepData> {
+    console.log('Saving complete approval flow:', serviceCode, approvalFlowData);
+
+    // Convert ApprovalFlowData to MasterStep format
+    const masterStepRequest = this.convertApprovalFlowToMasterStepRequest(approvalFlowData);
+
+    // Determine if this is create or update based on existing data
+    return this.getMasterStepsByService(approvalFlowData.service_type || 0).pipe(
+      map(response => {
+        const existingMasterStep = response.results.find(ms => ms.service.code === serviceCode);
+        return !!existingMasterStep;
+      }),
+      catchError(() => of(false)), // If error, assume it doesn't exist
+      map(exists => ({ exists, masterStepRequest }))
+    ).pipe(
+      map(({ exists, masterStepRequest }) => {
+        if (exists) {
+          console.log('Updating existing approval flow');
+          return this.updateMasterStep(serviceCode, masterStepRequest);
+        } else {
+          console.log('Creating new approval flow');
+          return this.createMasterStep(masterStepRequest);
+        }
+      }),
+      // Flatten the observable
+      map(obs => obs),
+      catchError(this.handleError)
+    );
+  }
+
+  // Conversion method: ApprovalFlowData -> MasterStepRequest
+  private convertApprovalFlowToMasterStepRequest(approvalFlow: ApprovalFlowData): CreateMasterStepRequest {
+    console.log('Converting approval flow to master step request:', approvalFlow);
+
+    const request: CreateMasterStepRequest = {
+      service: {
+        id: approvalFlow.service_type || 0,
+        code: approvalFlow.metadata?.service_code || approvalFlow.id || '',
+        name: approvalFlow.name,
+        name_ara: approvalFlow.name // You might want to add name_ara to ApprovalFlowData
+      },
+      steps: []
+    };
+
+    // Get approval step elements and sort by sequence
+    const approvalStepElements = approvalFlow.elements
+      .filter(el => el.type === 'approval_step')
+      .sort((a, b) => (a.properties.seq || 0) - (b.properties.seq || 0));
+
+    approvalStepElements.forEach(stepEl => {
+      const stepRequest: CreateApprovalStepRequest = {
+        service_type: stepEl.properties.service_type,
+        seq: stepEl.properties.seq || 1,
+        step_type: stepEl.properties.step_type || 2,
+        status: stepEl.properties.status,
+        group: stepEl.properties.group,
+        required_approvals: stepEl.properties.required_approvals,
+        priority_approver_groups: stepEl.properties.priority_approver_groups || [],
+        active_ind: stepEl.properties.active_ind !== false,
+        actions: [],
+        parallel_approval_groups: [],
+        conditions: []
+      };
+
+      // Find connected elements (actions, conditions, parallel groups)
+      const connections = approvalFlow.connections.filter(conn => conn.sourceId === stepEl.id);
+
+      connections.forEach(conn => {
+        const targetElement = approvalFlow.elements.find(el => el.id === conn.targetId);
+        if (!targetElement) return;
+
+        switch (targetElement.type) {
+          case 'action_step':
+            stepRequest.actions.push({
+              action: targetElement.properties.action,
+              to_status: targetElement.properties.to_status,
+              sub_status: targetElement.properties.sub_status,
+              active_ind: targetElement.properties.active_ind !== false
+            });
+            break;
+
+          case 'condition_step':
+            stepRequest.conditions!.push({
+              type: targetElement.properties.type || 1,
+              condition_logic: targetElement.properties.condition_logic || [],
+              to_status: targetElement.properties.to_status,
+              sub_status: targetElement.properties.sub_status,
+              active_ind: targetElement.properties.active_ind !== false
+            });
+            break;
+
+          case 'parallel_group':
+            if (targetElement.properties.parallel_groups) {
+              targetElement.properties.parallel_groups.forEach((groupId: number) => {
+                stepRequest.parallel_approval_groups!.push({
+                  group: groupId
+                });
+              });
+            }
+            break;
+        }
+      });
+
+      request.steps.push(stepRequest);
+    });
+
+    console.log('Converted master step request:', request);
+    return request;
+  }
+
+  // Lookup APIs (existing)
   private getLookups(name: string): Observable<LookupResponse> {
     const params = new HttpParams().set('name', name);
     return this.http.get<LookupResponse>(this.getApiUrl('/lookups/'), { params })
@@ -185,7 +497,7 @@ export class ApprovalFlowApiService {
     return this.getLookups('Case Sub Status');
   }
 
-  // Groups API
+  // Groups API (existing)
   getGroups(): Observable<GroupResponse> {
     return this.http.get<GroupResponse>(this.getApiUrl('/auth/groups/'))
       .pipe(
@@ -194,7 +506,7 @@ export class ApprovalFlowApiService {
       );
   }
 
-  // Convert master steps to approval flow summaries
+  // Convert master steps to approval flow summaries (existing)
   getApprovalFlowSummaries(): Observable<ApprovalFlowSummary[]> {
     return this.getMasterSteps().pipe(
       map(response => {
@@ -212,7 +524,7 @@ export class ApprovalFlowApiService {
     );
   }
 
-  // Convert MasterStepData to ApprovalFlowData
+  // Convert MasterStepData to ApprovalFlowData (existing method - no changes needed)
   convertMasterStepToApprovalFlow(masterStep: MasterStepData): ApprovalFlowData {
     const approvalFlow: ApprovalFlowData = {
       id: masterStep.service.code,
@@ -388,7 +700,7 @@ export class ApprovalFlowApiService {
     return approvalFlow;
   }
 
-  // Get specific approval flow by service code
+  // Get specific approval flow by service code (existing)
   getApprovalFlow(serviceCode: string): Observable<ApprovalFlowData> {
     return this.getMasterSteps().pipe(
       map(response => {
@@ -403,10 +715,28 @@ export class ApprovalFlowApiService {
     );
   }
 
-  // Save approval flow (would need API endpoint for this)
+  // Updated saveApprovalFlow method to use the new API
   saveApprovalFlow(approvalFlow: ApprovalFlowData): Observable<any> {
-    // This would convert back to the master step format and save
-    // For now, just save to localStorage as fallback
+    const serviceCode = approvalFlow.metadata?.service_code || approvalFlow.id || '';
+
+    if (!serviceCode) {
+      return throwError(() => new Error('Service code is required to save approval flow'));
+    }
+
+    if (this.isConfigured()) {
+      return this.saveCompleteApprovalFlow(serviceCode, approvalFlow).pipe(
+        map(result => ({ success: true, data: result })),
+        catchError(error => {
+          console.error('Failed to save to API, falling back to localStorage:', error);
+          return this.saveToLocalStorage(approvalFlow);
+        })
+      );
+    } else {
+      return this.saveToLocalStorage(approvalFlow);
+    }
+  }
+
+  private saveToLocalStorage(approvalFlow: ApprovalFlowData): Observable<any> {
     const savedData = JSON.stringify(approvalFlow, null, 2);
     localStorage.setItem(`approval_flow_${approvalFlow.id}`, savedData);
 
@@ -418,7 +748,7 @@ export class ApprovalFlowApiService {
     });
   }
 
-  // Utility methods
+  // Utility methods (existing)
   isConfigured(): boolean {
     return this.configService.isConfigured();
   }
@@ -427,7 +757,7 @@ export class ApprovalFlowApiService {
     return this.configService.getBaseUrl();
   }
 
-  // Test connection method
+  // Test connection method (existing)
   testConnection(): Observable<any> {
     return this.http.get(this.getApiUrl('/'))
       .pipe(
@@ -436,7 +766,7 @@ export class ApprovalFlowApiService {
       );
   }
 
-  // Convert lookup items to a more usable format
+  // Convert lookup items to a more usable format (existing)
   convertLookupsToServices(lookups: LookupItem[]): Service[] {
     return lookups.map(lookup => ({
       id: lookup.id,
