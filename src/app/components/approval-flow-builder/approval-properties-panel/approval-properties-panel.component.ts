@@ -29,7 +29,7 @@ import {
   Status
 } from '../../../models/approval-flow.models';
 import { ApprovalFlowApiService, LookupItem } from '../../../services/approval-flow-api.service';
-import { ConditionBuilderComponent } from '../../workflow-builder/properties-panel/condition-builder/condition-builder.component';
+import { ApprovalConditionBuilderComponent } from '../approval-condition-builder/approval-condition-builder.component';
 
 @Component({
   selector: 'app-approval-properties-panel',
@@ -48,7 +48,7 @@ import { ConditionBuilderComponent } from '../../workflow-builder/properties-pan
     MatChipsModule,
     MatDividerModule,
     MatProgressSpinnerModule,
-    ConditionBuilderComponent
+    ApprovalConditionBuilderComponent
   ],
   template: `
     <div class="approval-properties-panel" *ngIf="selectedElement || selectedConnection">
@@ -336,10 +336,11 @@ import { ConditionBuilderComponent } from '../../workflow-builder/properties-pan
                 <!-- Condition Logic Tab (for Condition Step) -->
                 <mat-tab label="Logic" *ngIf="selectedElement.type === 'condition_step'">
                   <div class="tab-content">
-                    <app-condition-builder
+                    <app-approval-condition-builder
                       [conditionLogic]="propertiesForm.get('condition_logic')?.value || []"
+                      [availableFields]="getAvailableFields()"
                       (conditionChanged)="onConditionLogicChanged($event)">
-                    </app-condition-builder>
+                    </app-approval-condition-builder>
                   </div>
                 </mat-tab>
 
@@ -405,8 +406,8 @@ import { ConditionBuilderComponent } from '../../workflow-builder/properties-pan
 
           <!-- Auto-save Status -->
           <div class="auto-save-status" *ngIf="!isLoading && !errorMessage && showAutoSaveStatus">
-            <div class="status-indicator">
-              <mat-icon [ngClass]="autoSaveStatus">{{ getAutoSaveIcon() }}</mat-icon>
+            <div class="status-indicator" [ngClass]="autoSaveStatus">
+              <mat-icon>{{ getAutoSaveIcon() }}</mat-icon>
               <span>{{ getAutoSaveMessage() }}</span>
             </div>
           </div>
@@ -451,7 +452,316 @@ import { ConditionBuilderComponent } from '../../workflow-builder/properties-pan
       </div>
     </div>
   `,
-  styleUrl: '../../../components/workflow-builder/properties-panel/properties-panel.component.scss'
+  styles: [`
+    .approval-properties-panel {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: #f8f9fa;
+    }
+
+    .properties-content {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .panel-header {
+      padding: 16px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .header-text h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 8px 0;
+      color: #333;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .header-text p {
+      margin: 0;
+      color: #666;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .reset-button {
+      margin-left: 8px;
+    }
+
+    .scrollable-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .loading-container mat-spinner {
+      margin-bottom: 16px;
+    }
+
+    .loading-container p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .error-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+      color: #f44336;
+    }
+
+    .error-container mat-icon {
+      font-size: 32px;
+      width: 32px;
+      height: 32px;
+      margin-bottom: 16px;
+    }
+
+    .error-container p {
+      margin: 0 0 16px 0;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .error-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tab-content {
+      padding: 16px 0;
+    }
+
+    .full-width {
+      width: 100%;
+    }
+
+    .form-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .parallel-section {
+      margin-top: 16px;
+    }
+
+    .parallel-content {
+      padding-top: 16px;
+    }
+
+    .parallel-fields {
+      margin-top: 16px;
+    }
+
+    .start-properties {
+      padding: 16px 0;
+    }
+
+    .connection-properties {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .connection-info {
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+
+    .connection-info p {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .connection-info p:last-child {
+      margin-bottom: 0;
+    }
+
+    .connection-info strong {
+      font-weight: 500;
+      color: #555;
+    }
+
+    .no-selection {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 40px 20px;
+      text-align: center;
+      color: #666;
+    }
+
+    .no-selection-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .no-selection mat-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: #ccc;
+    }
+
+    .no-selection h3 {
+      margin: 0;
+      color: #555;
+      font-size: 18px;
+    }
+
+    .no-selection p {
+      margin: 0;
+      color: #666;
+      font-size: 14px;
+      max-width: 280px;
+      line-height: 1.4;
+    }
+
+    .auto-save-status {
+      position: sticky;
+      bottom: 0;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+      padding: 12px 16px;
+      margin: 0 -16px -16px -16px;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .status-indicator mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+
+    .status-indicator.saved mat-icon {
+      color: #4caf50;
+    }
+
+    .status-indicator.saving mat-icon {
+      color: #ff9800;
+      animation: spin 1s linear infinite;
+    }
+
+    .status-indicator.error mat-icon {
+      color: #f44336;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .mat-expansion-panel {
+      box-shadow: none !important;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px !important;
+      margin-bottom: 16px;
+    }
+
+    .mat-expansion-panel-header {
+      padding: 12px 16px;
+    }
+
+    .mat-expansion-panel-content .mat-expansion-panel-body {
+      padding: 0 16px 16px;
+    }
+
+    .mat-form-field {
+      margin-bottom: 16px;
+    }
+
+    .mat-form-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .mat-tab-group {
+      background: transparent;
+    }
+
+    .mat-tab-body-content {
+      overflow: visible !important;
+    }
+
+    .mat-chip-set {
+      margin: 8px 0;
+    }
+
+    .mat-chip {
+      font-size: 11px !important;
+      min-height: 24px !important;
+      border-radius: 12px !important;
+    }
+
+    @media (max-width: 768px) {
+      .scrollable-content {
+        padding: 12px;
+      }
+
+      .panel-header {
+        padding: 12px;
+      }
+
+      .header-text h3 {
+        font-size: 14px;
+      }
+
+      .header-text p {
+        font-size: 12px;
+      }
+
+      .parallel-content,
+      .parallel-fields {
+        padding-top: 12px;
+        margin-top: 12px;
+      }
+    }
+  `]
 })
 export class ApprovalPropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedElement?: ApprovalFlowElement;
@@ -695,10 +1005,8 @@ export class ApprovalPropertiesPanelComponent implements OnInit, OnChanges, OnDe
   // Event handlers
   onStepTypeChange(stepType: number): void {
     if (stepType === StepType.AUTO) {
-      // Auto step type - hide some fields and show condition fields
       console.log('Changed to Auto step type');
     } else {
-      // Action-based step type
       console.log('Changed to Action Based step type');
     }
   }
@@ -711,7 +1019,6 @@ export class ApprovalPropertiesPanelComponent implements OnInit, OnChanges, OnDe
   onActionSelected(actionId: number): void {
     const selectedAction = this.actions.find(a => a.id === actionId);
     if (selectedAction) {
-      // Update form with action details
       this.propertiesForm.patchValue({
         name: selectedAction.name
       });
@@ -725,6 +1032,21 @@ export class ApprovalPropertiesPanelComponent implements OnInit, OnChanges, OnDe
       const conditionLogicCopy = JSON.parse(JSON.stringify(conditionLogic));
       this.propertiesForm.patchValue({ condition_logic: conditionLogicCopy });
     }
+  }
+
+  getAvailableFields(): any[] {
+    // Return available fields for condition building
+    return [
+      { name: 'application_id', display_name: 'Application ID', type: 'text' },
+      { name: 'applicant_type', display_name: 'Applicant Type', type: 'text' },
+      { name: 'service_type', display_name: 'Service Type', type: 'text' },
+      { name: 'current_status', display_name: 'Current Status', type: 'text' },
+      { name: 'submission_date', display_name: 'Submission Date', type: 'date' },
+      { name: 'amount', display_name: 'Amount', type: 'number' },
+      { name: 'priority', display_name: 'Priority', type: 'text' },
+      { name: 'urgency', display_name: 'Urgency', type: 'text' },
+      { name: 'approval_level', display_name: 'Approval Level', type: 'number' }
+    ];
   }
 
   private updateFormForElement(): void {
