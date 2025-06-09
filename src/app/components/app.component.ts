@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, Router } from '@angular/router';
+import {RouterOutlet, Router, RouterLink} from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,13 +14,19 @@ import { AuthService } from '../services/auth.service';
     RouterOutlet,
     MatToolbarModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    RouterLink
   ],
   template: `
     <div class="app-container">
       <mat-toolbar color="primary" class="app-toolbar">
         <span>Workflow Builder</span>
         <span class="spacer"></span>
+
+        <button mat-button routerLink="/approval-flow">
+          <mat-icon>account_tree</mat-icon>
+          Approval Flows
+        </button>
         <button mat-button *ngIf="authService.isAuthenticated()" (click)="logout()">
           <mat-icon>logout</mat-icon>
           Logout
