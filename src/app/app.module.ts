@@ -76,6 +76,12 @@ const routes: Routes = [
     component: WorkflowBuilderComponent,
     canActivate: [AuthGuard]
   },
+  {
+    path: 'approval-flow',
+    loadComponent: () => import('./components/approval-flow-builder/approval-flow-builder.component')
+      .then(m => m.ApprovalFlowBuilderComponent),
+    canActivate: [AuthGuard]
+  },
   { path: '', redirectTo: '/workflow', pathMatch: 'full' },
   { path: '**', redirectTo: '/workflow' }
 ];
