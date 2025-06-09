@@ -1,7 +1,7 @@
 // components/workflow-builder/properties-panel/condition-builder/condition-builder.component.ts
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
+import {ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators, FormsModule} from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -13,12 +13,12 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 export interface ConditionLogic {
-  field: string;
+  field?: string;
   operation: string;
-  value: any;
-  logical_operator?: 'and' | 'or';
+  value?: any;
   conditions?: ConditionLogic[]; // For nested conditions
 }
 
@@ -44,7 +44,9 @@ export interface FieldReference {
     MatChipsModule,
     MatTooltipModule,
     MatDividerModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    MatCheckboxModule,
+    FormsModule
   ],
   template: `
     <div class="condition-builder">
@@ -65,6 +67,13 @@ export interface FieldReference {
           </button>
 
           <button mat-button
+                  (click)="toggleAdvancedMode()"
+                  [color]="advancedMode ? 'accent' : ''">
+            <mat-icon>{{ advancedMode ? 'code_off' : 'code' }}</mat-icon>
+            {{ advancedMode ? 'Simple Mode' : 'Advanced Mode' }}
+          </button>
+
+          <button mat-button
                   color="warn"
                   (click)="clearAllConditions()"
                   [disabled]="conditionForm.disabled || conditionGroups.length === 0">
@@ -77,14 +86,47 @@ export interface FieldReference {
       <mat-divider></mat-divider>
 
       <div class="builder-content" *ngIf="!isLoading">
-        <form [formGroup]="conditionForm">
+
+        <!-- Advanced Mode - JSON Editor -->
+        <div *ngIf="advancedMode" class="json-editor-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Condition Logic JSON</mat-label>
+            <textarea matInput
+                      [(ngModel)]="jsonText"
+                      (ngModelChange)="onJsonTextChange($event)"
+                      [class.error]="jsonError"
+                      rows="10"
+                      placeholder="Enter condition logic as JSON...">
+            </textarea>
+            <mat-hint *ngIf="!jsonError">Enter valid JSON for condition logic</mat-hint>
+            <mat-error *ngIf="jsonError">{{ jsonError }}</mat-error>
+          </mat-form-field>
+
+          <div class="json-actions">
+            <button mat-button (click)="formatJson()">
+              <mat-icon>format_align_left</mat-icon>
+              Format JSON
+            </button>
+            <button mat-button (click)="validateJson()">
+              <mat-icon>check_circle</mat-icon>
+              Validate
+            </button>
+            <button mat-button (click)="loadSampleJson()">
+              <mat-icon>lightbulb</mat-icon>
+              Load Sample
+            </button>
+          </div>
+        </div>
+
+        <!-- Simple Mode - Visual Builder -->
+        <form [formGroup]="conditionForm" *ngIf="!advancedMode">
           <div formArrayName="conditionGroups" class="condition-groups">
 
             <!-- Empty State -->
             <div *ngIf="conditionGroups.length === 0" class="empty-state">
               <mat-icon>rule</mat-icon>
               <h4>No Conditions Defined</h4>
-              <p>Add condition groups to define dynamic logic for your element.</p>
+              <p>Add condition groups to define dynamic logic for your approval flow.</p>
               <button mat-raised-button
                       color="primary"
                       (click)="addConditionGroup()">
@@ -118,6 +160,7 @@ export interface FieldReference {
                       <mat-select formControlName="operation" required>
                         <mat-option value="and">AND - All conditions must be true</mat-option>
                         <mat-option value="or">OR - Any condition can be true</mat-option>
+                        <mat-option value="not">NOT - Negate all conditions</mat-option>
                       </mat-select>
                       <mat-hint>How should conditions in this group be evaluated?</mat-hint>
                     </mat-form-field>
@@ -133,6 +176,13 @@ export interface FieldReference {
                         <span class="condition-number">{{ condIndex + 1 }}</span>
                         <span class="condition-label">Condition</span>
                         <div class="condition-actions">
+                          <button mat-icon-button
+                                  color="primary"
+                                  (click)="duplicateCondition(groupIndex, condIndex)"
+                                  [disabled]="conditionForm.disabled"
+                                  matTooltip="Duplicate condition">
+                            <mat-icon>content_copy</mat-icon>
+                          </button>
                           <button mat-icon-button
                                   color="warn"
                                   (click)="removeCondition(groupIndex, condIndex)"
@@ -160,6 +210,8 @@ export interface FieldReference {
                               <mat-option value="today">Today's Date</mat-option>
                               <mat-option value="current_user">Current User</mat-option>
                               <mat-option value="current_time">Current Time</mat-option>
+                              <mat-option value="submission_date">Submission Date</mat-option>
+                              <mat-option value="application_id">Application ID</mat-option>
                             </mat-optgroup>
                           </mat-select>
                           <mat-error>Field is required</mat-error>
@@ -202,6 +254,13 @@ export interface FieldReference {
                             <input matInput type="date" formControlName="value" required>
                             <mat-error>Date is required</mat-error>
                           </mat-form-field>
+
+                          <!-- Boolean Input -->
+                          <div *ngSwitchCase="'boolean'" class="boolean-input">
+                            <mat-slide-toggle formControlName="value">
+                              {{ getConditionForm(groupIndex, condIndex).get('value')?.value ? 'True' : 'False' }}
+                            </mat-slide-toggle>
+                          </div>
 
                           <!-- List Input (for 'in' operations) -->
                           <div *ngSwitchCase="'list'" class="list-input">
@@ -284,7 +343,7 @@ export interface FieldReference {
         </form>
 
         <!-- JSON Preview -->
-        <mat-expansion-panel class="json-preview" *ngIf="conditionGroups.length > 0">
+        <mat-expansion-panel class="json-preview" *ngIf="conditionGroups.length > 0 && !advancedMode">
           <mat-expansion-panel-header>
             <mat-panel-title>
               <mat-icon>code</mat-icon>
@@ -297,6 +356,47 @@ export interface FieldReference {
 
           <div class="json-content">
             <pre>{{ getConditionLogicJson() }}</pre>
+
+            <div class="json-actions">
+              <button mat-button (click)="copyToClipboard()">
+                <mat-icon>content_copy</mat-icon>
+                Copy JSON
+              </button>
+              <button mat-button (click)="switchToAdvancedMode()">
+                <mat-icon>edit</mat-icon>
+                Edit as JSON
+              </button>
+            </div>
+          </div>
+        </mat-expansion-panel>
+
+        <!-- Sample Conditions -->
+        <mat-expansion-panel class="samples-panel" *ngIf="!advancedMode">
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon>lightbulb</mat-icon>
+              Sample Conditions
+            </mat-panel-title>
+            <mat-panel-description>
+              Common condition patterns
+            </mat-panel-description>
+          </mat-expansion-panel-header>
+
+          <div class="samples-content">
+            <div class="sample-grid">
+              <div *ngFor="let sample of sampleConditions"
+                   class="sample-item"
+                   (click)="loadSample(sample)">
+                <div class="sample-header">
+                  <mat-icon>{{ sample.icon }}</mat-icon>
+                  <span>{{ sample.name }}</span>
+                </div>
+                <p class="sample-description">{{ sample.description }}</p>
+                <div class="sample-preview">
+                  <code>{{ sample.preview }}</code>
+                </div>
+              </div>
+            </div>
           </div>
         </mat-expansion-panel>
       </div>
@@ -312,7 +412,7 @@ export interface FieldReference {
     .condition-builder {
       display: flex;
       flex-direction: column;
-      max-height: 600px;
+      max-height: 700px;
     }
 
     .builder-header {
@@ -346,6 +446,24 @@ export interface FieldReference {
       flex: 1;
       overflow-y: auto;
       padding: 16px;
+    }
+
+    .json-editor-section {
+      margin-bottom: 16px;
+    }
+
+    .json-editor-section .full-width {
+      width: 100%;
+    }
+
+    .json-editor-section textarea.error {
+      border-color: #f44336;
+    }
+
+    .json-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
     }
 
     .empty-state {
@@ -469,6 +587,13 @@ export interface FieldReference {
       flex-direction: column;
     }
 
+    .boolean-input {
+      display: flex;
+      align-items: center;
+      height: 56px;
+      padding: 0 12px;
+    }
+
     .list-input {
       display: flex;
       flex-direction: column;
@@ -531,7 +656,8 @@ export interface FieldReference {
       margin: 0 16px;
     }
 
-    .json-preview {
+    .json-preview,
+    .samples-panel {
       margin-top: 16px;
       border: 1px solid #e0e0e0;
     }
@@ -544,12 +670,72 @@ export interface FieldReference {
     }
 
     .json-content pre {
-      margin: 0;
+      margin: 0 0 12px 0;
       font-family: 'Courier New', monospace;
       font-size: 12px;
       color: #333;
       white-space: pre-wrap;
       word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+
+    .samples-content {
+      padding: 16px;
+    }
+
+    .sample-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .sample-item {
+      padding: 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .sample-item:hover {
+      border-color: #2196F3;
+      background: #f8f9ff;
+    }
+
+    .sample-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-weight: 500;
+      color: #333;
+    }
+
+    .sample-header mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      color: #2196F3;
+    }
+
+    .sample-description {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .sample-preview {
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #555;
     }
 
     .loading-state {
@@ -592,6 +778,10 @@ export interface FieldReference {
       .group-content {
         padding: 12px;
       }
+
+      .sample-grid {
+        grid-template-columns: 1fr;
+      }
     }
   `]
 })
@@ -604,6 +794,9 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
 
   conditionForm!: FormGroup;
   isLoading = false;
+  advancedMode = false;
+  jsonText = '';
+  jsonError = '';
 
   operationGroups = [
     {
@@ -641,11 +834,60 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
         { value: '*', label: 'Multiply (×)' },
         { value: '/', label: 'Divide (÷)' }
       ]
+    },
+    {
+      name: 'Logical',
+      operations: [
+        { value: 'is_empty', label: 'Is Empty' },
+        { value: 'is_not_empty', label: 'Is Not Empty' },
+        { value: 'is_null', label: 'Is Null' },
+        { value: 'is_not_null', label: 'Is Not Null' }
+      ]
+    }
+  ];
+
+  sampleConditions = [
+    {
+      name: 'Simple Field Check',
+      icon: 'check_circle',
+      description: 'Check if a field equals a specific value',
+      preview: 'first_name = "John"',
+      logic: [{ field: 'first_name', operation: '=', value: 'John' }]
+    },
+    {
+      name: 'Age Range',
+      icon: 'date_range',
+      description: 'Check if age is within a specific range',
+      preview: 'age >= 18 AND age <= 65',
+      logic: [
+        {
+          operation: 'and',
+          conditions: [
+            { field: 'age', operation: '>=', value: 18 },
+            { field: 'age', operation: '<=', value: 65 }
+          ]
+        }
+      ]
+    },
+    {
+      name: 'Multiple Options',
+      icon: 'list',
+      description: 'Check if field value is in a list of options',
+      preview: 'status IN ["pending", "review", "approved"]',
+      logic: [{ field: 'status', operation: 'in', value: 'pending,review,approved' }]
+    },
+    {
+      name: 'Email Validation',
+      icon: 'email',
+      description: 'Check if email contains specific domain',
+      preview: 'email CONTAINS "@company.com"',
+      logic: [{ field: 'email', operation: 'contains', value: '@company.com' }]
     }
   ];
 
   constructor(private fb: FormBuilder) {
     this.initializeForm();
+    this.initializeFields();
   }
 
   ngOnInit(): void {
@@ -672,9 +914,24 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     });
   }
 
+  private initializeFields(): void {
+    // Add some default fields if none provided
+    if (this.availableFields.length === 0) {
+      this.availableFields = [
+        { name: 'first_name', display_name: 'First Name', type: 'text' },
+        { name: 'last_name', display_name: 'Last Name', type: 'text' },
+        { name: 'email', display_name: 'Email', type: 'email' },
+        { name: 'age', display_name: 'Age', type: 'number' },
+        { name: 'date_of_birth', display_name: 'Date of Birth', type: 'date' },
+        { name: 'status', display_name: 'Status', type: 'text' },
+        { name: 'application_type', display_name: 'Application Type', type: 'text' }
+      ];
+    }
+  }
+
   private setupFormSubscription(): void {
     this.conditionForm.valueChanges.subscribe(() => {
-      if (this.conditionForm.valid) {
+      if (this.conditionForm.valid && !this.advancedMode) {
         this.emitConditionChange();
       }
     });
@@ -688,6 +945,98 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     return this.conditionGroups.at(groupIndex).get('conditions') as FormArray;
   }
 
+  getConditionForm(groupIndex: number, conditionIndex: number): FormGroup {
+    return this.getConditionsArray(groupIndex).at(conditionIndex) as FormGroup;
+  }
+
+  // Advanced Mode Methods
+  toggleAdvancedMode(): void {
+    this.advancedMode = !this.advancedMode;
+
+    if (this.advancedMode) {
+      this.switchToAdvancedMode();
+    } else {
+      this.switchToSimpleMode();
+    }
+  }
+
+  switchToAdvancedMode(): void {
+    this.advancedMode = true;
+    this.jsonText = this.getConditionLogicJson();
+  }
+
+  switchToSimpleMode(): void {
+    this.advancedMode = false;
+    if (this.jsonText) {
+      this.parseJsonToForm();
+    }
+  }
+
+  onJsonTextChange(text: string): void {
+    this.jsonText = text;
+    this.validateJson();
+  }
+
+  validateJson(): boolean {
+    try {
+      if (this.jsonText.trim()) {
+        const parsed = JSON.parse(this.jsonText);
+        this.jsonError = '';
+        this.emitConditionChange();
+        return true;
+      } else {
+        this.jsonError = '';
+        return true;
+      }
+    } catch (error) {
+      this.jsonError = 'Invalid JSON format';
+      return false;
+    }
+  }
+
+  formatJson(): void {
+    if (this.validateJson()) {
+      try {
+        const parsed = JSON.parse(this.jsonText);
+        this.jsonText = JSON.stringify(parsed, null, 2);
+      } catch (error) {
+        // Error already handled in validateJson
+      }
+    }
+  }
+
+  loadSampleJson(): void {
+    const sampleJson = {
+      "operation": "and",
+      "conditions": [
+        {
+          "field": "first_name",
+          "operation": "startswith",
+          "value": "John"
+        },
+        {
+          "field": "age",
+          "operation": ">",
+          "value": 18
+        }
+      ]
+    };
+
+    this.jsonText = JSON.stringify([sampleJson], null, 2);
+    this.validateJson();
+  }
+
+  private parseJsonToForm(): void {
+    try {
+      const logic = JSON.parse(this.jsonText);
+      this.conditionLogic = Array.isArray(logic) ? logic : [logic];
+      this.loadConditionLogic();
+    } catch (error) {
+      console.error('Error parsing JSON to form:', error);
+    }
+  }
+
+  // Form Management Methods
   private loadConditionLogic(): void {
     this.conditionGroups.clear();
 
@@ -759,6 +1108,11 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     }
   }
 
+  duplicateCondition(groupIndex: number, conditionIndex: number): void {
+    const conditionValue = this.getConditionsArray(groupIndex).at(conditionIndex).value;
+    this.addConditionFromData(this.getConditionsArray(groupIndex), conditionValue);
+  }
+
   removeConditionGroup(groupIndex: number): void {
     this.conditionGroups.removeAt(groupIndex);
     this.emitConditionChange();
@@ -774,6 +1128,7 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     this.emitConditionChange();
   }
 
+  // Event Handlers
   onFieldChange(groupIndex: number, conditionIndex: number, fieldName: string): void {
     const field = this.availableFields.find(f => f.name === fieldName);
     const conditionForm = this.getConditionsArray(groupIndex).at(conditionIndex);
@@ -801,6 +1156,7 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     valueControl?.updateValueAndValidity();
   }
 
+  // Utility Methods
   getValueInputType(groupIndex: number, conditionIndex: number): string {
     const conditionForm = this.getConditionsArray(groupIndex).at(conditionIndex);
     const operation = conditionForm.get('operation')?.value;
@@ -827,6 +1183,8 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
         case 'date':
         case 'datetime':
           return 'date';
+        case 'boolean':
+          return 'boolean';
         default:
           return 'text';
       }
@@ -908,7 +1266,9 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     const operator = groupValue.operation || 'and';
     return operator === 'and'
       ? 'All conditions must be true'
-      : 'Any condition can be true';
+      : operator === 'or'
+        ? 'Any condition can be true'
+        : 'Negated condition group';
   }
 
   getConditionLogicJson(): string {
@@ -916,9 +1276,36 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
     return JSON.stringify(logic, null, 2);
   }
 
+  // Sample Loading
+  loadSample(sample: any): void {
+    this.conditionLogic = sample.logic;
+    this.loadConditionLogic();
+    this.emitConditionChange();
+  }
+
+  // Clipboard
+  async copyToClipboard(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.getConditionLogicJson());
+      // Could show a snackbar or toast here
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+    }
+  }
+
+  // Output
   private emitConditionChange(): void {
-    const conditionLogic = this.buildConditionLogic();
-    this.conditionChanged.emit(conditionLogic);
+    if (this.advancedMode) {
+      try {
+        const parsed = JSON.parse(this.jsonText);
+        this.conditionChanged.emit(Array.isArray(parsed) ? parsed : [parsed]);
+      } catch (error) {
+        // Don't emit if JSON is invalid
+      }
+    } else {
+      const conditionLogic = this.buildConditionLogic();
+      this.conditionChanged.emit(conditionLogic);
+    }
   }
 
   private buildConditionLogic(): ConditionLogic[] {
