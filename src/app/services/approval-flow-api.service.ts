@@ -1,8 +1,9 @@
 // services/approval-flow-api.service.ts - Enhanced with POST/PUT/DELETE methods
 import { Injectable } from '@angular/core';
+
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
-import { catchError, tap, map } from 'rxjs/operators';
+import { Observable, throwError, of } from 'rxjs';
+import { catchError, tap, map, switchMap } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 import {
   Action,
@@ -80,17 +81,17 @@ export interface CreateApprovalStepRequest {
   group: number;
   required_approvals?: number;
   priority_approver_groups?: number[];
-  active_ind: boolean;
-  actions: CreateActionStepRequest[];
+  active_ind?: boolean;
+  actions?: CreateActionStepRequest[];
   parallel_approval_groups?: CreateParallelApprovalGroupRequest[];
-  conditions?: CreateApprovalStepConditionRequest[];
+  approvalstepcondition_set?: CreateApprovalStepConditionRequest[];
+  apicallcondition_set?: any[];
 }
-
 export interface CreateActionStepRequest {
   action: number;
   to_status: number;
   sub_status?: number;
-  active_ind: boolean;
+  active_ind?: boolean;
 }
 
 export interface CreateApprovalStepConditionRequest {
@@ -98,7 +99,7 @@ export interface CreateApprovalStepConditionRequest {
   condition_logic: any[];
   to_status?: number;
   sub_status?: number;
-  active_ind: boolean;
+  active_ind?: boolean;
 }
 
 export interface CreateParallelApprovalGroupRequest {
@@ -117,9 +118,9 @@ export interface UpdateMasterStepRequest {
 
 export interface UpdateApprovalStepRequest extends CreateApprovalStepRequest {
   id?: number; // Include ID for updates
-  actions: UpdateActionStepRequest[];
+  actions?: UpdateActionStepRequest[];
   parallel_approval_groups?: UpdateParallelApprovalGroupRequest[];
-  conditions?: UpdateApprovalStepConditionRequest[];
+  approvalstepcondition_set?: UpdateApprovalStepConditionRequest[];
 }
 
 export interface UpdateActionStepRequest extends CreateActionStepRequest {
@@ -150,7 +151,30 @@ export class ApprovalFlowApiService {
     }
     return `${baseUrl}${endpoint}`;
   }
+  private cleanApprovalStepData(data: any): any {
+    const cleaned: any = { ...data };
 
+    // Remove empty arrays and undefined values
+    Object.keys(cleaned).forEach(key => {
+      if (Array.isArray(cleaned[key]) && cleaned[key].length === 0) {
+        delete cleaned[key];
+      } else if (cleaned[key] === undefined || cleaned[key] === null) {
+        delete cleaned[key];
+      }
+    });
+
+    return cleaned;
+  }
+
+// Helper method to clean master step data
+  private cleanMasterStepData(data: CreateMasterStepRequest): CreateMasterStepRequest {
+    const cleaned: CreateMasterStepRequest = {
+      service: data.service,
+      steps: data.steps.map(step => this.cleanApprovalStepData(step))
+    };
+
+    return cleaned;
+  }
   private handleError = (error: HttpErrorResponse) => {
     console.error('API Error:', error);
 
@@ -238,7 +262,9 @@ export class ApprovalFlowApiService {
 
   // Master Steps API - CREATE/UPDATE/DELETE operations (NEW)
   createMasterStep(masterStepData: CreateMasterStepRequest): Observable<MasterStepData> {
-    return this.http.post<MasterStepData>(this.getApiUrl('/conditional_approvals/master-steps/'), masterStepData)
+    const cleanedData = this.cleanMasterStepData(masterStepData);
+
+    return this.http.post<MasterStepData>(this.getApiUrl('/conditional_approvals/master-steps/'), cleanedData)
       .pipe(
         tap(response => console.log('Created master step:', response)),
         catchError(this.handleError)
@@ -375,9 +401,7 @@ export class ApprovalFlowApiService {
         return !!existingMasterStep;
       }),
       catchError(() => of(false)), // If error, assume it doesn't exist
-      map(exists => ({ exists, masterStepRequest }))
-    ).pipe(
-      map(({ exists, masterStepRequest }) => {
+      switchMap(exists => {
         if (exists) {
           console.log('Updating existing approval flow');
           return this.updateMasterStep(serviceCode, masterStepRequest);
@@ -386,12 +410,9 @@ export class ApprovalFlowApiService {
           return this.createMasterStep(masterStepRequest);
         }
       }),
-      // Flatten the observable
-      map(obs => obs),
       catchError(this.handleError)
     );
   }
-
   // Conversion method: ApprovalFlowData -> MasterStepRequest
   private convertApprovalFlowToMasterStepRequest(approvalFlow: ApprovalFlowData): CreateMasterStepRequest {
     console.log('Converting approval flow to master step request:', approvalFlow);
@@ -413,18 +434,27 @@ export class ApprovalFlowApiService {
 
     approvalStepElements.forEach(stepEl => {
       const stepRequest: CreateApprovalStepRequest = {
-        service_type: stepEl.properties.service_type,
+        service_type: stepEl.properties.service_type || 0,
         seq: stepEl.properties.seq || 1,
         step_type: stepEl.properties.step_type || 2,
-        status: stepEl.properties.status,
-        group: stepEl.properties.group,
-        required_approvals: stepEl.properties.required_approvals,
-        priority_approver_groups: stepEl.properties.priority_approver_groups || [],
-        active_ind: stepEl.properties.active_ind !== false,
-        actions: [],
-        parallel_approval_groups: [],
-        conditions: []
+        status: stepEl.properties.status || 0,
+        group: stepEl.properties.group || 0,
+        active_ind: stepEl.properties.active_ind !== false
       };
+
+      // Only add optional fields if they have values
+      if (stepEl.properties.required_approvals) {
+        stepRequest.required_approvals = stepEl.properties.required_approvals;
+      }
+
+      if (stepEl.properties.priority_approver_groups && stepEl.properties.priority_approver_groups.length > 0) {
+        stepRequest.priority_approver_groups = stepEl.properties.priority_approver_groups;
+      }
+
+      // Initialize arrays for connected elements
+      const actions: CreateActionStepRequest[] = [];
+      const parallelGroups: CreateParallelApprovalGroupRequest[] = [];
+      const conditions: CreateApprovalStepConditionRequest[] = [];
 
       // Find connected elements (actions, conditions, parallel groups)
       const connections = approvalFlow.connections.filter(conn => conn.sourceId === stepEl.id);
@@ -435,16 +465,18 @@ export class ApprovalFlowApiService {
 
         switch (targetElement.type) {
           case 'action_step':
-            stepRequest.actions.push({
-              action: targetElement.properties.action,
-              to_status: targetElement.properties.to_status,
-              sub_status: targetElement.properties.sub_status,
-              active_ind: targetElement.properties.active_ind !== false
-            });
+            if (targetElement.properties.action && targetElement.properties.to_status) {
+              actions.push({
+                action: targetElement.properties.action,
+                to_status: targetElement.properties.to_status,
+                sub_status: targetElement.properties.sub_status,
+                active_ind: targetElement.properties.active_ind !== false
+              });
+            }
             break;
 
           case 'condition_step':
-            stepRequest.conditions!.push({
+            conditions.push({
               type: targetElement.properties.type || 1,
               condition_logic: targetElement.properties.condition_logic || [],
               to_status: targetElement.properties.to_status,
@@ -456,7 +488,7 @@ export class ApprovalFlowApiService {
           case 'parallel_group':
             if (targetElement.properties.parallel_groups) {
               targetElement.properties.parallel_groups.forEach((groupId: number) => {
-                stepRequest.parallel_approval_groups!.push({
+                parallelGroups.push({
                   group: groupId
                 });
               });
@@ -464,6 +496,19 @@ export class ApprovalFlowApiService {
             break;
         }
       });
+
+// Only add arrays if they have data
+      if (actions.length > 0) {
+        stepRequest.actions = actions;
+      }
+
+      if (parallelGroups.length > 0) {
+        stepRequest.parallel_approval_groups = parallelGroups;
+      }
+
+      if (conditions.length > 0) {
+        stepRequest.approvalstepcondition_set = conditions;
+      }
 
       request.steps.push(stepRequest);
     });
