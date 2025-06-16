@@ -1,4 +1,4 @@
-// app.routes.ts
+// src/app/app.routes.ts
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
@@ -26,6 +26,12 @@ export const routes: Routes = [
     path: 'approval-flow',
     loadComponent: () => import('./components/approval-flow-builder/approval-flow-builder.component')
       .then(m => m.ApprovalFlowBuilderComponent),
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'mapper-builder',
+    loadComponent: () => import('./components/mapper-builder/mapper-builder.component')
+      .then(m => m.MapperBuilderComponent),
     canActivate: [AuthGuard]
   },
   {
