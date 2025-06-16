@@ -28,6 +28,7 @@ import {
   FilterFunction
 } from '../../../../models/mapper.models';
 import { FieldRuleEditorComponent } from '../field-rule-editor/field-rule-editor.component';
+import {MatAutocomplete, MatAutocompleteTrigger} from '@angular/material/autocomplete';
 
 @Component({
   selector: 'app-mapper-canvas',
@@ -48,7 +49,9 @@ import { FieldRuleEditorComponent } from '../field-rule-editor/field-rule-editor
     MatMenuModule,
     MatDialogModule,
     MatProgressSpinnerModule,
-    MatSlideToggleModule
+    MatSlideToggleModule,
+    MatAutocompleteTrigger,
+    MatAutocomplete
   ],
   template: `
     <div class="mapper-canvas">
@@ -84,21 +87,22 @@ import { FieldRuleEditorComponent } from '../field-rule-editor/field-rule-editor
             <div class="form-row">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Model</mat-label>
-                <mat-select formControlName="model" (selectionChange)="onModelChange($event.value)">
-                  <mat-option>
-                    <input
-                      matInput
-                      placeholder="Search models..."
-                      (input)="filterModels($event.target.value)"
-                      class="model-search">
+                <input type="text"
+                       matInput
+                       formControlName="model"
+                       placeholder="Search and select model..."
+                       [matAutocomplete]="modelAuto">
+                <mat-autocomplete #modelAuto="matAutocomplete"
+                                  [displayWith]="displayModelFn"
+                                  (optionSelected)="onModelChange($event.option.value)">
+                  <mat-option *ngFor="let model of filteredModels$ | async"
+                              [value]="model.app_label + '.' + model.model">
+                <span class="model-option">
+                  <strong>{{ model.model }}</strong>
+                  <small>{{ model.app_label }}</small>
+                </span>
                   </mat-option>
-                  <mat-option *ngFor="let model of filteredModels$ | async" [value]="model.app_label + '.' + model.model">
-                    <span class="model-option">
-                      <strong>{{ model.model }}</strong>
-                      <small>{{ model.app_label }}</small>
-                    </span>
-                  </mat-option>
-                </mat-select>
+                </mat-autocomplete>
                 <mat-icon matSuffix>data_object</mat-icon>
                 <mat-error *ngIf="targetForm.get('model')?.hasError('required')">
                   Model is required

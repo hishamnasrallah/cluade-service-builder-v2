@@ -10,6 +10,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatRippleModule } from '@angular/material/core';
+import {MatDivider, MatDividerModule} from '@angular/material/divider';
 import { DragDropModule, CdkDragDrop, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { MapperTreeNode } from '../../../../models/mapper.models';
 
@@ -36,7 +37,8 @@ interface FlatNode {
     MatTooltipModule,
     MatMenuModule,
     MatRippleModule,
-    DragDropModule
+    DragDropModule,
+    MatDivider
   ],
   template: `
     <div class="mapper-tree">

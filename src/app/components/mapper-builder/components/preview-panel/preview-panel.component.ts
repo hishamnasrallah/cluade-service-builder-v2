@@ -54,7 +54,7 @@ import { PreviewResult, MapperTarget } from '../../../../models/mapper.models';
           <button
             mat-raised-button
             color="primary"
-            (click)="runPreview()"
+            (click)="onRunPreview()"
             [disabled]="!previewForm.valid || !selectedTarget">
             <mat-icon>play_arrow</mat-icon>
             Run Preview

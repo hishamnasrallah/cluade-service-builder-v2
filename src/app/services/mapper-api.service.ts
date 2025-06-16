@@ -120,19 +120,14 @@ export class MapperApiService {
 
   // MapperTarget CRUD
   getMapperTargets(caseMapperIt?: number): Observable<MapperTarget[]> {
-    const params = caseMapperIt ? { case_mapper: caseMapperIt.toString() } : {};
+    let params = new HttpParams();
+    if (caseMapperIt) {
+      params = params.set('case_mapper', caseMapperIt.toString());
+    }
     return this.http.get<MapperTarget[]>(this.getFullUrl('/api/mapping/targets/'), { params })
       .pipe(
         tap(targets => console.log('Mapper targets:', targets)),
         catchError(this.handleError('getMapperTargets'))
-      );
-  }
-
-  getMapperTarget(id: string): Observable<MapperTarget> {
-    return this.http.get<MapperTarget>(this.getFullUrl(`/api/mapping/targets/${id}/`))
-      .pipe(
-        tap(target => console.log('Mapper target:', target)),
-        catchError(this.handleError('getMapperTarget'))
       );
   }
 

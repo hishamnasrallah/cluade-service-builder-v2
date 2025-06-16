@@ -1,5 +1,6 @@
 // src/app/components/mapper-builder/dialogs/load-mapper-dialog/load-mapper-dialog.component.ts
 
+
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -13,6 +14,7 @@ import { MatSortModule, Sort } from '@angular/material/sort';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
+import {MatTooltip, MatTooltipModule} from '@angular/material/tooltip';
 import { debounceTime, startWith, switchMap } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 
@@ -34,7 +36,8 @@ import { MapperApiService } from '../../../../../services/mapper-api.service';
     MatSortModule,
     MatPaginatorModule,
     MatProgressSpinnerModule,
-    MatChipsModule
+    MatChipsModule,
+    MatTooltip
   ],
   template: `
     <div class="load-mapper-dialog">
