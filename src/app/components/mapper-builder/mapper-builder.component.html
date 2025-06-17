@@ -1,163 +1,222 @@
-<!-- Main Content Area with Tabs -->
-<mat-sidenav-container class="main-container">
-  <!-- Left Sidebar - Mapper Tree -->
-  <mat-sidenav
-    mode="side"
-    opened
-    [style.width.px]="sidenavWidth"
-    class="mapper-tree-sidenav">
+<!-- Update mapper-builder.component.html -->
 
-    <div class="sidenav-header">
-      <h3>Mapper Hierarchy</h3>
-      <div class="header-actions">
-        <button mat-icon-button (click)="onAddTarget()" matTooltip="Add new target">
-          <mat-icon>add_circle</mat-icon>
+<div class="mapper-builder-container">
+  <!-- Add the toolbar -->
+  <app-mapper-toolbar
+    [isDirty]="isDirty$ | async"
+    [isLoading]="isLoading$ | async"
+    [currentMapper]="currentMapper$ | async"
+    (newMapper)="onNewMapper()"
+    (loadMapper)="onLoadMapper()"
+    (saveMapper)="onSaveMapper()"
+    (exportMapper)="onExportMapper()"
+    (importMapper)="onImportMapper()">
+  </app-mapper-toolbar>
+
+  <!-- Loading bar -->
+  <mat-progress-bar
+    *ngIf="isLoading$ | async"
+    mode="indeterminate"
+    class="loading-bar">
+  </mat-progress-bar>
+  <!-- Main Content Area with Tabs -->
+  <mat-sidenav-container class="main-container">
+    <!-- Left Sidebar - Mapper Tree -->
+    <mat-sidenav
+      mode="side"
+      opened
+      [style.width.px]="sidenavWidth"
+      class="mapper-tree-sidenav">
+
+      <div class="sidenav-header">
+        <h3>Mapper Hierarchy</h3>
+        <div class="header-actions">
+          <button mat-icon-button (click)="onAddTarget()" matTooltip="Add new target">
+            <mat-icon>add_circle</mat-icon>
+          </button>
+          <button mat-icon-button [matMenuTriggerFor]="viewMenu" matTooltip="View options">
+            <mat-icon>view_module</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <mat-menu #viewMenu="matMenu">
+        <button mat-menu-item (click)="activeView = 'tree'">
+          <mat-icon>account_tree</mat-icon>
+          <span>Tree View</span>
         </button>
-        <button mat-icon-button [matMenuTriggerFor]="viewMenu" matTooltip="View options">
-          <mat-icon>view_module</mat-icon>
+        <button mat-menu-item (click)="toggleVisualMapper()">
+          <mat-icon>drag_indicator</mat-icon>
+          <span>Visual Field Mapper</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="viewExecutionLogs()">
+          <mat-icon>history</mat-icon>
+          <span>Execution Logs</span>
+        </button>
+        <button mat-menu-item (click)="viewVersionHistory()">
+          <mat-icon>timeline</mat-icon>
+          <span>Version History</span>
+        </button>
+      </mat-menu>
+
+      <mat-divider></mat-divider>
+
+      <div class="tree-container" *ngIf="activeView === 'tree'">
+        <app-mapper-tree
+          [nodes]="targetHierarchy$ | async"
+          [selectedNodeId]="selectedTargetId$ | async"
+          (nodeSelected)="onNodeSelected($event)"
+          (nodeDropped)="onNodeDropped($event)"
+          (nodeDeleted)="onNodeDeleted($event)"
+          (nodeAdded)="onNodeAdded($event)">
+        </app-mapper-tree>
+      </div>
+    </mat-sidenav>
+
+    <!-- Main Canvas Area -->
+    <mat-sidenav-content class="canvas-container">
+      <mat-tab-group class="main-tabs" *ngIf="!showLogs && !showVersionHistory && !showVisualMapper && !showExerciseRunner">
+        <mat-tab label="Configuration">
+          <div class="canvas-wrapper">
+            <app-mapper-canvas
+              [selectedTarget]="selectedTarget$ | async"
+              [availableModels]="availableModels$ | async"
+              [availableLookups]="availableLookups$ | async"
+              [availableTransforms]="availableTransforms$ | async"
+              [availableFilters]="availableFilters$ | async"
+              [availableProcessors]="availableProcessors"
+              (targetUpdated)="onTargetUpdated($event)"
+              (fieldRuleAdded)="onFieldRuleAdded($event)"
+              (fieldRuleUpdated)="onFieldRuleUpdated($event)"
+              (fieldRuleDeleted)="onFieldRuleDeleted($event)">
+            </app-mapper-canvas>
+          </div>
+        </mat-tab>
+        <mat-tab label="Transform Functions">
+          <div class="tab-content">
+            <app-transform-function-manager></app-transform-function-manager>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Field Testing">
+          <div class="tab-content">
+            <app-field-rule-tester
+              [fieldRule]="getSelectedFieldRule()"
+              [caseData]="getTestCaseData()">
+            </app-field-rule-tester>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+      <!-- Exercise Runner View -->
+      <div class="exercise-runner-wrapper" *ngIf="showExerciseRunner">
+        <app-exercise-runner
+          (loadExercise)="onLoadExercise($event)"
+          (showGuide)="onShowExerciseGuide($event)">
+        </app-exercise-runner>
+      </div>
+      <!-- Visual Field Mapper View -->
+      <div class="visual-mapper-wrapper" *ngIf="showVisualMapper">
+        <app-visual-field-mapper
+          [targetModel]="(selectedTarget$ | async)?.model || ''"
+          [modelFields]="modelFields"
+          [jsonPathSuggestions]="jsonPathSuggestions"
+          [fieldRules]="(selectedTarget$ | async)?.field_rules || []"
+          [availableTransforms]="availableTransforms$ | async"
+          (ruleCreated)="onFieldRuleAdded($event)"
+          (ruleUpdated)="onFieldRuleUpdated($event)"
+          (ruleDeleted)="onFieldRuleDeleted($event)">
+        </app-visual-field-mapper>
+      </div>
+
+      <!-- Execution Logs View -->
+      <div class="logs-wrapper" *ngIf="showLogs">
+        <app-execution-logs
+          [mapperId]="(currentMapper$ | async)?.id"
+          [targetId]="selectedTargetId$ | async">
+        </app-execution-logs>
+      </div>
+
+      <!-- Version History View -->
+      <div class="version-history-wrapper" *ngIf="showVersionHistory">
+        <app-version-history
+          [mapper]="currentMapper$ | async"
+          (loadVersion)="onLoadVersion($event)"
+          (compareVersions)="onCompareVersions($event)">
+        </app-version-history>
+      </div>
+    </mat-sidenav-content>
+
+    <!-- Right Sidebar - Preview Panel -->
+    <mat-sidenav
+      mode="side"
+      position="end"
+      [opened]="showPreview"
+      [style.width.px]="previewWidth"
+      class="preview-sidenav">
+
+      <div class="sidenav-header">
+        <h3>Preview</h3>
+        <button mat-icon-button (click)="togglePreview()" matTooltip="Close preview">
+          <mat-icon>close</mat-icon>
         </button>
       </div>
-    </div>
 
-    <mat-menu #viewMenu="matMenu">
-      <button mat-menu-item (click)="activeView = 'tree'">
-        <mat-icon>account_tree</mat-icon>
-        <span>Tree View</span>
-      </button>
-      <button mat-menu-item (click)="toggleVisualMapper()">
-        <mat-icon>drag_indicator</mat-icon>
-        <span>Visual Field Mapper</span>
-      </button>
       <mat-divider></mat-divider>
-      <button mat-menu-item (click)="viewExecutionLogs()">
-        <mat-icon>history</mat-icon>
-        <span>Execution Logs</span>
-      </button>
-      <button mat-menu-item (click)="viewVersionHistory()">
-        <mat-icon>timeline</mat-icon>
-        <span>Version History</span>
-      </button>
-    </mat-menu>
 
-    <mat-divider></mat-divider>
+      <app-preview-panel
+        [previewResult]="previewResult$ | async"
+        [selectedTarget]="selectedTarget$ | async"
+        (runPreviewEvent)="onRunPreview($event)">
+      </app-preview-panel>
+    </mat-sidenav>
+  </mat-sidenav-container>
 
-    <div class="tree-container" *ngIf="activeView === 'tree'">
-      <app-mapper-tree
-        [nodes]="targetHierarchy$ | async"
-        [selectedNodeId]="selectedTargetId$ | async"
-        (nodeSelected)="onNodeSelected($event)"
-        (nodeDropped)="onNodeDropped($event)"
-        (nodeDeleted)="onNodeDeleted($event)"
-        (nodeAdded)="onNodeAdded($event)">
-      </app-mapper-tree>
-    </div>
-  </mat-sidenav>
+  <!-- Floating Action Buttons -->
+  <div class="fab-container">
+    <button
+      mat-fab
+      color="warn"
+      (click)="toggleExerciseRunner()"
+      matTooltip="Practice Exercises"
+      matTooltipPosition="left"
+      class="exercise-fab">
+      <mat-icon>school</mat-icon>
+    </button>
+    <button
+      mat-fab
+      color="accent"
+      (click)="openBatchOperations()"
+      matTooltip="Batch Operations"
+      matTooltipPosition="left">
+      <mat-icon>layers</mat-icon>
+    </button>
+    <button
+      mat-fab
+      color="accent"
+      (click)="togglePreview()"
+      matTooltip="Toggle preview panel"
+      matTooltipPosition="left">
+      <mat-icon>{{ showPreview ? 'visibility_off' : 'visibility' }}</mat-icon>
+    </button>
 
-  <!-- Main Canvas Area -->
-  <mat-sidenav-content class="canvas-container">
-    <mat-tab-group class="main-tabs" *ngIf="!showLogs && !showVersionHistory && !showVisualMapper">
-      <mat-tab label="Configuration">
-        <div class="canvas-wrapper">
-          <app-mapper-canvas
-            [selectedTarget]="selectedTarget$ | async"
-            [availableModels]="availableModels$ | async"
-            [availableLookups]="availableLookups$ | async"
-            [availableTransforms]="availableTransforms$ | async"
-            [availableFilters]="availableFilters$ | async"
-            [availableProcessors]="availableProcessors"
-            (targetUpdated)="onTargetUpdated($event)"
-            (fieldRuleAdded)="onFieldRuleAdded($event)"
-            (fieldRuleUpdated)="onFieldRuleUpdated($event)"
-            (fieldRuleDeleted)="onFieldRuleDeleted($event)">
-          </app-mapper-canvas>
-        </div>
-      </mat-tab>
-    </mat-tab-group>
+    <button
+      mat-fab
+      color="primary"
+      (click)="onValidateAndSave()"
+      matTooltip="Validate & Save"
+      matTooltipPosition="left"
+      [disabled]="!(isDirty$ | async) || (isLoading$ | async)">
+      <mat-icon>save</mat-icon>
+    </button>
 
-    <!-- Visual Field Mapper View -->
-    <div class="visual-mapper-wrapper" *ngIf="showVisualMapper">
-      <app-visual-field-mapper
-        [targetModel]="(selectedTarget$ | async)?.model || ''"
-        [modelFields]="modelFields"
-        [jsonPathSuggestions]="jsonPathSuggestions"
-        [fieldRules]="(selectedTarget$ | async)?.field_rules || []"
-        [availableTransforms]="availableTransforms$ | async"
-        (ruleCreated)="onFieldRuleAdded($event)"
-        (ruleUpdated)="onFieldRuleUpdated($event)"
-        (ruleDeleted)="onFieldRuleDeleted($event)">
-      </app-visual-field-mapper>
-    </div>
-
-    <!-- Execution Logs View -->
-    <div class="logs-wrapper" *ngIf="showLogs">
-      <app-execution-logs
-        [mapperId]="(currentMapper$ | async)?.id"
-        [targetId]="selectedTargetId$ | async">
-      </app-execution-logs>
-    </div>
-
-    <!-- Version History View -->
-    <div class="version-history-wrapper" *ngIf="showVersionHistory">
-      <app-version-history
-        [mapper]="currentMapper$ | async"
-        (loadVersion)="onLoadVersion($event)"
-        (compareVersions)="onCompareVersions($event)">
-      </app-version-history>
-    </div>
-  </mat-sidenav-content>
-
-  <!-- Right Sidebar - Preview Panel -->
-  <mat-sidenav
-    mode="side"
-    position="end"
-    [opened]="showPreview"
-    [style.width.px]="previewWidth"
-    class="preview-sidenav">
-
-    <div class="sidenav-header">
-      <h3>Preview</h3>
-      <button mat-icon-button (click)="togglePreview()" matTooltip="Close preview">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-
-    <mat-divider></mat-divider>
-
-    <app-preview-panel
-      [previewResult]="previewResult$ | async"
-      [selectedTarget]="selectedTarget$ | async"
-      (runPreviewEvent)="onRunPreview($event)">
-    </app-preview-panel>
-  </mat-sidenav>
-</mat-sidenav-container>
-
-<!-- Floating Action Buttons -->
-<div class="fab-container">
-  <button
-    mat-fab
-    color="accent"
-    (click)="togglePreview()"
-    matTooltip="Toggle preview panel"
-    matTooltipPosition="left">
-    <mat-icon>{{ showPreview ? 'visibility_off' : 'visibility' }}</mat-icon>
-  </button>
-
-  <button
-    mat-fab
-    color="primary"
-    (click)="onValidateAndSave()"
-    matTooltip="Validate & Save"
-    matTooltipPosition="left"
-    [disabled]="!(isDirty$ | async) || (isLoading$ | async)">
-    <mat-icon>save</mat-icon>
-  </button>
-
-  <button
-    mat-mini-fab
-    (click)="showKeyboardShortcuts()"
-    matTooltip="Keyboard shortcuts (Shift + ?)"
-    matTooltipPosition="left"
-    class="help-fab">
-    <mat-icon>keyboard</mat-icon>
-  </button>
+    <button
+      mat-mini-fab
+      (click)="showKeyboardShortcuts()"
+      matTooltip="Keyboard shortcuts (Shift + ?)"
+      matTooltipPosition="left"
+      class="help-fab">
+      <mat-icon>keyboard</mat-icon>
+    </button>
+  </div>
 </div>

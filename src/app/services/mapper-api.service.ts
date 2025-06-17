@@ -1,4 +1,4 @@
-// src/app/services/mapper-api.service.ts
+// src/app/services/mapper-api.service.ts - Updated with correct endpoints
 
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -30,7 +30,8 @@ import {
   providedIn: 'root'
 })
 export class MapperApiService {
-  private apiUrl = '/api/mapping';
+  // Updated to match documentation
+  private apiUrl = '/case/api/mapper';
 
   constructor(
     private http: HttpClient,
@@ -184,7 +185,7 @@ export class MapperApiService {
 
   // Preview and Execution
   runDryRun(caseId: number, mapperTargetId: string): Observable<PreviewResult> {
-    return this.http.post<PreviewResult>(this.getFullUrl('/api/mapping/dry_run/'), {
+    return this.http.post<PreviewResult>(this.getFullUrl('/case/api/mapper/dry-run/'), {
       case_id: caseId,
       mapper_target_id: mapperTargetId
     })
@@ -196,7 +197,7 @@ export class MapperApiService {
 
   runMapping(caseId: number, targetId: string): Observable<any> {
     return this.http.post(
-      this.getFullUrl('/api/mapper/run/'),
+      this.getFullUrl('/case/api/mapper/run/'),
       { case_id: caseId, mapper_target_id: targetId }
     )
       .pipe(
@@ -204,7 +205,47 @@ export class MapperApiService {
         catchError(this.handleError('runMapping'))
       );
   }
+  getExecutionLogs(params?: any): Observable<MapperExecutionLog[]> {
+    return this.http.get<MapperExecutionLog[]>(this.getFullUrl('/case/api/mapper/logs/'), { params })
+      .pipe(
+        tap(logs => console.log('Execution logs:', logs)),
+        catchError(this.handleError('getExecutionLogs'))
+      );
+  }
 
+  // Clone mapper endpoint
+  cloneMapperVersion(mapperId: number): Observable<CaseMapper> {
+    return this.http.post<CaseMapper>(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/clone/`),
+      {}
+    )
+      .pipe(
+        tap(mapper => console.log('Cloned mapper:', mapper)),
+        catchError(this.handleError('cloneMapperVersion'))
+      );
+  }
+
+  // Export/Import endpoints
+  exportMapper(mapperId: number): Observable<MapperExportData> {
+    return this.http.get<MapperExportData>(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/export/`)
+    )
+      .pipe(
+        tap(data => console.log('Export data:', data)),
+        catchError(this.handleError('exportMapper'))
+      );
+  }
+
+  importMapper(data: any): Observable<CaseMapper> {
+    return this.http.post<CaseMapper>(
+      this.getFullUrl('/api/case-mappers/import/'),
+      data
+    )
+      .pipe(
+        tap(mapper => console.log('Imported mapper:', mapper)),
+        catchError(this.handleError('importMapper'))
+      );
+  }
   // Save entire configuration
   saveMapperConfiguration(config: SaveMapperRequest): Observable<any> {
     return this.http.post(this.getFullUrl('/api/mapping/save/'), config)
@@ -214,14 +255,6 @@ export class MapperApiService {
       );
   }
 
-  // Execution logs API
-  getExecutionLogs(params?: any): Observable<MapperExecutionLog[]> {
-    return this.http.get<MapperExecutionLog[]>(this.getFullUrl('/api/mapper/logs/'), { params })
-      .pipe(
-        tap(logs => console.log('Execution logs:', logs)),
-        catchError(this.handleError('getExecutionLogs'))
-      );
-  }
 
   getExecutionLogDetail(id: number): Observable<MapperExecutionLog> {
     return this.http.get<MapperExecutionLog>(this.getFullUrl(`/api/mapper/logs/${id}/`))
@@ -293,16 +326,6 @@ export class MapperApiService {
       .pipe(
         tap(() => console.log('Deleted version:', versionId)),
         catchError(this.handleError('deleteMapperVersion'))
-      );
-  }
-
-  exportMapperVersion(versionId: number): Observable<MapperExportData> {
-    return this.http.get<MapperExportData>(
-      this.getFullUrl(`/api/mapper/versions/${versionId}/export/`)
-    )
-      .pipe(
-        tap(data => console.log('Export data:', data)),
-        catchError(this.handleError('exportMapperVersion'))
       );
   }
 

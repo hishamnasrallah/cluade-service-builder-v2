@@ -34,11 +34,24 @@ import { MapperValidationService } from '../../services/mapper-validation.servic
 import { KeyboardShortcutsService, KeyboardShortcutsDialogComponent } from '../../services/keyboard-shortcuts.service';
 import { MapperUndoRedoService } from '../../services/undo-redo.service';
 import { MapperStatePersistenceService } from '../../services/state-persistence.service';
-import {ModelField, ProcessorFunction, JSONPathSuggestion, MapperVersion} from '../../models/mapper.models';
+import {
+  ModelField,
+  ProcessorFunction,
+  JSONPathSuggestion,
+  MapperVersion,
+  CaseMapper,
+  MapperTarget
+} from '../../models/mapper.models';
 import {
   NewMapperDialogComponent,
   ValidationErrorsDialogComponent
 } from './dialogs/mapper-dialogs/new-mapper-dialog/new-mapper-dialog.component';
+import { ExerciseRunnerComponent } from './exercise-runner/exercise-runner.component';
+import {FieldRuleTesterComponent} from '../field-rule-tester/field-rule-tester.component';
+import {
+  TransformFunctionManagerComponent
+} from './components/transform-function-manager/transform-function-manager.component';
+import {BatchOperationsComponent} from './components/batch-operations/batch-operations.component';
 
 @Component({
   selector: 'app-mapper-builder',
@@ -58,12 +71,15 @@ import {
     MapperTreeComponent,
     MapperCanvasComponent,
     PreviewPanelComponent,
-    // MapperToolbarComponent,
+    ExerciseRunnerComponent,
+    MapperToolbarComponent,
     VersionHistoryComponent,
     ExecutionLogsComponent,
     VisualFieldMapperComponent,
     MatTab,
-    MatTabGroup
+    MatTabGroup,
+    FieldRuleTesterComponent,
+    TransformFunctionManagerComponent
   ],
   templateUrl:'mapper-builder.component.html',
   styleUrl:'mapper-builder.component.scss'
@@ -85,7 +101,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
   availableTransforms$ = this.stateService.getAvailableTransforms$();
   availableFilters$ = this.stateService.getAvailableFilters$();
   previewResult$ = this.stateService.getPreviewResult$();
-
+  showExerciseRunner = false;
   activeView: 'tree' | 'visual' = 'tree';
   modelFields: any[] = [];
   jsonPathSuggestions: string[] = [];
@@ -120,6 +136,110 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  toggleExerciseRunner(): void {
+    this.showExerciseRunner = !this.showExerciseRunner;
+  }
+
+  onLoadExercise(exerciseId: string): void {
+    // Load exercise template
+    switch (exerciseId) {
+      case 'A1':
+        this.loadExerciseA1();
+        break;
+      case 'B2':
+        this.loadExerciseB2();
+        break;
+      case 'C1':
+        this.loadExerciseC1();
+        break;
+    }
+  }
+
+  private loadExerciseA1(): void {
+    // Create mapper for Exercise A1
+    const mapper: CaseMapper = {
+      name: 'User Registration Mapper',
+      case_type: 'USER_REG',
+      version: 1,
+      active_ind: true
+    };
+
+    const target: MapperTarget = {
+      id: uuidv4(),
+      name: 'User Target',
+      model: 'auth.User',
+      case_mapper: 0,
+      active_ind: true,
+      field_rules: []
+    };
+
+    this.stateService.loadMapper(mapper, [target]);
+    this.snackBar.open('Exercise A1 template loaded', 'Close', { duration: 3000 });
+  }
+
+  getSelectedFieldRule(): MapperFieldRule | undefined {
+    const state = this.stateService.getState$().getValue();
+    if (!state.selectedTargetId) return undefined;
+
+    const target = state.targets.find(t => t.id === state.selectedTargetId);
+    return target?.field_rules?.[0]; // Or track selected rule
+  }
+
+  getTestCaseData(): any {
+    // Return test data for the current case type
+    const mapper = this.stateService.getState$().getValue().currentMapper;
+    if (!mapper) return {};
+
+    // Return sample data based on case type
+    const sampleData: { [key: string]: any } = {
+      'USER_REG': {
+        username: 'johndoe',
+        email: 'john@example.com',
+        full_name: 'John Doe',
+        is_active: true
+      },
+      'ORDER': {
+        order_id: 'ORD-001',
+        customer: 'ACME Corp',
+        items: [
+          { sku: 'WIDGET-A', quantity: 10, price: 29.99 }
+        ]
+      }
+    };
+
+    return sampleData[mapper.case_type] || {};
+  }
+
+  openBatchOperations(): void {
+    const state = this.stateService.getState$().getValue();
+
+    const dialogRef = this.dialog.open(BatchOperationsComponent, {
+      width: '600px',
+      data: {
+        targets: state.targets,
+        selectedTargets: state.selectedTargetId ? [state.selectedTargetId] : []
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        // Reload targets after batch operation
+        this.loadMapper(state.currentMapper!.id!.toString());
+      }
+    });
+  }
+
+  onShowExerciseGuide(exerciseId: string): void {
+    // Show visual guide for exercise
+    const guides: { [key: string]: string } = {
+      'B2': 'For array processing, create a parent target for Order and child targets for OrderItems with root_path set to "items"',
+      'C1': 'Use expression conditions and post-processor functions for complex business rules'
+    };
+
+    this.snackBar.open(guides[exerciseId] || 'Follow the exercise instructions', 'Close', {
+      duration: 10000
+    });
+  }
   private loadReferenceData(): void {
     this.stateService.setLoading(true);
 

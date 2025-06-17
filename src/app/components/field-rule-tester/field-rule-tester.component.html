@@ -1,0 +1,139 @@
+<!-- src/app/components/mapper-builder/components/field-rule-tester/field-rule-tester.component.html -->
+
+<div class="field-rule-tester">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>science</mat-icon>
+        Field Rule Tester
+      </mat-card-title>
+      <mat-card-subtitle *ngIf="fieldRule">
+        Testing: {{ fieldRule.target_field }} ← {{ fieldRule.json_path }}
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="testForm" class="test-form">
+        <div class="editor-section">
+          <h4>Test Data (JSON)</h4>
+          <ngx-monaco-editor
+            formControlName="testData"
+            [options]="editorOptions"
+            style="height: 200px;">
+          </ngx-monaco-editor>
+        </div>
+
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>Advanced Options</mat-panel-title>
+          </mat-expansion-panel-header>
+
+          <div class="editor-section">
+            <h4>Context Override (JSON)</h4>
+            <ngx-monaco-editor
+              formControlName="contextOverride"
+              [options]="editorOptions"
+              style="height: 150px;">
+            </ngx-monaco-editor>
+          </div>
+        </mat-expansion-panel>
+
+        <div class="test-actions">
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="runTest()"
+            [disabled]="isLoading || !fieldRule">
+            <mat-icon>play_arrow</mat-icon>
+            Run Test
+          </button>
+        </div>
+      </form>
+
+      <!-- Test Results -->
+      <div class="test-results" *ngIf="testResult">
+        <h3>Test Results</h3>
+
+        <div class="result-status" [class.success]="testResult.success" [class.error]="!testResult.success">
+          <mat-icon>{{ testResult.success ? 'check_circle' : 'error' }}</mat-icon>
+          <span>{{ testResult.success ? 'Test Passed' : 'Test Failed' }}</span>
+          <mat-chip>{{ testResult.execution_time }}ms</mat-chip>
+        </div>
+
+        <div class="result-details" *ngIf="testResult.success">
+          <!-- Extraction Step -->
+          <div class="result-step">
+            <h4>
+              <mat-icon>route</mat-icon>
+              Step 1: JSON Path Extraction
+            </h4>
+            <div class="result-value">
+              <pre>{{ getExtractedPath() }}</pre>
+              <button mat-icon-button (click)="copyToClipboard(getExtractedPath())" matTooltip="Copy">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Condition Check -->
+          <div class="result-step" *ngIf="testResult.condition_result !== undefined">
+            <h4>
+              <mat-icon>rule</mat-icon>
+              Step 2: Condition Evaluation
+            </h4>
+            <div class="result-value">
+              <mat-chip [color]="testResult.condition_result ? 'primary' : 'warn'">
+                {{ testResult.condition_result ? 'Condition Met' : 'Condition Not Met' }}
+              </mat-chip>
+              <p *ngIf="testResult.condition_details">{{ testResult.condition_details }}</p>
+            </div>
+          </div>
+
+          <!-- Transform Step -->
+          <div class="result-step" *ngIf="fieldRule?.transform_function_path">
+            <h4>
+              <mat-icon>transform</mat-icon>
+              Step 3: Transform Function
+            </h4>
+            <div class="result-value">
+              <pre>{{ getTransformedValue() }}</pre>
+              <button mat-icon-button (click)="copyToClipboard(getTransformedValue())" matTooltip="Copy">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Final Value -->
+          <div class="result-step final-value">
+            <h4>
+              <mat-icon>done_all</mat-icon>
+              Final Value
+            </h4>
+            <div class="result-value">
+              <pre>{{ getFinalValue() }}</pre>
+              <button mat-icon-button (click)="copyToClipboard(getFinalValue())" matTooltip="Copy">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Details -->
+        <div class="error-details" *ngIf="!testResult.success && testResult.error">
+          <h4>Error Details</h4>
+          <pre class="error-message">{{ testResult.error }}</pre>
+          <div class="error-trace" *ngIf="testResult.error_trace">
+            <h5>Stack Trace:</h5>
+            <pre>{{ testResult.error_trace }}</pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" *ngIf="isLoading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Running test...</p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

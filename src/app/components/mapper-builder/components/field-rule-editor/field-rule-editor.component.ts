@@ -1,7 +1,7 @@
 // src/app/components/mapper-builder/components/field-rule-editor/field-rule-editor.component.ts
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -18,6 +18,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Observable } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
+import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import {
   MapperFieldRule,
@@ -34,6 +35,8 @@ interface DialogData {
   targetModel: string;
   availableLookups: LookupOption[];
   availableTransforms: TransformFunction[];
+  modelFields?: ModelField[];
+  jsonPathSuggestions?: string[];
 }
 
 @Component({
@@ -56,7 +59,8 @@ interface DialogData {
     MatRadioModule,
     MatDividerModule,
     MatSlideToggleModule,
-    FormsModule
+    FormsModule,
+    DragDropModule
   ],
   templateUrl:'field-rule-editor.component.html',
   styleUrl:'field-rule-editor.component.scss'
@@ -66,21 +70,25 @@ export class FieldRuleEditorComponent implements OnInit {
   ruleForm: FormGroup;
   conditionMode: 'simple' | 'expression' = 'simple';
 
-  // // Mock data - should come from API
-  // targetFields: string[] = ['id', 'name', 'full_name', 'birth_date', 'status', 'created_at'];
-  // suggestedPaths: string[] = [
-  //   'user.name',
-  //   'user.profile.full_name',
-  //   'user.birth_date',
-  //   'applicant.name',
-  //   'case_data.citizen_info.name'
-  // ];
+
   // Dynamic data from API
   targetFields: string[] = [];
   suggestedPaths: string[] = [];
   isLoadingFields = false;
-
+  arrayIndices: number[] = [];
   filteredPaths$: Observable<string[]>;
+  visualConditionMode = false;
+  conditionBuilder = {
+    field: '',
+    operator: '==',
+    value: ''
+  };
+  advancedOptions = {
+    skip_empty: false,
+    trim_whitespace: true,
+    convert_types: true,
+    array_index_notation: false
+  };
 
   constructor(
     private fb: FormBuilder,
@@ -99,6 +107,9 @@ export class FieldRuleEditorComponent implements OnInit {
   ngOnInit(): void {
     if (this.data.rule) {
       this.populateForm(this.data.rule);
+    }
+    if (!this.data.modelFields && this.data.targetModel) {
+      this.loadModelFields();
     }
 
     // Load model fields based on target model
@@ -146,7 +157,66 @@ export class FieldRuleEditorComponent implements OnInit {
       }
     });
   }
+  addArrayIndex(): void {
+    const indices = this.ruleForm.get('array_indices') as FormArray;
+    indices.push(this.fb.control(0));
+  }
 
+  removeArrayIndex(index: number): void {
+    const indices = this.ruleForm.get('array_indices') as FormArray;
+    indices.removeAt(index);
+  }
+  buildJsonPath(): string {
+    const basePath = this.ruleForm.get('json_path')?.value;
+    const useArrayIndex = this.ruleForm.get('use_array_index')?.value;
+
+    if (!useArrayIndex) return basePath;
+
+    const indices = this.ruleForm.get('array_indices')?.value || [];
+    let path = basePath;
+
+    indices.forEach((index: number) => {
+      path += `.${index}`;
+    });
+
+    return path;
+  }
+  buildConditionFromVisual(): void {
+    const condition = `${this.conditionBuilder.field} ${this.conditionBuilder.operator} '${this.conditionBuilder.value}'`;
+    this.ruleForm.patchValue({ condition_expression: condition });
+  }
+
+  // Drag and drop for condition ordering
+  dropCondition(event: CdkDragDrop<any[]>): void {
+    const conditionsArray = this.ruleForm.get('conditions') as FormArray;
+    const conditions = conditionsArray.value;
+    moveItemInArray(conditions, event.previousIndex, event.currentIndex);
+    conditionsArray.setValue(conditions);
+  }
+
+  // Real-time validation
+  validateJsonPath(): void {
+    const path = this.ruleForm.get('json_path')?.value;
+    if (!path) return;
+
+    // Check against suggestions
+    const isValid = this.validatePathFormat(path);
+    if (!isValid) {
+      this.ruleForm.get('json_path')?.setErrors({ invalidPath: true });
+    }
+  }
+
+  validatePathFormat(path: string): boolean {
+    // Implementation from validation service
+    const segments = path.split('.');
+    for (const segment of segments) {
+      if (segment === '') return false;
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(segment) && !/^\d+$/.test(segment)) {
+        return false;
+      }
+    }
+    return true;
+  }
   createRuleForm(): FormGroup {
     return this.fb.group({
       json_path: ['', Validators.required],
@@ -160,7 +230,11 @@ export class FieldRuleEditorComponent implements OnInit {
       // Advanced options
       skip_empty: [false],
       trim_whitespace: [true],
-      convert_types: [true]
+      convert_types: [true],
+      use_array_index: [false],
+      array_indices: this.fb.array([]),
+      array_index_notation: [false],
+      validate_on_save: [true]
     });
   }
 
@@ -292,7 +366,13 @@ export class FieldRuleEditorComponent implements OnInit {
   }
 
   save(): void {
-    if (this.ruleForm.valid) {
+    if (this.ruleForm.get('validate_on_save')?.value) {
+      const validationErrors = this.validateRule();
+      if (validationErrors.length > 0) {
+        // Show validation errors
+        this.showValidationErrors(validationErrors);
+        return;
+      }
       const formValue = this.ruleForm.value;
       const result: Partial<MapperFieldRule> = {
         json_path: formValue.json_path,
@@ -314,6 +394,32 @@ export class FieldRuleEditorComponent implements OnInit {
     }
   }
 
+  validateRule(): string[] {
+    const errors: string[] = [];
+    const formValue = this.ruleForm.value;
+
+    // Validate JSONPath
+    if (!this.validatePathFormat(formValue.json_path)) {
+      errors.push('Invalid JSON path format');
+    }
+
+    // Validate target field
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(formValue.target_field)) {
+      errors.push('Target field must be a valid Python identifier');
+    }
+
+    // Validate lookups
+    if (formValue.source_lookup && !formValue.target_lookup) {
+      errors.push('Target lookup required when source lookup is specified');
+    }
+
+    return errors;
+  }
+
+  showValidationErrors(errors: string[]): void {
+    // Show errors in a dialog or snackbar
+    console.error('Validation errors:', errors);
+  }
   private buildConditions(conditionGroups: any[]): MapperFieldRuleCondition[] {
     const conditions: MapperFieldRuleCondition[] = [];
 

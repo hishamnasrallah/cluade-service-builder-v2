@@ -1,0 +1,102 @@
+<!-- src/app/components/mapper-builder/components/batch-operations/batch-operations.component.html -->
+
+<div class="batch-operations-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>layers</mat-icon>
+    Batch Operations
+  </h2>
+
+  <mat-dialog-content>
+    <div class="operation-form">
+      <form [formGroup]="operationForm">
+        <!-- Target Selection -->
+        <div class="targets-section">
+          <h3>Select Targets ({{ getSelectedCount() }} selected)</h3>
+
+          <div class="selection-actions">
+            <button mat-button (click)="selectAll()">Select All</button>
+            <button mat-button (click)="deselectAll()">Deselect All</button>
+          </div>
+
+          <mat-list class="targets-list">
+            <mat-list-item *ngFor="let target of data.targets">
+              <mat-checkbox
+                [checked]="isTargetSelected(target.id!)"
+                (change)="toggleTarget(target.id!)">
+                <span class="target-info">
+                  <strong>{{ target.name }}</strong>
+                  <small>{{ target.model }}</small>
+                </span>
+              </mat-checkbox>
+            </mat-list-item>
+          </mat-list>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <!-- Operation Selection -->
+        <div class="operation-section">
+          <h3>Choose Operation</h3>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Operation</mat-label>
+            <mat-select formControlName="operation">
+              <mat-option *ngFor="let op of operations" [value]="op.value">
+                <mat-icon [class.danger]="op.danger">{{ op.icon }}</mat-icon>
+                {{ op.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <!-- Dynamic fields based on operation -->
+          <div [ngSwitch]="operationForm.get('operation')?.value" class="operation-fields">
+            <!-- Update Model -->
+            <mat-form-field *ngSwitchCase="'update_model'" appearance="outline" class="full-width">
+              <mat-label>New Model</mat-label>
+              <input matInput formControlName="targetModel" placeholder="app_label.ModelName">
+              <mat-hint>Enter the new model in format: app.Model</mat-hint>
+            </mat-form-field>
+
+            <!-- Add/Remove Processor -->
+            <mat-form-field *ngSwitchCase="'add_processor'" appearance="outline" class="full-width">
+              <mat-label>Processor Function Path</mat-label>
+              <input matInput formControlName="processorPath" placeholder="module.function">
+            </mat-form-field>
+
+            <mat-form-field *ngSwitchCase="'remove_processor'" appearance="outline" class="full-width">
+              <mat-label>Processor Function Path</mat-label>
+              <input matInput formControlName="processorPath" placeholder="module.function">
+            </mat-form-field>
+
+            <!-- Delete Confirmation -->
+            <div *ngSwitchCase="'bulk_delete'" class="delete-confirmation">
+              <mat-icon color="warn">warning</mat-icon>
+              <p>This will permanently delete {{ getSelectedCount() }} target(s) and all their field rules.</p>
+              <mat-checkbox formControlName="confirmDelete" color="warn">
+                I understand this action cannot be undone
+              </mat-checkbox>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-section" *ngIf="isProcessing">
+          <p>Processing batch operation...</p>
+          <mat-progress-bar mode="determinate" [value]="progress"></mat-progress-bar>
+        </div>
+      </form>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cancel()" [disabled]="isProcessing">Cancel</button>
+    <button
+      mat-raised-button
+      [color]="isOperationDangerous(operationForm.get('operation')?.value) ? 'warn' : 'primary'"
+      (click)="execute()"
+      [disabled]="!canExecute() || isProcessing">
+      <mat-icon>{{ getOperationIcon(operationForm.get('operation')?.value) }}</mat-icon>
+      Execute
+    </button>
+  </mat-dialog-actions>
+</div>
