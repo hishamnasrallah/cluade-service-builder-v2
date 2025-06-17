@@ -1,0 +1,220 @@
+<div class="execution-logs-container">
+  <mat-card class="filter-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>history</mat-icon>
+        Execution Logs
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-button (click)="refreshLogs()" [disabled]="isLoading">
+          <mat-icon>refresh</mat-icon>
+          Refresh
+        </button>
+        <button mat-button (click)="exportLogs()" [disabled]="!dataSource.filteredData.length">
+          <mat-icon>download</mat-icon>
+          Export
+        </button>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="filterForm" class="filter-form">
+        <div class="filter-row">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search</mat-label>
+            <input matInput formControlName="search" placeholder="Search by case ID, target, or user">
+            <mat-icon matPrefix>search</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Status</mat-label>
+            <mat-select formControlName="status">
+              <mat-option *ngFor="let status of statusOptions" [value]="status.value">
+                {{ status.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date From</mat-label>
+            <input matInput [matDatepicker]="fromPicker" formControlName="dateFrom">
+            <mat-datepicker-toggle matSuffix [for]="fromPicker"></mat-datepicker-toggle>
+            <mat-datepicker #fromPicker></mat-datepicker>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date To</mat-label>
+            <input matInput [matDatepicker]="toPicker" formControlName="dateTo">
+            <mat-datepicker-toggle matSuffix [for]="toPicker"></mat-datepicker-toggle>
+            <mat-datepicker #toPicker></mat-datepicker>
+          </mat-form-field>
+
+          <button mat-stroked-button (click)="clearFilters()" class="clear-button">
+            <mat-icon>clear</mat-icon>
+            Clear
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="logs-table-card">
+    <div class="table-container">
+      <table mat-table [dataSource]="dataSource" matSort class="logs-table">
+        <!-- Timestamp Column -->
+        <ng-container matColumnDef="timestamp">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Timestamp</th>
+          <td mat-cell *matCellDef="let log">
+            {{ log.executed_at | date:'short' }}
+          </td>
+        </ng-container>
+
+        <!-- Case Column -->
+        <ng-container matColumnDef="case">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Case ID</th>
+          <td mat-cell *matCellDef="let log">
+            <code>{{ log.case }}</code>
+          </td>
+        </ng-container>
+
+        <!-- Target Column -->
+        <ng-container matColumnDef="target">
+          <th mat-header-cell *matHeaderCellDef>Target</th>
+          <td mat-cell *matCellDef="let log">
+            <span class="target-name">{{ log.mapper_target }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let log">
+            <mat-chip-listbox class="status-chip">
+              <mat-chip [class]="getStatusColor(log.success)">
+                <mat-icon>{{ getStatusIcon(log.success) }}</mat-icon>
+                {{ log.success ? 'Success' : 'Failed' }}
+              </mat-chip>
+            </mat-chip-listbox>
+          </td>
+        </ng-container>
+
+        <!-- Duration Column -->
+        <ng-container matColumnDef="duration">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Duration</th>
+          <td mat-cell *matCellDef="let log">
+            {{ formatDuration(log.execution_time_ms) }}
+          </td>
+        </ng-container>
+
+        <!-- Records Column -->
+        <ng-container matColumnDef="records">
+          <th mat-header-cell *matHeaderCellDef>Records</th>
+          <td mat-cell *matCellDef="let log">
+            {{ formatRecords(log.records_created, log.records_updated) }}
+          </td>
+        </ng-container>
+
+        <!-- User Column -->
+        <ng-container matColumnDef="user">
+          <th mat-header-cell *matHeaderCellDef>User</th>
+          <td mat-cell *matCellDef="let log">
+            {{ log.executed_by || '-' }}
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let log">
+            <button mat-icon-button (click)="viewDetails(log)" matTooltip="View details">
+              <mat-icon>visibility</mat-icon>
+            </button>
+            <button mat-icon-button (click)="rerunMapping(log)" matTooltip="Rerun mapping">
+              <mat-icon>replay</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            class="log-row"
+            [class.error-row]="!row.success"></tr>
+
+        <!-- No Data Row -->
+        <tr class="mat-row no-data-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="no-data">
+              <mat-icon>info</mat-icon>
+              <p>No execution logs found</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <mat-paginator
+        [pageSizeOptions]="[10, 25, 50, 100]"
+        [showFirstLastButtons]="true"
+        aria-label="Select page of execution logs">
+      </mat-paginator>
+    </div>
+  </mat-card>
+
+  <!-- Detail View -->
+  <mat-expansion-panel *ngIf="selectedLog" class="detail-panel">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <mat-icon>info</mat-icon>
+        Execution Details
+      </mat-panel-title>
+      <mat-panel-description>
+        Case {{ selectedLog.case }} - {{ selectedLog.executed_at | date:'medium' }}
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+
+    <div class="detail-content">
+      <div class="detail-section">
+        <h4>Execution Summary</h4>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Case ID:</label>
+            <span>{{ selectedLog.case }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Target:</label>
+            <span>{{ selectedLog.mapper_target }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Status:</label>
+            <mat-chip-listbox>
+              <mat-chip [class]="getStatusColor(selectedLog.success)">
+                {{ selectedLog.success ? 'Success' : 'Failed' }}
+              </mat-chip>
+            </mat-chip-listbox>
+          </div>
+          <div class="detail-item">
+            <label>Duration:</label>
+            <span>{{ formatDuration(selectedLog.execution_time_ms) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Records Created:</label>
+            <span>{{ selectedLog.records_created || 0 }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Records Updated:</label>
+            <span>{{ selectedLog.records_updated || 0 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-section" *ngIf="selectedLog.result_data">
+        <h4>Result Data</h4>
+        <pre class="result-data">{{ selectedLog.result_data | json }}</pre>
+      </div>
+
+      <div class="detail-section error-section" *ngIf="selectedLog.error_trace">
+        <h4>Error Details</h4>
+        <pre class="error-trace">{{ selectedLog.error_trace }}</pre>
+      </div>
+    </div>
+  </mat-expansion-panel>
+</div>

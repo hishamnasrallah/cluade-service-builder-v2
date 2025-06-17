@@ -1,0 +1,158 @@
+<div class="version-history-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>history</mat-icon>
+        Version History
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-raised-button color="primary" (click)="createNewVersion()">
+          <mat-icon>add</mat-icon>
+          Create New Version
+        </button>
+        <button mat-button
+                [disabled]="selectedVersions.length !== 2"
+                (click)="compareSelectedVersions()">
+          <mat-icon>compare_arrows</mat-icon>
+          Compare Selected
+        </button>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="loading-overlay" *ngIf="isLoading">
+        <mat-spinner diameter="40"></mat-spinner>
+      </div>
+
+      <table mat-table [dataSource]="versions" class="version-table">
+        <!-- Version Column -->
+        <ng-container matColumnDef="version">
+          <th mat-header-cell *matHeaderCellDef>Version</th>
+          <td mat-cell *matCellDef="let version">
+            <div class="version-number">
+              <mat-checkbox
+                [checked]="isVersionSelected(version)"
+                (change)="toggleVersionSelection(version)"
+                (click)="$event.stopPropagation()">
+              </mat-checkbox>
+              <strong>v{{ version.version }}</strong>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Name</th>
+          <td mat-cell *matCellDef="let version">
+            {{ version.name }}
+          </td>
+        </ng-container>
+
+        <!-- Created Column -->
+        <ng-container matColumnDef="created">
+          <th mat-header-cell *matHeaderCellDef>Created</th>
+          <td mat-cell *matCellDef="let version">
+            {{ version.created_at | date:'short' }}
+          </td>
+        </ng-container>
+
+        <!-- Author Column -->
+        <ng-container matColumnDef="author">
+          <th mat-header-cell *matHeaderCellDef>Author</th>
+          <td mat-cell *matCellDef="let version">
+            {{ version.created_by }}
+          </td>
+        </ng-container>
+
+        <!-- Changes Column -->
+        <ng-container matColumnDef="changes">
+          <th mat-header-cell *matHeaderCellDef>Changes</th>
+          <td mat-cell *matCellDef="let version">
+            <span class="changes-summary" *ngIf="version.changes_summary">
+              {{ version.changes_summary | slice:0:50 }}{{ version.changes_summary.length > 50 ? '...' : '' }}
+            </span>
+            <button mat-button (click)="viewChanges(version)" class="view-changes-btn">
+              <mat-icon>visibility</mat-icon>
+              View
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let version">
+            <mat-chip-listbox>
+              <mat-chip [color]="getVersionStatusColor(version)">
+                {{ getVersionStatusText(version) }}
+              </mat-chip>
+            </mat-chip-listbox>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let version">
+            <button mat-icon-button [matMenuTriggerFor]="versionMenu" matTooltip="Version actions">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #versionMenu="matMenu">
+              <button mat-menu-item (click)="onLoadVersion(version)">
+                <mat-icon>folder_open</mat-icon>
+                <span>Load Version</span>
+              </button>
+              <button mat-menu-item (click)="rollbackToVersion(version)">
+                <mat-icon>restore</mat-icon>
+                <span>Rollback to This Version</span>
+              </button>
+              <button mat-menu-item (click)="exportVersion(version)">
+                <mat-icon>download</mat-icon>
+                <span>Export</span>
+              </button>
+              <mat-divider></mat-divider>
+              <button mat-menu-item
+                      (click)="deleteVersion(version)"
+                      [disabled]="version.is_active"
+                      class="delete-option">
+                <mat-icon color="warn">delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+            class="version-row"
+            [class.active-version]="row.is_active"></tr>
+
+        <!-- No Data Row -->
+        <tr class="mat-row no-data-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+            <div class="no-data">
+              <mat-icon>history</mat-icon>
+              <p>No version history available</p>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Version Comparison Panel -->
+  <mat-card *ngIf="selectedVersions.length === 2" class="comparison-hint">
+    <mat-card-content>
+      <div class="comparison-info">
+        <mat-icon>info</mat-icon>
+        <span>
+          Selected versions {{ selectedVersions[0].version }} and {{ selectedVersions[1].version }} for comparison.
+          <button mat-button color="primary" (click)="compareSelectedVersions()">
+            Compare Now
+          </button>
+        </span>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

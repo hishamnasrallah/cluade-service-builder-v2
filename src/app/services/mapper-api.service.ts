@@ -13,7 +13,17 @@ import {
   TransformFunction,
   FilterFunction,
   PreviewResult,
-  SaveMapperRequest
+  SaveMapperRequest,
+  ModelField,
+  MapperExecutionLog,
+  MapperFieldRuleLog,
+  MapperVersion,
+  MapperExportData,
+  TestResult,
+  BatchOperationRequest,
+  JSONPathSuggestion,
+  ProcessorFunction,
+  ValidationResult
 } from '../models/mapper.models';
 
 @Injectable({
@@ -101,6 +111,14 @@ export class MapperApiService {
       );
   }
 
+  getProcessorFunctions(): Observable<ProcessorFunction[]> {
+    return this.http.get<ProcessorFunction[]>(this.getFullUrl('/api/functions/processors/'))
+      .pipe(
+        tap(processors => console.log('Processor functions:', processors)),
+        catchError(this.handleError('getProcessorFunctions'))
+      );
+  }
+
   // CaseMapper CRUD
   getCaseMappers(): Observable<CaseMapper[]> {
     return this.http.get<CaseMapper[]>(this.getFullUrl('/api/mapping/case-mappers/'))
@@ -155,7 +173,16 @@ export class MapperApiService {
       );
   }
 
-  // Preview
+  // Model fields API
+  getModelFields(model: string): Observable<ModelField[]> {
+    return this.http.get<ModelField[]>(this.getFullUrl(`/api/models/${model}/fields/`))
+      .pipe(
+        tap(fields => console.log(`Model fields for ${model}:`, fields)),
+        catchError(this.handleError('getModelFields'))
+      );
+  }
+
+  // Preview and Execution
   runDryRun(caseId: number, mapperTargetId: string): Observable<PreviewResult> {
     return this.http.post<PreviewResult>(this.getFullUrl('/api/mapping/dry_run/'), {
       case_id: caseId,
@@ -164,6 +191,17 @@ export class MapperApiService {
       .pipe(
         tap(result => console.log('Dry run result:', result)),
         catchError(this.handleError('runDryRun'))
+      );
+  }
+
+  runMapping(caseId: number, targetId: string): Observable<any> {
+    return this.http.post(
+      this.getFullUrl('/api/mapper/run/'),
+      { case_id: caseId, mapper_target_id: targetId }
+    )
+      .pipe(
+        tap(result => console.log('Mapping result:', result)),
+        catchError(this.handleError('runMapping'))
       );
   }
 
@@ -176,30 +214,151 @@ export class MapperApiService {
       );
   }
 
-  // Helper methods
-  getModelFields(model: string): Observable<string[]> {
-    // This would ideally be a separate API endpoint
-    // For now, returning a mock response
-    const mockFields: { [key: string]: string[] } = {
-      'citizen.Citizen': ['id', 'full_name', 'birth_date', 'national_id', 'gender', 'marital_status'],
-      'citizen.Child': ['id', 'name', 'age', 'parent', 'birth_date'],
-      'education.EducationRecord': ['id', 'level', 'institution', 'graduation_date', 'degree']
-    };
-
-    return new Observable(observer => {
-      setTimeout(() => {
-        observer.next(mockFields[model] || ['id', 'name', 'created_at', 'updated_at']);
-        observer.complete();
-      }, 100);
-    });
+  // Execution logs API
+  getExecutionLogs(params?: any): Observable<MapperExecutionLog[]> {
+    return this.http.get<MapperExecutionLog[]>(this.getFullUrl('/api/mapper/logs/'), { params })
+      .pipe(
+        tap(logs => console.log('Execution logs:', logs)),
+        catchError(this.handleError('getExecutionLogs'))
+      );
   }
 
-  // Get case types for mapper creation
+  getExecutionLogDetail(id: number): Observable<MapperExecutionLog> {
+    return this.http.get<MapperExecutionLog>(this.getFullUrl(`/api/mapper/logs/${id}/`))
+      .pipe(
+        tap(log => console.log('Execution log detail:', log)),
+        catchError(this.handleError('getExecutionLogDetail'))
+      );
+  }
+
+  // Field rule change logs
+  getFieldRuleLogs(ruleId: number): Observable<MapperFieldRuleLog[]> {
+    return this.http.get<MapperFieldRuleLog[]>(
+      this.getFullUrl(`/api/mapper/field-rules/${ruleId}/logs/`)
+    )
+      .pipe(
+        tap(logs => console.log('Field rule logs:', logs)),
+        catchError(this.handleError('getFieldRuleLogs'))
+      );
+  }
+
+  // Version management
+  getMapperVersions(mapperId: number): Observable<MapperVersion[]> {
+    return this.http.get<MapperVersion[]>(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/versions/`)
+    )
+      .pipe(
+        tap(versions => console.log('Mapper versions:', versions)),
+        catchError(this.handleError('getMapperVersions'))
+      );
+  }
+
+  cloneMapper(mapperId: number): Observable<CaseMapper> {
+    return this.http.post<CaseMapper>(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/clone/`),
+      {}
+    )
+      .pipe(
+        tap(mapper => console.log('Cloned mapper:', mapper)),
+        catchError(this.handleError('cloneMapper'))
+      );
+  }
+
+  createMapperVersion(mapperId: number, data: any): Observable<MapperVersion> {
+    return this.http.post<MapperVersion>(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/create-version/`),
+      data
+    )
+      .pipe(
+        tap(version => console.log('Created version:', version)),
+        catchError(this.handleError('createMapperVersion'))
+      );
+  }
+
+  rollbackToVersion(mapperId: number, versionId: number): Observable<any> {
+    return this.http.post(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/rollback/`),
+      { version_id: versionId }
+    )
+      .pipe(
+        tap(result => console.log('Rollback result:', result)),
+        catchError(this.handleError('rollbackToVersion'))
+      );
+  }
+
+  deleteMapperVersion(versionId: number): Observable<void> {
+    return this.http.delete<void>(
+      this.getFullUrl(`/api/mapper/versions/${versionId}/`)
+    )
+      .pipe(
+        tap(() => console.log('Deleted version:', versionId)),
+        catchError(this.handleError('deleteMapperVersion'))
+      );
+  }
+
+  exportMapperVersion(versionId: number): Observable<MapperExportData> {
+    return this.http.get<MapperExportData>(
+      this.getFullUrl(`/api/mapper/versions/${versionId}/export/`)
+    )
+      .pipe(
+        tap(data => console.log('Export data:', data)),
+        catchError(this.handleError('exportMapperVersion'))
+      );
+  }
+
+  // Test individual field rules
+  testFieldRule(ruleId: number, testData: any): Observable<TestResult> {
+    return this.http.post<TestResult>(
+      this.getFullUrl(`/api/mapper/field-rules/${ruleId}/test/`),
+      testData
+    )
+      .pipe(
+        tap(result => console.log('Test result:', result)),
+        catchError(this.handleError('testFieldRule'))
+      );
+  }
+
+  // Batch operations
+  batchUpdateTargets(request: BatchOperationRequest): Observable<any> {
+    return this.http.post(
+      this.getFullUrl('/api/mapper/targets/batch/'),
+      request
+    )
+      .pipe(
+        tap(result => console.log('Batch update result:', result)),
+        catchError(this.handleError('batchUpdateTargets'))
+      );
+  }
+
+  // JSONPath suggestions
+  getJSONPathSuggestions(caseType: string): Observable<JSONPathSuggestion[]> {
+    return this.http.get<JSONPathSuggestion[]>(
+      this.getFullUrl(`/api/mapper/json-paths/${caseType}/`)
+    )
+      .pipe(
+        tap(suggestions => console.log('JSONPath suggestions:', suggestions)),
+        catchError(this.handleError('getJSONPathSuggestions'))
+      );
+  }
+
+  // Case types
   getCaseTypes(): Observable<string[]> {
-    // This would ideally come from backend
-    return new Observable(observer => {
-      observer.next(['CitizenRequest', 'VacationRequest', 'EducationRequest', 'GeneralRequest']);
-      observer.complete();
-    });
+    return this.http.get<string[]>(this.getFullUrl('/api/case-types/'))
+      .pipe(
+        tap(types => console.log('Case types:', types)),
+        catchError(this.handleError('getCaseTypes'))
+      );
+  }
+
+  // Validate mapper configuration
+  validateMapper(mapperId: number): Observable<ValidationResult> {
+    return this.http.post<ValidationResult>(
+      this.getFullUrl(`/api/case-mappers/${mapperId}/validate/`),
+      {}
+    )
+      .pipe(
+        tap(result => console.log('Validation result:', result)),
+        catchError(this.handleError('validateMapper'))
+      );
   }
 }

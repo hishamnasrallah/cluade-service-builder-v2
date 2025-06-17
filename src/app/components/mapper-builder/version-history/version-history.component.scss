@@ -1,0 +1,145 @@
+.version-history-container {
+  padding: 24px;
+}
+
+mat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+mat-card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+
+mat-card-content {
+  position: relative;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.version-table {
+  width: 100%;
+}
+
+.version-row {
+  transition: background-color 0.2s ease;
+}
+
+.version-row:hover {
+  background-color: #f5f5f5;
+}
+
+.active-version {
+  background-color: #e3f2fd;
+}
+
+.active-version:hover {
+  background-color: #bbdefb;
+}
+
+.version-number {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-number mat-checkbox {
+  margin-right: 4px;
+}
+
+.changes-summary {
+  color: #666;
+  font-size: 13px;
+}
+
+.view-changes-btn {
+  margin-left: 8px;
+  min-width: auto;
+}
+
+mat-chip {
+  font-size: 12px;
+  min-height: 24px;
+  padding: 4px 8px;
+}
+
+.delete-option {
+  color: #f44336;
+}
+
+.no-data-row {
+  height: 200px;
+}
+
+.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+  padding: 48px;
+}
+
+.no-data mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+}
+
+.comparison-hint {
+  margin-top: 16px;
+  background-color: #e8f5e9;
+}
+
+.comparison-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comparison-info mat-icon {
+  color: #4caf50;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .version-history-container {
+    padding: 16px;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .version-table {
+    font-size: 13px;
+  }
+
+  .changes-summary {
+    display: block;
+    margin-bottom: 8px;
+  }
+}

@@ -7,6 +7,10 @@ export interface CaseMapper {
   version: number;
   parent?: number;
   active_ind: boolean;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 export interface MapperTarget {
@@ -23,6 +27,8 @@ export interface MapperTarget {
   parent_target?: string;  // UUID
   active_ind: boolean;
   field_rules?: MapperFieldRule[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface MapperFieldRule {
@@ -36,6 +42,8 @@ export interface MapperFieldRule {
   default_value?: string;
   condition_expression?: string;
   conditions?: MapperFieldRuleCondition[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface MapperFieldRuleCondition {
@@ -48,12 +56,87 @@ export interface MapperFieldRuleCondition {
   condition_value?: string;
 }
 
-export type ConditionOperator = '==' | '!=' | '>' | '<' | 'in' | 'not_in';
+export type ConditionOperator = '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not in';
 
+// New interfaces for missing features
+export interface MapperExecutionLog {
+  id: number;
+  case: number;
+  mapper_target: string;
+  executed_at: string;
+  executed_by?: string;
+  success: boolean;
+  result_data: any;
+  error_trace?: string;
+  execution_time_ms?: number;
+  records_created?: number;
+  records_updated?: number;
+}
+
+export interface MapperFieldRuleLog {
+  id: number;
+  rule: number;
+  user: string;
+  timestamp: string;
+  action: 'create' | 'update' | 'delete';
+  old_data?: any;
+  new_data?: any;
+  changes?: string[];
+}
+
+export interface ModelField {
+  name: string;
+  type: string;
+  required: boolean;
+  max_length?: number;
+  choices?: Array<{value: any, display: string}>;
+  help_text?: string;
+  default?: any;
+  related_model?: string;
+}
+
+export interface MapperVersion {
+  id: number;
+  mapper_id: number;
+  version: number;
+  name: string;
+  created_at: string;
+  created_by: string;
+  changes_summary?: string;
+  parent_version?: number;
+  is_active: boolean;
+}
+
+export interface TestResult {
+  field_rule_id: number;
+  input_value: any;
+  output_value: any;
+  success: boolean;
+  error?: string;
+  execution_time_ms: number;
+  condition_matched?: boolean;
+  transform_applied?: boolean;
+}
+
+export interface BatchOperationRequest {
+  operation: 'create' | 'update' | 'delete';
+  target_ids: string[];
+  data?: any;
+}
+
+export interface JSONPathSuggestion {
+  path: string;
+  type: string;
+  sample_value?: any;
+  frequency?: number;
+}
+
+// Extended interfaces
 export interface ModelOption {
   app_label: string;
   model: string;
   display_name?: string;
+  fields?: ModelField[];
 }
 
 export interface LookupOption {
@@ -73,12 +156,27 @@ export interface TransformFunction {
   path: string;
   label: string;
   description?: string;
+  parameters?: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    default?: any;
+  }>;
+  example?: string;
 }
 
 export interface FilterFunction {
   path: string;
   label: string;
   description?: string;
+  example?: string;
+}
+
+export interface ProcessorFunction {
+  path: string;
+  label: string;
+  description?: string;
+  type: 'finder' | 'processor' | 'post_processor';
 }
 
 export interface PreviewResult {
@@ -96,11 +194,21 @@ export interface PreviewResult {
     child_targets_count: number;
     execution_time_ms: number;
   };
+  field_mappings?: Array<{
+    source_path: string;
+    target_field: string;
+    source_value: any;
+    mapped_value: any;
+    transform_applied?: string;
+    condition_matched?: boolean;
+  }>;
 }
 
 export interface SaveMapperRequest {
   case_mapper: CaseMapper;
   targets: MapperTarget[];
+  create_version?: boolean;
+  version_notes?: string;
 }
 
 // Tree node interface for the mapper tree
@@ -114,6 +222,8 @@ export interface MapperTreeNode {
   active: boolean;
   level: number;
   data: MapperTarget;
+  hasErrors?: boolean;
+  fieldRuleCount?: number;
 }
 
 // UI state interfaces
@@ -123,6 +233,7 @@ export interface DragDropEvent {
   item: MapperTreeNode;
   container: any;
   previousContainer: any;
+  targetParentId?: string;
 }
 
 export interface FieldRuleFormData {
@@ -148,9 +259,48 @@ export interface ConditionFormData {
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
+  warnings?: ValidationWarning[];
 }
 
 export interface ValidationError {
   field: string;
   message: string;
+  severity?: 'error' | 'warning' | 'info';
+}
+
+export interface ValidationWarning {
+  field: string;
+  message: string;
+}
+
+// Keyboard shortcuts
+export interface KeyboardShortcut {
+  key: string;
+  modifiers?: string[];
+  description: string;
+  action: () => void;
+  enabled?: boolean;
+}
+
+// State management
+export interface UndoableAction {
+  type: string;
+  timestamp: Date;
+  description: string;
+  undo: () => void;
+  redo: () => void;
+}
+
+// Export/Import formats
+export interface MapperExportData {
+  version: string;
+  exported_at: string;
+  exported_by?: string;
+  mapper: CaseMapper;
+  targets: MapperTarget[];
+  metadata?: {
+    total_rules: number;
+    total_targets: number;
+    dependencies?: string[];
+  };
 }
