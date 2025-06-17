@@ -1,0 +1,96 @@
+.load-mapper-dialog {
+  min-width: 700px;
+  max-width: 900px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.search-field {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.mapper-table-container {
+  position: relative;
+  max-height: 400px;
+  overflow: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.mapper-table {
+  width: 100%;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.mapper-row:hover {
+  background-color: #f5f5f5;
+}
+
+.mapper-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-badge {
+  font-size: 11px;
+  background-color: #e0e0e0;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: #666;
+}
+
+.case-type-chip mat-chip {
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.status-active {
+  color: #4caf50;
+}
+
+.status-inactive {
+  color: #ff9800;
+}
+
+.no-data-row {
+  height: 200px;
+}
+
+.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: #999;
+}
+
+.no-data mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+}
+
+.no-data p {
+  margin: 0;
+}

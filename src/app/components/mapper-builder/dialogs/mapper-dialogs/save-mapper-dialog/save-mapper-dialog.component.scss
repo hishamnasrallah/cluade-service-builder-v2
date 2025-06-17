@@ -1,0 +1,68 @@
+.save-mapper-dialog {
+  min-width: 500px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.full-width {
+  width: 100%;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.metadata-section,
+.options-section {
+  margin: 16px 0;
+}
+
+.metadata-section h3,
+.options-section h3 {
+  margin: 0 0 12px 0;
+  color: #666;
+  font-size: 16px;
+}
+
+.metadata-chips mat-chip {
+  font-size: 12px;
+}
+
+.metadata-chips mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+mat-slide-toggle {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.info-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.info-message mat-icon {
+  color: #1976d2;
+}
+
+.info-message p {
+  margin: 0;
+  font-size: 13px;
+  color: #333;
+}

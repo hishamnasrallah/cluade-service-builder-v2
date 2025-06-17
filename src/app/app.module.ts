@@ -77,6 +77,12 @@ const routes: Routes = [
     canActivate: [AuthGuard]
   },
   {
+    path: 'mapper-builder',
+    loadComponent: () => import('./components/mapper-builder/mapper-builder.component')
+      .then(m => m.MapperBuilderComponent),
+    canActivate: [AuthGuard]
+  },
+  {
     path: 'approval-flow',
     loadComponent: () => import('./components/approval-flow-builder/approval-flow-builder.component')
       .then(m => m.ApprovalFlowBuilderComponent),

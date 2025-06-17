@@ -1,0 +1,205 @@
+<div class="mapper-canvas">
+  <mat-card class="target-config-card" *ngIf="selectedTarget">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon class="header-icon">settings</mat-icon>
+        Target Configuration
+      </mat-card-title>
+      <div class="header-actions">
+        <mat-slide-toggle
+          [checked]="selectedTarget.active_ind"
+          (change)="onActiveToggle($event.checked)"
+          matTooltip="Toggle target active state">
+          Active
+        </mat-slide-toggle>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="targetForm" class="target-form">
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Target Name</mat-label>
+            <input matInput formControlName="name" placeholder="Enter target name">
+            <mat-icon matSuffix>label</mat-icon>
+            <mat-error *ngIf="targetForm.get('name')?.hasError('required')">
+              Name is required
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Model</mat-label>
+            <input type="text"
+                   matInput
+                   formControlName="model"
+                   placeholder="Search and select model..."
+                   [matAutocomplete]="modelAuto">
+            <mat-autocomplete #modelAuto="matAutocomplete"
+                              [displayWith]="displayModelFn"
+                              (optionSelected)="onModelChange($event.option.value)">
+              <mat-option *ngFor="let model of filteredModels$ | async"
+                          [value]="model.app_label + '.' + model.model">
+                <span class="model-option">
+                  <strong>{{ model.model }}</strong>
+                  <small>{{ model.app_label }}</small>
+                </span>
+              </mat-option>
+            </mat-autocomplete>
+            <mat-icon matSuffix>data_object</mat-icon>
+            <mat-error *ngIf="targetForm.get('model')?.hasError('required')">
+              Model is required
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row" *ngIf="selectedTarget.parent_target">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Root Path (JSON Path)</mat-label>
+            <input
+              matInput
+              formControlName="root_path"
+              placeholder="e.g., children, items, records">
+            <mat-icon matSuffix matTooltip="Path to list in parent's data">format_list_bulleted</mat-icon>
+            <mat-hint>JSON path to the list of items to map</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Filter Function (Optional)</mat-label>
+            <mat-select formControlName="filter_function_path">
+              <mat-option [value]="null">None</mat-option>
+              <mat-option *ngFor="let filter of availableFilters" [value]="filter.path">
+                {{ filter.label }}
+              </mat-option>
+            </mat-select>
+            <mat-icon matSuffix>filter_alt</mat-icon>
+            <mat-hint>Function to filter items in list mapping</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="form-actions">
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="saveTargetConfig()"
+            [disabled]="!targetForm.valid || !targetForm.dirty">
+            <mat-icon>save</mat-icon>
+            Save Configuration
+          </button>
+          <button
+            mat-button
+            (click)="resetTargetForm()"
+            [disabled]="!targetForm.dirty">
+            <mat-icon>undo</mat-icon>
+            Reset
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Field Rules Section -->
+  <mat-card class="field-rules-card" *ngIf="selectedTarget">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon class="header-icon">rule</mat-icon>
+        Field Mapping Rules
+      </mat-card-title>
+      <div class="header-actions">
+        <button mat-raised-button color="accent" (click)="addFieldRule()">
+          <mat-icon>add</mat-icon>
+          Add Field Rule
+        </button>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="field-rules-table" *ngIf="selectedTarget.field_rules && selectedTarget.field_rules.length > 0">
+        <table mat-table [dataSource]="selectedTarget.field_rules" class="full-width">
+          <!-- JSON Path Column -->
+          <ng-container matColumnDef="json_path">
+            <th mat-header-cell *matHeaderCellDef>Source Path</th>
+            <td mat-cell *matCellDef="let rule">
+              <code class="json-path">{{ rule.json_path }}</code>
+            </td>
+          </ng-container>
+
+          <!-- Target Field Column -->
+          <ng-container matColumnDef="target_field">
+            <th mat-header-cell *matHeaderCellDef>Target Field</th>
+            <td mat-cell *matCellDef="let rule">
+              <span class="target-field">{{ rule.target_field }}</span>
+            </td>
+          </ng-container>
+
+          <!-- Transform Column -->
+          <ng-container matColumnDef="transform">
+            <th mat-header-cell *matHeaderCellDef>Transform</th>
+            <td mat-cell *matCellDef="let rule">
+              <mat-chip-listbox class="transform-chip" *ngIf="rule.transform_function_path">
+                <mat-chip>{{ getTransformLabel(rule.transform_function_path) }}</mat-chip>
+              </mat-chip-listbox>
+              <span *ngIf="!rule.transform_function_path" class="no-transform">None</span>
+            </td>
+          </ng-container>
+
+          <!-- Conditions Column -->
+          <ng-container matColumnDef="conditions">
+            <th mat-header-cell *matHeaderCellDef>Conditions</th>
+            <td mat-cell *matCellDef="let rule">
+              <mat-icon
+                *ngIf="hasConditions(rule)"
+                class="condition-indicator"
+                matTooltip="Has conditions">
+                check_circle
+              </mat-icon>
+              <mat-icon
+                *ngIf="!hasConditions(rule)"
+                class="no-condition-indicator">
+                radio_button_unchecked
+              </mat-icon>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Actions</th>
+            <td mat-cell *matCellDef="let rule">
+              <button mat-icon-button (click)="editFieldRule(rule)" matTooltip="Edit rule">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button (click)="duplicateFieldRule(rule)" matTooltip="Duplicate rule">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+              <button mat-icon-button (click)="deleteFieldRule(rule)" matTooltip="Delete rule" color="warn">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="field-rule-row"></tr>
+        </table>
+      </div>
+
+      <div class="empty-rules" *ngIf="!selectedTarget.field_rules || selectedTarget.field_rules.length === 0">
+        <mat-icon>rule_folder</mat-icon>
+        <p>No field rules defined</p>
+        <button mat-raised-button color="primary" (click)="addFieldRule()">
+          <mat-icon>add</mat-icon>
+          Create First Rule
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- No Target Selected -->
+  <div class="no-target-selected" *ngIf="!selectedTarget">
+    <mat-icon>touch_app</mat-icon>
+    <h3>No Target Selected</h3>
+    <p>Select a target from the tree to configure its mapping rules</p>
+  </div>
+</div>

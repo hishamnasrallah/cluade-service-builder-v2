@@ -1,0 +1,114 @@
+<div class="mapper-builder-container">
+  <!-- Header Toolbar -->
+  <app-mapper-toolbar
+    [isDirty]="isDirty$ | async"
+    [isLoading]="isLoading$ | async"
+    [currentMapper]="currentMapper$ | async"
+    (newMapper)="onNewMapper()"
+    (loadMapper)="onLoadMapper()"
+    (saveMapper)="onSaveMapper()"
+    (exportMapper)="onExportMapper()"
+    (importMapper)="onImportMapper()">
+  </app-mapper-toolbar>
+
+  <!-- Loading Bar -->
+  <mat-progress-bar
+    *ngIf="isLoading$ | async"
+    mode="indeterminate"
+    class="loading-bar">
+  </mat-progress-bar>
+
+  <!-- Main Content Area -->
+  <mat-sidenav-container class="main-container">
+    <!-- Left Sidebar - Mapper Tree -->
+    <mat-sidenav
+      mode="side"
+      opened
+      [style.width.px]="sidenavWidth"
+      class="mapper-tree-sidenav">
+
+      <div class="sidenav-header">
+        <h3>Mapper Hierarchy</h3>
+        <button mat-icon-button (click)="onAddTarget()" matTooltip="Add new target">
+          <mat-icon>add_circle</mat-icon>
+        </button>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <div class="tree-container">
+        <app-mapper-tree
+          [nodes]="targetHierarchy$ | async"
+          [selectedNodeId]="selectedTargetId$ | async"
+          (nodeSelected)="onNodeSelected($event)"
+          (nodeDropped)="onNodeDropped($event)"
+          (nodeDeleted)="onNodeDeleted($event)"
+          (nodeAdded)="onNodeAdded($event)">
+        </app-mapper-tree>
+      </div>
+    </mat-sidenav>
+
+    <!-- Main Canvas Area -->
+    <mat-sidenav-content class="canvas-container">
+      <div class="canvas-wrapper">
+        <app-mapper-canvas
+          [selectedTarget]="selectedTarget$ | async"
+          [availableModels]="availableModels$ | async"
+          [availableLookups]="availableLookups$ | async"
+          [availableTransforms]="availableTransforms$ | async"
+          [availableFilters]="availableFilters$ | async"
+          (targetUpdated)="onTargetUpdated($event)"
+          (fieldRuleAdded)="onFieldRuleAdded($event)"
+          (fieldRuleUpdated)="onFieldRuleUpdated($event)"
+          (fieldRuleDeleted)="onFieldRuleDeleted($event)">
+        </app-mapper-canvas>
+      </div>
+    </mat-sidenav-content>
+
+    <!-- Right Sidebar - Preview Panel -->
+    <mat-sidenav
+      mode="side"
+      position="end"
+      [opened]="showPreview"
+      [style.width.px]="previewWidth"
+      class="preview-sidenav">
+
+      <div class="sidenav-header">
+        <h3>Preview</h3>
+        <button mat-icon-button (click)="togglePreview()" matTooltip="Close preview">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <app-preview-panel
+        [previewResult]="previewResult$ | async"
+        [selectedTarget]="selectedTarget$ | async"
+        (runPreviewEvent)="onRunPreview($event)">  <!-- Changed from (runPreview) -->
+      </app-preview-panel>
+    </mat-sidenav>
+  </mat-sidenav-container>
+
+  <!-- Floating Action Buttons -->
+  <div class="fab-container">
+    <button
+      mat-fab
+      color="accent"
+      (click)="togglePreview()"
+      matTooltip="Toggle preview panel"
+      matTooltipPosition="left">
+      <mat-icon>{{ showPreview ? 'visibility_off' : 'visibility' }}</mat-icon>
+    </button>
+
+    <button
+      mat-fab
+      color="primary"
+      (click)="onValidateAndSave()"
+      matTooltip="Validate & Save"
+      matTooltipPosition="left"
+      [disabled]="!(isDirty$ | async) || (isLoading$ | async)">
+      <mat-icon>save</mat-icon>
+    </button>
+  </div>
+</div>

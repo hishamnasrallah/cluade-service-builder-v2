@@ -1,0 +1,136 @@
+<div class="mapper-tree">
+  <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="tree-container">
+    <mat-tree-node
+      *matTreeNodeDef="let node"
+      matTreeNodePadding
+      [class.selected]="node.id === selectedNodeId"
+      [class.inactive]="!node.active"
+      class="tree-node"
+      matRipple
+      cdkDrag
+      [cdkDragData]="node"
+      (click)="selectNode(node)">
+
+      <button mat-icon-button disabled class="node-icon">
+        <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
+      </button>
+
+      <div class="node-content">
+        <span class="node-name">{{ node.name }}</span>
+        <span class="node-model">{{ node.model }}</span>
+        <mat-icon
+          *ngIf="node.rootPath"
+          class="list-indicator"
+          matTooltip="List mapping: {{ node.rootPath }}">
+          format_list_bulleted
+        </mat-icon>
+      </div>
+
+      <button
+        mat-icon-button
+        [matMenuTriggerFor]="nodeMenu"
+        class="node-menu"
+        (click)="$event.stopPropagation()">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+
+      <mat-menu #nodeMenu="matMenu">
+        <button mat-menu-item (click)="addChild(node)">
+          <mat-icon>add</mat-icon>
+          <span>Add Child Target</span>
+        </button>
+        <button mat-menu-item (click)="duplicateNode(node)">
+          <mat-icon>content_copy</mat-icon>
+          <span>Duplicate</span>
+        </button>
+        <button mat-menu-item (click)="toggleActive(node)">
+          <mat-icon>{{ node.active ? 'visibility_off' : 'visibility' }}</mat-icon>
+          <span>{{ node.active ? 'Deactivate' : 'Activate' }}</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="deleteNode(node)" class="delete-option">
+          <mat-icon color="warn">delete</mat-icon>
+          <span>Delete</span>
+        </button>
+      </mat-menu>
+    </mat-tree-node>
+
+    <mat-tree-node
+      *matTreeNodeDef="let node; when: hasChild"
+      matTreeNodePadding
+      [class.selected]="node.id === selectedNodeId"
+      [class.inactive]="!node.active"
+      class="tree-node expandable"
+      matRipple
+      cdkDrag
+      [cdkDragData]="node"
+      (click)="selectNode(node)">
+
+      <button
+        mat-icon-button
+        matTreeNodeToggle
+        [attr.aria-label]="'Toggle ' + node.name"
+        class="toggle-button">
+        <mat-icon>
+          {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+        </mat-icon>
+      </button>
+
+      <button mat-icon-button disabled class="node-icon">
+        <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
+      </button>
+
+      <div class="node-content">
+        <span class="node-name">{{ node.name }}</span>
+        <span class="node-model">{{ node.model }}</span>
+        <mat-icon
+          *ngIf="node.rootPath"
+          class="list-indicator"
+          matTooltip="List mapping: {{ node.rootPath }}">
+          format_list_bulleted
+        </mat-icon>
+      </div>
+
+      <span class="child-count" *ngIf="node.node.children.length > 0">
+            {{ node.node.children.length }}
+          </span>
+
+      <button
+        mat-icon-button
+        [matMenuTriggerFor]="nodeMenu"
+        class="node-menu"
+        (click)="$event.stopPropagation()">
+        <mat-icon>more_vert</mat-icon>
+      </button>
+
+      <mat-menu #nodeMenu="matMenu">
+        <button mat-menu-item (click)="addChild(node)">
+          <mat-icon>add</mat-icon>
+          <span>Add Child Target</span>
+        </button>
+        <button mat-menu-item (click)="duplicateNode(node)">
+          <mat-icon>content_copy</mat-icon>
+          <span>Duplicate</span>
+        </button>
+        <button mat-menu-item (click)="toggleActive(node)">
+          <mat-icon>{{ node.active ? 'visibility_off' : 'visibility' }}</mat-icon>
+          <span>{{ node.active ? 'Deactivate' : 'Activate' }}</span>
+        </button>
+        <mat-divider></mat-divider>
+        <button mat-menu-item (click)="deleteNode(node)" class="delete-option">
+          <mat-icon color="warn">delete</mat-icon>
+          <span>Delete</span>
+        </button>
+      </mat-menu>
+    </mat-tree-node>
+  </mat-tree>
+
+  <div class="empty-state" *ngIf="!nodes || nodes.length === 0">
+    <mat-icon>folder_open</mat-icon>
+    <p>No targets defined</p>
+    <button mat-raised-button color="primary" (click)="addRootTarget()">
+      <mat-icon>add</mat-icon>
+      Add First Target
+    </button>
+  </div>
+</div>

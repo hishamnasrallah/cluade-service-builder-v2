@@ -1,0 +1,37 @@
+<div class="validation-errors-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon color="warn">warning</mat-icon>
+    Validation Errors Found
+  </h2>
+
+  <mat-dialog-content>
+    <p class="error-summary">
+      {{ data.errors.length }} validation error{{ data.errors.length > 1 ? 's' : '' }} found in the mapper configuration:
+    </p>
+
+    <mat-list class="error-list">
+      <mat-list-item *ngFor="let error of data.errors; let i = index">
+        <mat-icon matListItemIcon color="warn">error_outline</mat-icon>
+        <div matListItemTitle>Error #{{ i + 1 }}</div>
+        <div matListItemLine>{{ error }}</div>
+      </mat-list-item>
+    </mat-list>
+
+    <mat-divider></mat-divider>
+
+    <p class="warning-message">
+      <mat-icon>info</mat-icon>
+      You can still save the mapper with errors, but it may not function correctly until the issues are resolved.
+    </p>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cancel()">Go Back & Fix</button>
+    <button
+      mat-raised-button
+      color="warn"
+      (click)="forceSave()">
+      Save Anyway
+    </button>
+  </mat-dialog-actions>
+</div>

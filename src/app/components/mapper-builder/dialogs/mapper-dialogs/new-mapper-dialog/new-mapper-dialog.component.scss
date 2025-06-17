@@ -1,0 +1,45 @@
+.validation-errors-dialog {
+  min-width: 500px;
+  max-width: 600px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: #d32f2f;
+}
+
+.error-summary {
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.error-list {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: #ffebee;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.error-list mat-list-item {
+  height: auto;
+  min-height: 48px;
+}
+
+.warning-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #fff3cd;
+  border-radius: 4px;
+  color: #856404;
+}
+
+.warning-message mat-icon {
+  color: #ffc107;
+}

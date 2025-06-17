@@ -1,0 +1,87 @@
+<div class="save-mapper-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>save</mat-icon>
+    Save Mapper Configuration
+  </h2>
+
+  <mat-dialog-content>
+    <form [formGroup]="saveForm">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Mapper Name</mat-label>
+        <input matInput formControlName="name" placeholder="Enter mapper name">
+        <mat-error *ngIf="saveForm.get('name')?.hasError('required')">
+          Name is required
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Description</mat-label>
+        <textarea
+          matInput
+          formControlName="description"
+          rows="3"
+          placeholder="Enter description (optional)">
+            </textarea>
+      </mat-form-field>
+
+      <div class="metadata-section">
+        <h3>Metadata</h3>
+        <div class="metadata-chips">
+          <mat-chip-listbox>
+            <mat-chip disabled>
+              <mat-icon>label</mat-icon>
+              Case Type: {{ data.mapper.case_type }}
+            </mat-chip>
+            <mat-chip disabled>
+              <mat-icon>history</mat-icon>
+              Version: {{ data.mapper.version }}
+            </mat-chip>
+            <mat-chip disabled>
+              <mat-icon>account_tree</mat-icon>
+              Targets: {{ data.targetCount }}
+            </mat-chip>
+            <mat-chip disabled>
+              <mat-icon>rule</mat-icon>
+              Rules: {{ data.ruleCount }}
+            </mat-chip>
+          </mat-chip-listbox>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <div class="options-section">
+        <h3>Save Options</h3>
+
+        <mat-slide-toggle formControlName="activate">
+          Activate mapper after saving
+        </mat-slide-toggle>
+
+        <mat-slide-toggle formControlName="createVersion">
+          Create new version (keep current as backup)
+        </mat-slide-toggle>
+
+        <mat-slide-toggle formControlName="validateBeforeSave">
+          Validate configuration before saving
+        </mat-slide-toggle>
+      </div>
+
+      <div class="info-message" *ngIf="saveForm.get('createVersion')?.value">
+        <mat-icon>info</mat-icon>
+        <p>A new version will be created. The current version will be preserved and marked as inactive.</p>
+      </div>
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cancel()">Cancel</button>
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="save()"
+      [disabled]="!saveForm.valid">
+      <mat-icon>save</mat-icon>
+      Save Mapper
+    </button>
+  </mat-dialog-actions>
+</div>

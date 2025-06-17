@@ -1,0 +1,210 @@
+<div class="preview-panel">
+  <div class="preview-controls">
+    <form [formGroup]="previewForm" class="case-selector">
+      <mat-form-field appearance="outline" class="case-id-field">
+        <mat-label>Case ID</mat-label>
+        <input
+          matInput
+          type="number"
+          formControlName="caseId"
+          placeholder="Enter case ID">
+        <mat-icon matSuffix>fingerprint</mat-icon>
+      </mat-form-field>
+
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="runPreview()"
+        [disabled]="!previewForm.valid || !selectedTarget">
+        <mat-icon>play_arrow</mat-icon>
+        Run Preview
+      </button>
+    </form>
+
+    <mat-button-toggle-group
+      [(value)]="viewMode"
+      class="view-toggle">
+      <mat-button-toggle value="formatted">
+        <mat-icon>view_agenda</mat-icon>
+        Formatted
+      </mat-button-toggle>
+      <mat-button-toggle value="json">
+        <mat-icon>code</mat-icon>
+        JSON
+      </mat-button-toggle>
+      <mat-button-toggle value="table">
+        <mat-icon>table_chart</mat-icon>
+        Table
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Preview Results -->
+  <div class="preview-content" *ngIf="previewResult">
+    <!-- Summary Card -->
+    <mat-card class="summary-card" *ngIf="previewResult.summary">
+      <mat-card-header>
+        <mat-card-title>Execution Summary</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="summary-stats">
+          <div class="stat">
+            <mat-icon>timer</mat-icon>
+            <div>
+              <strong>{{ previewResult.summary.execution_time_ms }}ms</strong>
+              <span>Execution Time</span>
+            </div>
+          </div>
+          <div class="stat">
+            <mat-icon>description</mat-icon>
+            <div>
+              <strong>{{ previewResult.summary.record_count }}</strong>
+              <span>Records</span>
+            </div>
+          </div>
+          <div class="stat">
+            <mat-icon>rule</mat-icon>
+            <div>
+              <strong>{{ previewResult.summary.mapped_fields_count }}</strong>
+              <span>Fields Mapped</span>
+            </div>
+          </div>
+          <div class="stat">
+            <mat-icon>account_tree</mat-icon>
+            <div>
+              <strong>{{ previewResult.summary.child_targets_count }}</strong>
+              <span>Child Targets</span>
+            </div>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Error Display -->
+    <mat-card class="error-card" *ngIf="previewResult.error">
+      <mat-card-header>
+        <mat-card-title class="error-title">
+          <mat-icon>error</mat-icon>
+          Preview Error
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <pre class="error-message">{{ previewResult.error }}</pre>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Formatted View -->
+    <div *ngIf="viewMode === 'formatted' && !previewResult.error" class="formatted-view">
+      <mat-expansion-panel [expanded]="true" class="result-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>{{ previewResult.preview_list ? 'list' : 'description' }}</mat-icon>
+            {{ previewResult.target }}
+          </mat-panel-title>
+          <mat-panel-description>
+            {{ previewResult.action }}
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <!-- Single Record Preview -->
+        <div *ngIf="previewResult.preview_fields" class="fields-preview">
+          <div *ngFor="let field of getFieldEntries(previewResult.preview_fields)" class="field-row">
+            <span class="field-name">{{ field.key }}:</span>
+            <span class="field-value">{{ formatValue(field.value) }}</span>
+          </div>
+        </div>
+
+        <!-- List Records Preview -->
+        <div *ngIf="previewResult.preview_list" class="list-preview">
+          <mat-expansion-panel
+            *ngFor="let item of previewResult.preview_list; let i = index"
+            class="list-item-panel">
+            <mat-expansion-panel-header>
+              <mat-panel-title>Record {{ i + 1 }}</mat-panel-title>
+            </mat-expansion-panel-header>
+
+            <div class="fields-preview">
+              <div *ngFor="let field of getFieldEntries(item)" class="field-row">
+                <span class="field-name">{{ field.key }}:</span>
+                <span class="field-value">{{ formatValue(field.value) }}</span>
+              </div>
+            </div>
+          </mat-expansion-panel>
+        </div>
+
+        <!-- Child Targets -->
+        <div *ngIf="previewResult.children && previewResult.children.length > 0" class="children-preview">
+          <h4>Child Targets</h4>
+          <!-- Simple list instead of recursive component -->
+          <mat-expansion-panel *ngFor="let child of previewResult.children" class="child-result">
+            <mat-expansion-panel-header>
+              <mat-panel-title>{{ child.target }}</mat-panel-title>
+            </mat-expansion-panel-header>
+            <pre>{{ child | json }}</pre>
+          </mat-expansion-panel>
+        </div>
+      </mat-expansion-panel>
+    </div>
+
+    <!-- JSON View -->
+    <div *ngIf="viewMode === 'json' && !previewResult.error" class="json-view">
+      <pre>{{ previewResult | json }}</pre>
+    </div>
+
+    <!-- Table View -->
+    <div *ngIf="viewMode === 'table' && !previewResult.error" class="table-view">
+      <div *ngIf="previewResult.preview_fields" class="single-record-table">
+        <table>
+          <thead>
+          <tr>
+            <th>Field</th>
+            <th>Value</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let field of getFieldEntries(previewResult.preview_fields)">
+            <td class="field-name">{{ field.key }}</td>
+            <td class="field-value">{{ formatValue(field.value) }}</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div *ngIf="previewResult.preview_list" class="list-table">
+        <table>
+          <thead>
+          <tr>
+            <th>#</th>
+            <th *ngFor="let key of getListHeaders(previewResult.preview_list)">
+              {{ key }}
+            </th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr *ngFor="let item of previewResult.preview_list; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td *ngFor="let key of getListHeaders(previewResult.preview_list)">
+              {{ formatValue(item[key]) }}
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!previewResult">
+    <mat-icon>preview</mat-icon>
+    <h3>No Preview Available</h3>
+    <p>Enter a case ID and run preview to see mapping results</p>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Running preview...</p>
+  </div>
+</div>
