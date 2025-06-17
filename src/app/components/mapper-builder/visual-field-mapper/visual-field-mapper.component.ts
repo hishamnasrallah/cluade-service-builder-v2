@@ -21,7 +21,8 @@ import {
   TransformFunction
 } from '../../../models/mapper.models';
 import { FieldRuleEditorComponent } from '../components/field-rule-editor/field-rule-editor.component';
-import {MatFormField} from '@angular/material/form-field';
+import {MatFormField, MatLabel} from '@angular/material/form-field';
+import {MatInput} from '@angular/material/input';
 
 interface FieldConnection {
   id: string;
@@ -57,7 +58,9 @@ interface VisualField {
     MatDialogModule,
     MatProgressSpinnerModule,
     MatExpansionModule,
-    MatFormField
+    MatFormField,
+    MatInput,
+    MatLabel
   ],
   templateUrl: './visual-field-mapper.component.html',
   styleUrl: './visual-field-mapper.component.scss'
@@ -67,9 +70,26 @@ export class VisualFieldMapperComponent implements OnInit {
 
   @Input() targetModel: string = '';
   @Input() modelFields: ModelField[] = [];
-  @Input() jsonPathSuggestions: JSONPathSuggestion[] = [];
-  @Input() fieldRules: MapperFieldRule[] = [];
-  @Input() availableTransforms: TransformFunction[] = [];
+  @Input({
+    transform: (value: string[] | JSONPathSuggestion[]): JSONPathSuggestion[] => {
+      if (!value) return [];
+
+      // If it's already JSONPathSuggestion[], return as is
+      if (value.length > 0 && typeof value[0] === 'object' && 'path' in value[0]) {
+        return value as JSONPathSuggestion[];
+      }
+
+      // Transform string[] to JSONPathSuggestion[]
+      return (value as string[]).map(path => ({
+        path: path,
+        description: `JSON path: ${path}`,
+        type: 'string'
+      }));
+    }
+  }) jsonPathSuggestions: JSONPathSuggestion[] = [];  @Input() fieldRules: MapperFieldRule[] = [];
+  @Input({transform: (value: TransformFunction[] | null): TransformFunction[] => {
+  return value && Array.isArray(value) ? value : [];
+}}) availableTransforms: TransformFunction[] = [];
 
   @Output() ruleCreated = new EventEmitter<MapperFieldRule>();
   @Output() ruleUpdated = new EventEmitter<{ ruleId: number; updates: Partial<MapperFieldRule> }>();
@@ -252,7 +272,7 @@ export class VisualFieldMapperComponent implements OnInit {
     });
   }
 
-  editConnection(connection: FieldConnection): void {
+  editConnection(connection: any): void {
     const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
       width: '800px',
       data: {
@@ -280,7 +300,7 @@ export class VisualFieldMapperComponent implements OnInit {
     });
   }
 
-  deleteConnection(connection: FieldConnection): void {
+  deleteConnection(connection: any): void {
     if (confirm('Delete this field mapping?')) {
       if (connection.rule?.id) {
         this.ruleDeleted.emit(connection.rule.id);

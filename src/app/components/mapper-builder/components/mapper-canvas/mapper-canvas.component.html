@@ -80,6 +80,63 @@
           </mat-form-field>
         </div>
 
+        <mat-divider></mat-divider>
+        <div class="form-section">
+          <h4>Advanced Processing Functions</h4>
+
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Finder Function (Optional)</mat-label>
+              <mat-select formControlName="finder_function_path">
+                <mat-option [value]="null">None (Create new records)</mat-option>
+                <ng-container *ngFor="let processor of availableProcessors">
+                  <mat-option *ngIf="processor.type === 'finder'"
+                              [value]="processor.path">
+                    {{ processor.label }}
+                  </mat-option>
+                </ng-container>
+              </mat-select>
+              <mat-icon matSuffix>search</mat-icon>
+              <mat-hint>Function to find existing records before creating new ones</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <!-- Processor Function Section (around line 105-115) -->
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Processor Function (Optional)</mat-label>
+              <mat-select formControlName="processor_function_path">
+                <mat-option [value]="null">None (Default processing)</mat-option>
+                <ng-container *ngFor="let processor of availableProcessors">
+                  <mat-option *ngIf="processor.type === 'processor'"
+                              [value]="processor.path">
+                    {{ processor.label }}
+                  </mat-option>
+                </ng-container>
+              </mat-select>
+              <mat-icon matSuffix>settings_applications</mat-icon>
+              <mat-hint>Custom function to process records during mapping</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <!-- Post-processor Function Section (around line 120-130) -->
+          <div class="form-row">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Post-processor Function (Optional)</mat-label>
+              <mat-select formControlName="post_processor_path">
+                <mat-option [value]="null">None</mat-option>
+                <ng-container *ngFor="let processor of availableProcessors">
+                  <mat-option *ngIf="processor.type === 'post_processor'"
+                              [value]="processor.path">
+                    {{ processor.label }}
+                  </mat-option>
+                </ng-container>
+              </mat-select>
+              <mat-icon matSuffix>done_all</mat-icon>
+              <mat-hint>Function to run after records are created/updated</mat-hint>
+            </mat-form-field>
+          </div>
+        </div>
         <div class="form-actions">
           <button
             mat-raised-button

@@ -35,6 +35,19 @@ mat-tab-group {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  margin-top: 16px;
+}
+
+.form-section h4 {
+  margin: 0 0 8px 0;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+
+mat-divider {
+  margin: 16px 0;
 }
 
 .form-section h3 {

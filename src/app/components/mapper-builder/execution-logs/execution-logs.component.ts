@@ -47,7 +47,9 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 })
 export class ExecutionLogsComponent implements OnInit {
   @Input() mapperId?: number;
-  @Input() targetId?: string;
+  @Input({transform: (value: string | undefined | null): string | undefined => {
+      return value ? value.trim() : undefined;
+    }}) targetId?: string;
   @Input() caseId?: number;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;

@@ -22,9 +22,9 @@ export class KeyboardShortcutsService {
     fromEvent<KeyboardEvent>(document, 'keydown').pipe(
       filter(() => this.enabled),
       filter(event => !this.isInputElement(event.target as Element)),
-      map(event => this.createShortcutKey(event)),
-      filter(key => this.shortcuts.has(key))
-    ).subscribe(key => {
+      map(event => ({ event, key: this.createShortcutKey(event) })), // Preserve event object
+      filter(({ key }) => this.shortcuts.has(key))
+    ).subscribe(({ event, key }) => {
       const shortcut = this.shortcuts.get(key);
       if (shortcut && shortcut.enabled !== false) {
         event.preventDefault();

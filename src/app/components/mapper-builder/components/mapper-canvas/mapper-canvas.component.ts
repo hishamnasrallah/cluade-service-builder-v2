@@ -25,7 +25,8 @@ import {
   ModelOption,
   LookupOption,
   TransformFunction,
-  FilterFunction
+  FilterFunction,
+  ProcessorFunction
 } from '../../../../models/mapper.models';
 import { FieldRuleEditorComponent } from '../field-rule-editor/field-rule-editor.component';
 import {MatAutocomplete, MatAutocompleteTrigger} from '@angular/material/autocomplete';
@@ -76,6 +77,8 @@ export class MapperCanvasComponent implements OnChanges {
   );
 
   displayedColumns = ['json_path', 'target_field', 'transform', 'conditions', 'actions'];
+  processor: any;
+  @Input() availableProcessors!: any[];
 
   constructor(
     private fb: FormBuilder,

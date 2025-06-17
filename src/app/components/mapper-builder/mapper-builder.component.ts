@@ -1,6 +1,6 @@
 // src/app/components/mapper-builder/mapper-builder.component.ts
 
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject, takeUntil, forkJoin, firstValueFrom, combineLatest } from 'rxjs';
 // import { map } from 'rxjs/operators';
@@ -14,6 +14,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
+import {MatTab, MatTabGroup, MatTabsModule} from '@angular/material/tabs';
 import { Router, ActivatedRoute } from '@angular/router';
 import { map, take } from 'rxjs/operators';
 
@@ -21,12 +22,19 @@ import { MapperTreeComponent } from './components/mapper-tree/mapper-tree.compon
 import { MapperCanvasComponent } from './components/mapper-canvas/mapper-canvas.component';
 import { PreviewPanelComponent } from './components/preview-panel/preview-panel.component';
 import { MapperToolbarComponent } from './components/mapper-toolbar/mapper-toolbar.component';
+import { ExecutionLogsComponent } from './execution-logs/execution-logs.component';
+import { VersionHistoryComponent } from './version-history/version-history.component';
+import { VisualFieldMapperComponent } from './visual-field-mapper/visual-field-mapper.component';
 import { SaveMapperDialogComponent } from './dialogs/mapper-dialogs/save-mapper-dialog/save-mapper-dialog.component';
 import { LoadMapperDialogComponent } from './dialogs/mapper-dialogs/load-mapper-dialog/load-mapper-dialog.component';
 
 import { MapperStateService } from '../../services/mapper-state.service';
 import { MapperApiService } from '../../services/mapper-api.service';
 import { MapperValidationService } from '../../services/mapper-validation.service';
+import { KeyboardShortcutsService, KeyboardShortcutsDialogComponent } from '../../services/keyboard-shortcuts.service';
+import { MapperUndoRedoService } from '../../services/undo-redo.service';
+import { MapperStatePersistenceService } from '../../services/state-persistence.service';
+import {ModelField, ProcessorFunction, JSONPathSuggestion, MapperVersion} from '../../models/mapper.models';
 import {
   NewMapperDialogComponent,
   ValidationErrorsDialogComponent
@@ -50,7 +58,12 @@ import {
     MapperTreeComponent,
     MapperCanvasComponent,
     PreviewPanelComponent,
-    MapperToolbarComponent
+    // MapperToolbarComponent,
+    VersionHistoryComponent,
+    ExecutionLogsComponent,
+    VisualFieldMapperComponent,
+    MatTab,
+    MatTabGroup
   ],
   templateUrl:'mapper-builder.component.html',
   styleUrl:'mapper-builder.component.scss'
@@ -73,10 +86,19 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
   availableFilters$ = this.stateService.getAvailableFilters$();
   previewResult$ = this.stateService.getPreviewResult$();
 
+  activeView: 'tree' | 'visual' = 'tree';
+  modelFields: any[] = [];
+  jsonPathSuggestions: string[] = [];
+  availableProcessors: any[] = [];
+  showLogs = false;
+  showVersionHistory = false;
+  showVisualMapper = false;
+
   // UI state
   showPreview = false;
   sidenavWidth = 320;
   previewWidth = 400;
+
 
   constructor(
     private stateService: MapperStateService,
@@ -391,5 +413,42 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
 
   togglePreview(): void {
     this.showPreview = !this.showPreview;
+  }
+
+  showKeyboardShortcuts() {
+
+  }
+
+  onLoadVersion($event: MapperVersion) {
+
+  }
+
+  onCompareVersions($event: { v1: MapperVersion; v2: MapperVersion }) {
+
+  }
+
+  viewVersionHistory(): void {
+    this.showVersionHistory = !this.showVersionHistory;
+    if (this.showVersionHistory) {
+      this.showLogs = false;
+      this.showVisualMapper = false;
+    }
+  }
+
+  viewExecutionLogs(): void {
+    this.showLogs = !this.showLogs;
+    if (this.showLogs) {
+      this.showVisualMapper = false;
+      this.showVersionHistory = false;
+    }
+  }
+
+  toggleVisualMapper(): void {
+    this.showVisualMapper = !this.showVisualMapper;
+    if (this.showVisualMapper) {
+      this.showLogs = false;
+      this.showVersionHistory = false;
+      this.activeView = 'visual';
+    }
   }
 }

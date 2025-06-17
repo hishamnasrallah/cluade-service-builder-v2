@@ -1,5 +1,4 @@
 // src/app/components/mapper-builder/components/field-rule-editor/field-rule-editor.component.ts
-
 import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {FormBuilder, FormGroup, FormArray, ReactiveFormsModule, Validators, FormsModule} from '@angular/forms';
@@ -25,8 +24,10 @@ import {
   LookupOption,
   TransformFunction,
   ConditionOperator,
-  MapperFieldRuleCondition
+  MapperFieldRuleCondition,
+  ModelField
 } from '../../../../models/mapper.models';
+import { MapperApiService } from '../../../../services/mapper-api.service';
 
 interface DialogData {
   rule: MapperFieldRule | null;
@@ -60,24 +61,30 @@ interface DialogData {
   templateUrl:'field-rule-editor.component.html',
   styleUrl:'field-rule-editor.component.scss'
 })
+
 export class FieldRuleEditorComponent implements OnInit {
   ruleForm: FormGroup;
   conditionMode: 'simple' | 'expression' = 'simple';
 
-  // Mock data - should come from API
-  targetFields: string[] = ['id', 'name', 'full_name', 'birth_date', 'status', 'created_at'];
-  suggestedPaths: string[] = [
-    'user.name',
-    'user.profile.full_name',
-    'user.birth_date',
-    'applicant.name',
-    'case_data.citizen_info.name'
-  ];
+  // // Mock data - should come from API
+  // targetFields: string[] = ['id', 'name', 'full_name', 'birth_date', 'status', 'created_at'];
+  // suggestedPaths: string[] = [
+  //   'user.name',
+  //   'user.profile.full_name',
+  //   'user.birth_date',
+  //   'applicant.name',
+  //   'case_data.citizen_info.name'
+  // ];
+  // Dynamic data from API
+  targetFields: string[] = [];
+  suggestedPaths: string[] = [];
+  isLoadingFields = false;
 
   filteredPaths$: Observable<string[]>;
 
   constructor(
     private fb: FormBuilder,
+    private apiService: MapperApiService,
     public dialogRef: MatDialogRef<FieldRuleEditorComponent>,
     @Inject(MAT_DIALOG_DATA) public data: DialogData
   ) {
@@ -96,6 +103,48 @@ export class FieldRuleEditorComponent implements OnInit {
 
     // Load model fields based on target model
     this.loadModelFields();
+
+    // Load JSONPath suggestions
+    this.loadJSONPathSuggestions();
+  }
+  loadModelFields(): void {
+    if (this.data.targetModel) {
+      this.isLoadingFields = true;
+      this.apiService.getModelFields(this.data.targetModel).subscribe({
+        next: (fields: ModelField[]) => {
+          this.targetFields = fields.map(f => f.name);
+          this.isLoadingFields = false;
+        },
+        error: (error) => {
+          console.error('Failed to load model fields:', error);
+          this.isLoadingFields = false;
+          // Fallback to some default fields
+          this.targetFields = ['id', 'name', 'created_at', 'updated_at'];
+        }
+      });
+    }
+  }
+
+  loadJSONPathSuggestions(): void {
+    // Get case type from somewhere (could be passed in data)
+    const caseType = 'default'; // You might want to pass this from parent
+
+    this.apiService.getJSONPathSuggestions(caseType).subscribe({
+      next: (suggestions) => {
+        this.suggestedPaths = suggestions.map(s => s.path);
+      },
+      error: (error) => {
+        console.error('Failed to load JSONPath suggestions:', error);
+        // Fallback suggestions
+        this.suggestedPaths = [
+          'user.name',
+          'user.profile.full_name',
+          'user.birth_date',
+          'applicant.name',
+          'case_data.citizen_info.name'
+        ];
+      }
+    });
   }
 
   createRuleForm(): FormGroup {
@@ -230,13 +279,13 @@ export class FieldRuleEditorComponent implements OnInit {
     );
   }
 
-  loadModelFields(): void {
-    // TODO: Load actual model fields from API
-    // For now using mock data
-    if (this.data.targetModel === 'citizen.Citizen') {
-      this.targetFields = ['id', 'full_name', 'birth_date', 'national_id', 'gender', 'marital_status'];
-    }
-  }
+  // loadModelFields(): void {
+  //   // TODO: Load actual model fields from API
+  //   // For now using mock data
+  //   if (this.data.targetModel === 'citizen.Citizen') {
+  //     this.targetFields = ['id', 'full_name', 'birth_date', 'national_id', 'gender', 'marital_status'];
+  //   }
+  // }
 
   cancel(): void {
     this.dialogRef.close();

@@ -43,6 +43,11 @@
   color: #424242;
 }
 
+.header-actions {
+  display: flex;
+  gap: 4px;
+}
+
 .tree-container {
   padding: 16px;
   height: calc(100% - 57px);
@@ -55,10 +60,23 @@
   overflow: hidden;
 }
 
-.canvas-wrapper {
+.canvas-wrapper,
+.visual-mapper-wrapper,
+.logs-wrapper,
+.version-history-wrapper {
   height: 100%;
   overflow-y: auto;
   padding: 24px;
+}
+.main-tabs {
+  height: 100%;
+}
+.main-tabs ::ng-deep .mat-tab-body-wrapper {
+  height: 100%;
+}
+.main-tabs ::ng-deep .mat-tab-body {
+  height: 100%;
+  overflow: hidden;
 }
 
 .fab-container {
@@ -69,6 +87,11 @@
   flex-direction: column;
   gap: 16px;
   z-index: 100;
+}
+
+.help-fab {
+  background-color: #757575;
+  color: white;
 }
 
 /* Custom scrollbar */
@@ -90,6 +113,7 @@
   background: #a1a1a1;
 }
 
+
 /* Responsive adjustments */
 @media (max-width: 1024px) {
   .mapper-tree-sidenav {
@@ -102,12 +126,19 @@
 }
 
 @media (max-width: 768px) {
-  .canvas-wrapper {
+  .canvas-wrapper,
+  .visual-mapper-wrapper,
+  .logs-wrapper,
+  .version-history-wrapper {
     padding: 16px;
   }
 
   .fab-container {
     bottom: 16px;
     right: 16px;
+  }
+
+  .header-actions {
+    flex-direction: row;
   }
 }

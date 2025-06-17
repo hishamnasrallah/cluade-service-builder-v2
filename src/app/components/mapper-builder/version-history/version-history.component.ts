@@ -1,6 +1,6 @@
 // src/app/components/mapper-builder/components/version-history/version-history.component.ts
 
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import {Component, Input, Output, EventEmitter, OnInit, Inject} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,7 +9,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import {MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef} from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import {
   CaseMapper,
@@ -17,6 +17,11 @@ import {
   MapperTarget
 } from '../../../models/mapper.models';
 import { MapperApiService } from '../../../services/mapper-api.service';
+import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatInputModule} from '@angular/material/input';
+import {MatDivider, MatDividerModule} from '@angular/material/divider';
+import {MatCheckbox} from '@angular/material/checkbox';
 
 interface VersionComparison {
   version1: MapperVersion;
@@ -42,13 +47,15 @@ interface VersionComparison {
     MatTooltipModule,
     MatMenuModule,
     MatDialogModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatDivider,
+    MatCheckbox
   ],
   templateUrl: './version-history.component.html',
   styleUrl: './version-history.component.scss'
 })
 export class VersionHistoryComponent implements OnInit {
-  @Input() mapper?: CaseMapper;
+  @Input({transform: (value: CaseMapper | undefined | null): CaseMapper | undefined => value || undefined}) mapper?: CaseMapper;
   @Output() loadVersion = new EventEmitter<MapperVersion>();
   @Output() compareVersions = new EventEmitter<{v1: MapperVersion, v2: MapperVersion}>();
 
@@ -253,7 +260,8 @@ export class VersionHistoryComponent implements OnInit {
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
-    MatButtonModule
+    MatButtonModule,
+
   ]
 })
 export class CreateVersionDialogComponent {
