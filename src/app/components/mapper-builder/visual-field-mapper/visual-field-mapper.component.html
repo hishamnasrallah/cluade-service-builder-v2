@@ -1,10 +1,33 @@
 <div class="visual-mapper-container">
   <div class="mapper-header">
-    <h3>Visual Field Mapping</h3>
+    <h3>
+      <mat-icon>drag_indicator</mat-icon>
+      Visual Field Mapping
+    </h3>
+    <div class="header-info">
+      <mat-chip-listbox>
+        <mat-chip>
+          <mat-icon>link</mat-icon>
+          {{ connections.length }} connections
+        </mat-chip>
+        <mat-chip>
+          <mat-icon>check_circle</mat-icon>
+          {{ getConnectedFieldsCount() }} mapped
+        </mat-chip>
+        <mat-chip>
+          <mat-icon>warning</mat-icon>
+          {{ getUnmappedRequiredCount() }} required unmapped
+        </mat-chip>
+      </mat-chip-listbox>
+    </div>
     <div class="header-actions">
-      <button mat-button (click)="autoMapFields()">
+      <button mat-raised-button (click)="autoMapFields()">
         <mat-icon>auto_fix_high</mat-icon>
-        Auto Map
+        Smart Auto Map
+      </button>
+      <button mat-button (click)="showMappingSuggestions()">
+        <mat-icon>lightbulb</mat-icon>
+        Suggestions
       </button>
       <button mat-button (click)="clearAllMappings()" color="warn">
         <mat-icon>clear</mat-icon>
@@ -21,94 +44,189 @@
           <mat-icon>source</mat-icon>
           Source Fields (JSON)
         </mat-card-title>
+        <div class="panel-actions">
+          <button mat-icon-button (click)="collapseAllSource()" matTooltip="Collapse all">
+            <mat-icon>unfold_less</mat-icon>
+          </button>
+          <button mat-icon-button (click)="expandAllSource()" matTooltip="Expand all">
+            <mat-icon>unfold_more</mat-icon>
+          </button>
+        </div>
       </mat-card-header>
 
       <mat-card-content>
         <mat-form-field appearance="outline" class="search-field">
-          <mat-label>Search fields</mat-label>
+          <mat-label>Search source fields</mat-label>
           <input matInput [formControl]="searchSourceControl" placeholder="Type to filter...">
           <mat-icon matPrefix>search</mat-icon>
+          <mat-chip-listbox matSuffix *ngIf="searchSourceControl.value" class="search-count">
+            <mat-chip>{{ filteredSourceFields.length }}</mat-chip>
+          </mat-chip-listbox>
         </mat-form-field>
 
-        <div class="fields-list" cdkDropList
+        <div class="field-categories" *ngIf="!searchSourceControl.value">
+          <mat-chip-listbox class="category-chips">
+            <mat-chip *ngFor="let category of sourceCategories"
+                      (click)="filterByCategory('source', category)"
+                      [selected]="selectedSourceCategory === category">
+              {{ category }}
+            </mat-chip>
+          </mat-chip-listbox>
+        </div>
+
+        <div class="fields-list"
+             cdkDropList
+             #sourceList="cdkDropList"
              [cdkDropListData]="filteredSourceFields"
-             (cdkDropListDropped)="onDropToSource($event, $event.item.data)">
+             [cdkDropListConnectedTo]="[targetList]"
+             (cdkDropListDropped)="onDropped($event)">
 
           <div *ngFor="let field of filteredSourceFields"
                class="field-item"
                [class.connected]="field.connected"
+               [class.highlighted]="isFieldHighlighted(field)"
                [attr.data-source-field]="field.path"
                cdkDrag
                [cdkDragData]="field"
-               (cdkDragStarted)="onSourceFieldDragStart(field)"
-               (cdkDragEnded)="onDragEnd()">
+               (cdkDragStarted)="onDragStarted($event, field, 'source')"
+               (cdkDragMoved)="onDragMoved($event)"
+               (cdkDragEnded)="onDragEnded($event)"
+               matRipple>
+
+            <mat-icon class="drag-handle" cdkDragHandle>drag_indicator</mat-icon>
 
             <mat-icon class="field-type-icon"
                       [style.color]="getFieldTypeColor(field.type)"
-                      [matTooltip]="field.type">
+                      [matTooltip]="'Type: ' + field.type">
               {{ getFieldIcon(field.type) }}
             </mat-icon>
 
             <div class="field-info">
               <span class="field-name">{{ field.name }}</span>
               <span class="field-path">{{ field.path }}</span>
-              <span class="field-sample" *ngIf="field.sample">
-                {{ field.sample | json }}
+              <span class="field-sample" *ngIf="field.sample"
+                    [matTooltip]="'Sample: ' + (field.sample | json)">
+                {{ formatSampleValue(field.sample) }}
               </span>
             </div>
 
-            <mat-icon class="connection-status" *ngIf="field.connected">
-              link
-            </mat-icon>
+            <mat-badge *ngIf="field.connected"
+                       [matBadgeContent]="getConnectionCount(field, 'source')"
+                       matBadgeColor="primary"
+                       matBadgeSize="small">
+              <mat-icon class="connection-status">link</mat-icon>
+            </mat-badge>
+
+            <button mat-icon-button
+                    [matMenuTriggerFor]="sourceFieldMenu"
+                    (click)="$event.stopPropagation()">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #sourceFieldMenu="matMenu">
+              <button mat-menu-item (click)="showFieldDetails(field)">
+                <mat-icon>info</mat-icon>
+                <span>Field Details</span>
+              </button>
+              <button mat-menu-item (click)="suggestTargetsFor(field)">
+                <mat-icon>lightbulb</mat-icon>
+                <span>Suggest Targets</span>
+              </button>
+              <button mat-menu-item
+                      *ngIf="field.connected"
+                      (click)="disconnectField(field, 'source')">
+                <mat-icon>link_off</mat-icon>
+                <span>Disconnect All</span>
+              </button>
+            </mat-menu>
+
+            <!-- Drag preview placeholder -->
+            <div *cdkDragPlaceholder class="field-placeholder"></div>
+
+            <!-- Custom drag preview -->
+            <div *cdkDragPreview class="field-drag-preview">
+              <mat-icon [style.color]="getFieldTypeColor(field.type)">
+                {{ getFieldIcon(field.type) }}
+              </mat-icon>
+              <span>{{ field.name }}</span>
+            </div>
           </div>
 
           <div class="no-fields" *ngIf="filteredSourceFields.length === 0">
             <mat-icon>search_off</mat-icon>
-            <p>No matching fields</p>
+            <p>No matching source fields</p>
+            <button mat-button (click)="searchSourceControl.setValue('')">
+              Clear Search
+            </button>
           </div>
         </div>
       </mat-card-content>
     </mat-card>
 
-    <!-- Connection Canvas -->
-    <div class="connection-area">
+    <!-- Connection Canvas Area -->
+    <div class="connection-area" #connectionArea>
       <canvas #canvas
+              [class.drag-active]="dragPreview.active"
               (click)="onCanvasClick($event)"
-              (mousemove)="drawConnections()"></canvas>
+              (mousemove)="onCanvasMouseMove($event)"></canvas>
 
-      <!-- Connection Details -->
-      <div class="connection-details" *ngIf="selectedConnection">
+      <!-- Connection Details Popup -->
+      <div class="connection-details"
+           *ngIf="selectedConnection"
+           [style.left.px]="connectionDetailsPosition.x"
+           [style.top.px]="connectionDetailsPosition.y">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>Connection Details</mat-card-title>
+            <mat-card-title>
+              <mat-icon>link</mat-icon>
+              Connection Details
+            </mat-card-title>
             <button mat-icon-button (click)="selectedConnection = null">
               <mat-icon>close</mat-icon>
             </button>
           </mat-card-header>
 
           <mat-card-content>
-            <div class="detail-row">
-              <strong>Source:</strong>
-              <code>{{ selectedConnection.sourceField }}</code>
-            </div>
-            <div class="detail-row">
-              <strong>Target:</strong>
-              <code>{{ selectedConnection.targetField }}</code>
-            </div>
-            <div class="detail-row" *ngIf="selectedConnection.transform">
-              <strong>Transform:</strong>
-              <mat-chip>{{ selectedConnection.transform }}</mat-chip>
-            </div>
-            <div class="detail-row" *ngIf="selectedConnection.condition">
-              <strong>Condition:</strong>
-              <code class="condition-text">{{ selectedConnection.condition }}</code>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <mat-icon>source</mat-icon>
+                <div>
+                  <strong>Source</strong>
+                  <code>{{ selectedConnection.sourceField }}</code>
+                </div>
+              </div>
+              <div class="detail-item">
+                <mat-icon>flag</mat-icon>
+                <div>
+                  <strong>Target</strong>
+                  <code>{{ selectedConnection.targetField }}</code>
+                </div>
+              </div>
+              <div class="detail-item" *ngIf="selectedConnection.transform">
+                <mat-icon>transform</mat-icon>
+                <div>
+                  <strong>Transform</strong>
+                  <mat-chip>{{ getTransformLabel(selectedConnection.transform) }}</mat-chip>
+                </div>
+              </div>
+              <div class="detail-item" *ngIf="selectedConnection.condition">
+                <mat-icon>rule</mat-icon>
+                <div>
+                  <strong>Condition</strong>
+                  <code class="condition-text">{{ selectedConnection.condition }}</code>
+                </div>
+              </div>
             </div>
           </mat-card-content>
 
           <mat-card-actions>
-            <button mat-button (click)="editConnection(selectedConnection)">
+            <button mat-raised-button color="primary" (click)="editConnection(selectedConnection)">
               <mat-icon>edit</mat-icon>
               Edit
+            </button>
+            <button mat-button (click)="testConnection(selectedConnection)">
+              <mat-icon>play_arrow</mat-icon>
+              Test
             </button>
             <button mat-button color="warn" (click)="deleteConnection(selectedConnection)">
               <mat-icon>delete</mat-icon>
@@ -116,6 +234,28 @@
             </button>
           </mat-card-actions>
         </mat-card>
+      </div>
+
+      <!-- Connection Hover Tooltip -->
+      <div class="connection-tooltip"
+           *ngIf="hoveredConnection && !selectedConnection"
+           [style.left.px]="tooltipPosition.x"
+           [style.top.px]="tooltipPosition.y">
+        <div class="tooltip-content">
+          <strong>{{ hoveredConnection.sourceField.split('.').pop() }}</strong>
+          <mat-icon>arrow_forward</mat-icon>
+          <strong>{{ hoveredConnection.targetField }}</strong>
+          <div class="tooltip-tags">
+            <mat-chip *ngIf="hoveredConnection.transform" class="mini-chip">
+              <mat-icon>transform</mat-icon>
+              Transform
+            </mat-chip>
+            <mat-chip *ngIf="hoveredConnection.condition" class="mini-chip">
+              <mat-icon>rule</mat-icon>
+              Conditional
+            </mat-chip>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -126,97 +266,253 @@
           <mat-icon>flag</mat-icon>
           Target Fields ({{ targetModel }})
         </mat-card-title>
+        <div class="panel-actions">
+          <button mat-icon-button [matMenuTriggerFor]="targetViewMenu" matTooltip="View options">
+            <mat-icon>view_module</mat-icon>
+          </button>
+          <mat-menu #targetViewMenu="matMenu">
+            <button mat-menu-item (click)="showRequiredOnly = !showRequiredOnly">
+              <mat-icon>{{ showRequiredOnly ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span>Required Fields Only</span>
+            </button>
+            <button mat-menu-item (click)="showUnmappedOnly = !showUnmappedOnly">
+              <mat-icon>{{ showUnmappedOnly ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+              <span>Unmapped Fields Only</span>
+            </button>
+          </mat-menu>
+        </div>
       </mat-card-header>
 
       <mat-card-content>
         <mat-form-field appearance="outline" class="search-field">
-          <mat-label>Search fields</mat-label>
+          <mat-label>Search target fields</mat-label>
           <input matInput [formControl]="searchTargetControl" placeholder="Type to filter...">
           <mat-icon matPrefix>search</mat-icon>
+          <mat-chip-listbox matSuffix *ngIf="searchTargetControl.value" class="search-count">
+            <mat-chip>{{ filteredTargetFields.length }}</mat-chip>
+          </mat-chip-listbox>
         </mat-form-field>
 
-        <div class="fields-list" cdkDropList
-             [cdkDropListData]="filteredTargetFields"
-             (cdkDropListDropped)="onDropToTarget($event, $event.item.data)">
+        <div class="field-stats">
+          <div class="stat">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ getMappedCount() }} / {{ targetFields.length }} mapped</span>
+          </div>
+          <div class="stat">
+            <mat-icon color="warn">warning</mat-icon>
+            <span>{{ getUnmappedRequiredCount() }} required unmapped</span>
+          </div>
+        </div>
 
-          <div *ngFor="let field of filteredTargetFields"
+        <div class="fields-list"
+             cdkDropList
+             #targetList="cdkDropList"
+             [cdkDropListData]="filteredTargetFields"
+             [cdkDropListConnectedTo]="[sourceList]"
+             (cdkDropListDropped)="onDropped($event)">
+
+          <div *ngFor="let field of getFilteredTargetFields()"
                class="field-item"
                [class.connected]="field.connected"
                [class.required]="field.required"
+               [class.error]="field.required && !field.connected"
                [attr.data-target-field]="field.name"
                cdkDrag
                [cdkDragData]="field"
-               (cdkDragStarted)="onTargetFieldDragStart(field)"
-               (cdkDragEnded)="onDragEnd()">
+               (cdkDragStarted)="onDragStarted($event, field, 'target')"
+               (cdkDragMoved)="onDragMoved($event)"
+               (cdkDragEnded)="onDragEnded($event)"
+               matRipple>
 
             <mat-icon class="field-type-icon"
                       [style.color]="getFieldTypeColor(field.type)"
-                      [matTooltip]="field.type">
+                      [matTooltip]="'Type: ' + field.type">
               {{ getFieldIcon(field.type) }}
             </mat-icon>
 
             <div class="field-info">
               <span class="field-name">
                 {{ field.name }}
-                <mat-icon class="required-icon" *ngIf="field.required" matTooltip="Required field">
+                <mat-icon class="required-icon"
+                          *ngIf="field.required"
+                          matTooltip="Required field"
+                          color="warn">
                   star
                 </mat-icon>
               </span>
               <span class="field-type-label">{{ field.type }}</span>
+              <span class="field-description" *ngIf="field.description">
+                {{ field.description }}
+              </span>
             </div>
 
-            <mat-icon class="connection-status" *ngIf="field.connected">
-              link
-            </mat-icon>
+            <div class="field-status">
+              <mat-icon class="connection-status"
+                        *ngIf="field.connected"
+                        [matTooltip]="'Connected to ' + getConnectedSource(field)">
+                link
+              </mat-icon>
+              <mat-icon class="warning-icon"
+                        *ngIf="field.required && !field.connected"
+                        color="warn"
+                        matTooltip="Required field not mapped">
+                warning
+              </mat-icon>
+            </div>
+
+            <button mat-icon-button
+                    [matMenuTriggerFor]="targetFieldMenu"
+                    (click)="$event.stopPropagation()">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #targetFieldMenu="matMenu">
+              <button mat-menu-item (click)="suggestSourcesFor(field)">
+                <mat-icon>search</mat-icon>
+                <span>Find Matching Sources</span>
+              </button>
+              <button mat-menu-item (click)="createCustomMapping(field)">
+                <mat-icon>add</mat-icon>
+                <span>Create Custom Mapping</span>
+              </button>
+              <button mat-menu-item
+                      *ngIf="field.connected"
+                      (click)="disconnectField(field, 'target')">
+                <mat-icon>link_off</mat-icon>
+                <span>Disconnect</span>
+              </button>
+            </mat-menu>
+
+            <!-- Drop zone indicator -->
+            <div class="drop-zone-indicator" *ngIf="isDragActive && canDropOn(field)">
+              <mat-icon>add_circle</mat-icon>
+              Drop here to connect
+            </div>
           </div>
 
-          <div class="no-fields" *ngIf="filteredTargetFields.length === 0">
+          <div class="no-fields" *ngIf="getFilteredTargetFields().length === 0">
             <mat-icon>search_off</mat-icon>
-            <p>No matching fields</p>
+            <p>No matching target fields</p>
+            <button mat-button (click)="resetTargetFilters()">
+              Reset Filters
+            </button>
           </div>
         </div>
       </mat-card-content>
     </mat-card>
   </div>
 
-  <!-- Legend -->
+  <!-- Bottom Toolbar -->
+  <div class="mapper-toolbar">
+    <div class="toolbar-section">
+      <button mat-button (click)="showHelp()">
+        <mat-icon>help</mat-icon>
+        Help
+      </button>
+      <button mat-button (click)="showKeyboardShortcuts()">
+        <mat-icon>keyboard</mat-icon>
+        Shortcuts
+      </button>
+    </div>
+
+    <div class="toolbar-section">
+      <mat-chip-listbox class="view-options">
+        <mat-chip (click)="toggleConnectionLabels()">
+          <mat-icon>label</mat-icon>
+          Labels
+        </mat-chip>
+        <mat-chip (click)="toggleAnimations()">
+          <mat-icon>animation</mat-icon>
+          Animations
+        </mat-chip>
+        <mat-chip (click)="toggleCompactMode()">
+          <mat-icon>view_compact</mat-icon>
+          Compact
+        </mat-chip>
+      </mat-chip-listbox>
+    </div>
+
+    <div class="toolbar-section">
+      <button mat-button (click)="exportMappings()">
+        <mat-icon>download</mat-icon>
+        Export
+      </button>
+      <button mat-button (click)="importMappings()">
+        <mat-icon>upload</mat-icon>
+        Import
+      </button>
+    </div>
+  </div>
+
+  <!-- Legend Panel -->
   <mat-expansion-panel class="legend-panel">
     <mat-expansion-panel-header>
       <mat-panel-title>
         <mat-icon>help</mat-icon>
-        Legend & Help
+        Visual Mapping Guide
       </mat-panel-title>
     </mat-expansion-panel-header>
 
     <div class="legend-content">
       <div class="legend-section">
         <h4>Field Types</h4>
-        <div class="legend-item">
-          <mat-icon [style.color]="getFieldTypeColor('string')">text_fields</mat-icon>
-          <span>String</span>
+        <div class="legend-grid">
+          <div class="legend-item" *ngFor="let type of fieldTypes">
+            <mat-icon [style.color]="getFieldTypeColor(type.value)">
+              {{ getFieldIcon(type.value) }}
+            </mat-icon>
+            <span>{{ type.label }}</span>
+          </div>
         </div>
-        <div class="legend-item">
-          <mat-icon [style.color]="getFieldTypeColor('number')">looks_one</mat-icon>
-          <span>Number</span>
-        </div>
-        <div class="legend-item">
-          <mat-icon [style.color]="getFieldTypeColor('boolean')">toggle_on</mat-icon>
-          <span>Boolean</span>
-        </div>
-        <div class="legend-item">
-          <mat-icon [style.color]="getFieldTypeColor('date')">event</mat-icon>
-          <span>Date</span>
+      </div>
+
+      <div class="legend-section">
+        <h4>Connection Types</h4>
+        <div class="connection-examples">
+          <div class="connection-example">
+            <svg width="100" height="30">
+              <path d="M 10 15 L 90 15" class="connection-path"></path>
+            </svg>
+            <span>Direct Mapping</span>
+          </div>
+          <div class="connection-example">
+            <svg width="100" height="30">
+              <path d="M 10 15 L 90 15" class="connection-path conditional"></path>
+            </svg>
+            <span>Conditional Mapping</span>
+          </div>
+          <div class="connection-example">
+            <svg width="100" height="30">
+              <path d="M 10 15 L 90 15" class="connection-path transformed"></path>
+            </svg>
+            <span>With Transform</span>
+          </div>
         </div>
       </div>
 
       <div class="legend-section">
         <h4>How to Use</h4>
-        <ul>
-          <li>Drag fields from source to target to create mappings</li>
-          <li>Click on a connection line to view details</li>
-          <li>Double-click a connection to edit it</li>
-          <li>Use Auto Map to automatically match fields by name</li>
-          <li>Orange dashed lines indicate conditional mappings</li>
+        <ul class="help-list">
+          <li>
+            <mat-icon>drag_indicator</mat-icon>
+            Drag fields from source to target to create mappings
+          </li>
+          <li>
+            <mat-icon>touch_app</mat-icon>
+            Click on a connection to view details
+          </li>
+          <li>
+            <mat-icon>edit</mat-icon>
+            Double-click a connection to edit it
+          </li>
+          <li>
+            <mat-icon>auto_fix_high</mat-icon>
+            Use Smart Auto Map to automatically match similar fields
+          </li>
+          <li>
+            <mat-icon>keyboard</mat-icon>
+            Press Shift+? to see keyboard shortcuts
+          </li>
         </ul>
       </div>
     </div>

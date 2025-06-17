@@ -1,136 +1,346 @@
 <div class="mapper-tree">
-  <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="tree-container">
-    <mat-tree-node
-      *matTreeNodeDef="let node"
-      matTreeNodePadding
-      [class.selected]="node.id === selectedNodeId"
-      [class.inactive]="!node.active"
-      class="tree-node"
-      matRipple
-      cdkDrag
-      [cdkDragData]="node"
-      (click)="selectNode(node)">
-
-      <button mat-icon-button disabled class="node-icon">
-        <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
+  <!-- Tree Search and Actions -->
+  <div class="tree-header" *ngIf="nodes && nodes.length > 0">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search targets</mat-label>
+      <input matInput
+             #searchInput
+             placeholder="Type to filter..."
+             (input)="filterNodes(searchInput.value)">
+      <mat-icon matPrefix>search</mat-icon>
+      <button mat-icon-button matSuffix
+              *ngIf="searchInput.value"
+              (click)="searchInput.value = ''; filterNodes('')">
+        <mat-icon>clear</mat-icon>
       </button>
+    </mat-form-field>
 
-      <div class="node-content">
-        <span class="node-name">{{ node.name }}</span>
-        <span class="node-model">{{ node.model }}</span>
-        <mat-icon
-          *ngIf="node.rootPath"
-          class="list-indicator"
-          matTooltip="List mapping: {{ node.rootPath }}">
-          format_list_bulleted
-        </mat-icon>
-      </div>
-
-      <button
-        mat-icon-button
-        [matMenuTriggerFor]="nodeMenu"
-        class="node-menu"
-        (click)="$event.stopPropagation()">
-        <mat-icon>more_vert</mat-icon>
+    <div class="tree-actions">
+      <button mat-icon-button (click)="expandAll()" matTooltip="Expand all">
+        <mat-icon>unfold_more</mat-icon>
       </button>
-
-      <mat-menu #nodeMenu="matMenu">
-        <button mat-menu-item (click)="addChild(node)">
-          <mat-icon>add</mat-icon>
-          <span>Add Child Target</span>
-        </button>
-        <button mat-menu-item (click)="duplicateNode(node)">
-          <mat-icon>content_copy</mat-icon>
-          <span>Duplicate</span>
-        </button>
-        <button mat-menu-item (click)="toggleActive(node)">
-          <mat-icon>{{ node.active ? 'visibility_off' : 'visibility' }}</mat-icon>
-          <span>{{ node.active ? 'Deactivate' : 'Activate' }}</span>
-        </button>
-        <mat-divider></mat-divider>
-        <button mat-menu-item (click)="deleteNode(node)" class="delete-option">
-          <mat-icon color="warn">delete</mat-icon>
-          <span>Delete</span>
-        </button>
-      </mat-menu>
-    </mat-tree-node>
-
-    <mat-tree-node
-      *matTreeNodeDef="let node; when: hasChild"
-      matTreeNodePadding
-      [class.selected]="node.id === selectedNodeId"
-      [class.inactive]="!node.active"
-      class="tree-node expandable"
-      matRipple
-      cdkDrag
-      [cdkDragData]="node"
-      (click)="selectNode(node)">
-
-      <button
-        mat-icon-button
-        matTreeNodeToggle
-        [attr.aria-label]="'Toggle ' + node.name"
-        class="toggle-button">
-        <mat-icon>
-          {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
-        </mat-icon>
+      <button mat-icon-button (click)="collapseAll()" matTooltip="Collapse all">
+        <mat-icon>unfold_less</mat-icon>
       </button>
+    </div>
+  </div>
 
-      <button mat-icon-button disabled class="node-icon">
-        <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
-      </button>
+  <!-- Tree Container -->
+  <div class="tree-container" *ngIf="nodes && nodes.length > 0">
+    <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="mapper-hierarchy-tree">
+      <!-- Leaf Node Template -->
+      <mat-tree-node
+        *matTreeNodeDef="let node"
+        matTreeNodePadding
+        [class.selected]="node.id === selectedNodeId"
+        [class.inactive]="!node.active"
+        [class.has-errors]="node.hasErrors"
+        [class.cut]="isNodeCut(node)"
+        [attr.data-node-id]="node.id"
+        class="tree-node leaf-node"
+        matRipple
+        cdkDrag
+        [cdkDragData]="node"
+        (cdkDragStarted)="onDragStart($event, node)"
+        (cdkDragMoved)="onDragMove($event)"
+        (cdkDragEnded)="onDragEnd($event)"
+        (click)="selectNode(node)"
+        (contextmenu)="showContextMenu($event, node)">
 
-      <div class="node-content">
-        <span class="node-name">{{ node.name }}</span>
-        <span class="node-model">{{ node.model }}</span>
-        <mat-icon
-          *ngIf="node.rootPath"
-          class="list-indicator"
-          matTooltip="List mapping: {{ node.rootPath }}">
-          format_list_bulleted
-        </mat-icon>
-      </div>
+        <!-- Node Content -->
+        <div class="node-content">
+          <mat-icon class="node-icon" [style.color]="getNodeIcon(node) | iconColor">
+            {{ getNodeIcon(node) }}
+          </mat-icon>
 
-      <span class="child-count" *ngIf="node.node.children.length > 0">
-            {{ node.node.children.length }}
-          </span>
+          <div class="node-info">
+            <span class="node-name" [class.error-text]="node.hasErrors">
+              {{ node.name }}
+            </span>
+            <span class="node-model">{{ node.model }}</span>
 
-      <button
-        mat-icon-button
-        [matMenuTriggerFor]="nodeMenu"
-        class="node-menu"
-        (click)="$event.stopPropagation()">
-        <mat-icon>more_vert</mat-icon>
-      </button>
+            <div class="node-badges">
+              <mat-chip *ngIf="node.rootPath" class="path-chip">
+                <mat-icon>format_list_bulleted</mat-icon>
+                {{ node.rootPath }}
+              </mat-chip>
 
-      <mat-menu #nodeMenu="matMenu">
-        <button mat-menu-item (click)="addChild(node)">
-          <mat-icon>add</mat-icon>
-          <span>Add Child Target</span>
-        </button>
-        <button mat-menu-item (click)="duplicateNode(node)">
-          <mat-icon>content_copy</mat-icon>
-          <span>Duplicate</span>
-        </button>
-        <button mat-menu-item (click)="toggleActive(node)">
-          <mat-icon>{{ node.active ? 'visibility_off' : 'visibility' }}</mat-icon>
-          <span>{{ node.active ? 'Deactivate' : 'Activate' }}</span>
-        </button>
-        <mat-divider></mat-divider>
-        <button mat-menu-item (click)="deleteNode(node)" class="delete-option">
-          <mat-icon color="warn">delete</mat-icon>
-          <span>Delete</span>
-        </button>
-      </mat-menu>
-    </mat-tree-node>
-  </mat-tree>
+              <mat-chip *ngIf="getFieldRuleCount(node) > 0" class="rule-chip">
+                <mat-icon>rule</mat-icon>
+                {{ getFieldRuleCount(node) }}
+              </mat-chip>
+            </div>
+          </div>
 
+          <div class="node-status">
+            <mat-icon *ngIf="getNodeStatusIcon(node)"
+                      [color]="getNodeStatusColor(node)"
+                      [matTooltip]="getNodeStatusTooltip(node)"
+                      class="status-icon">
+              {{ getNodeStatusIcon(node) }}
+            </mat-icon>
+          </div>
+
+          <button
+            mat-icon-button
+            [matMenuTriggerFor]="nodeMenu"
+            class="node-menu"
+            (click)="$event.stopPropagation()">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+        </div>
+
+        <!-- Context Menu -->
+        <mat-menu #nodeMenu="matMenu">
+          <button mat-menu-item (click)="addChild(node)">
+            <mat-icon>add</mat-icon>
+            <span>Add Child Target</span>
+          </button>
+          <button mat-menu-item (click)="duplicateNode(node)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Duplicate</span>
+          </button>
+          <button mat-menu-item (click)="renameNode(node)">
+            <mat-icon>edit</mat-icon>
+            <span>Rename</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="cutNodeToClipboard(node)">
+            <mat-icon>content_cut</mat-icon>
+            <span>Cut</span>
+          </button>
+          <button mat-menu-item (click)="copyNodeToClipboard(node)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Copy</span>
+          </button>
+          <button mat-menu-item (click)="pasteFromClipboard(node)" [disabled]="!cutNode">
+            <mat-icon>content_paste</mat-icon>
+            <span>Paste</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="toggleActive(node)">
+            <mat-icon>{{ node.active ? 'visibility_off' : 'visibility' }}</mat-icon>
+            <span>{{ node.active ? 'Deactivate' : 'Activate' }}</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="deleteNode(node)" class="delete-option">
+            <mat-icon color="warn">delete</mat-icon>
+            <span>Delete</span>
+          </button>
+        </mat-menu>
+
+        <!-- Drag Preview -->
+        <div *cdkDragPreview class="node-drag-preview">
+          <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
+          <span>{{ node.name }}</span>
+          <mat-badge *ngIf="getChildCount(node) > 0"
+                     [matBadgeContent]="getChildCount(node)"
+                     matBadgeSize="small">
+          </mat-badge>
+        </div>
+      </mat-tree-node>
+
+      <!-- Parent Node Template -->
+      <mat-tree-node
+        *matTreeNodeDef="let node; when: hasChild"
+        matTreeNodePadding
+        [class.selected]="node.id === selectedNodeId"
+        [class.inactive]="!node.active"
+        [class.has-errors]="node.hasErrors"
+        [class.cut]="isNodeCut(node)"
+        [attr.data-node-id]="node.id"
+        class="tree-node parent-node"
+        matRipple
+        cdkDrag
+        [cdkDragData]="node"
+        (cdkDragStarted)="onDragStart($event, node)"
+        (cdkDragMoved)="onDragMove($event)"
+        (cdkDragEnded)="onDragEnd($event)"
+        (click)="selectNode(node)"
+        (contextmenu)="showContextMenu($event, node)">
+
+        <!-- Node Content -->
+        <div class="node-content">
+          <button
+            mat-icon-button
+            matTreeNodeToggle
+            [attr.aria-label]="'Toggle ' + node.name"
+            class="toggle-button"
+            (click)="$event.stopPropagation(); toggleNodeExpansion(node)">
+            <mat-icon class="toggle-icon">
+              {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+            </mat-icon>
+          </button>
+
+          <mat-icon class="node-icon" [style.color]="getNodeIcon(node) | iconColor">
+            {{ getNodeIcon(node) }}
+          </mat-icon>
+
+          <div class="node-info">
+            <span class="node-name" [class.error-text]="node.hasErrors">
+              {{ node.name }}
+            </span>
+            <span class="node-model">{{ node.model }}</span>
+
+            <div class="node-badges">
+              <mat-chip *ngIf="node.rootPath" class="path-chip">
+                <mat-icon>format_list_bulleted</mat-icon>
+                {{ node.rootPath }}
+              </mat-chip>
+
+              <mat-chip *ngIf="getFieldRuleCount(node) > 0" class="rule-chip">
+                <mat-icon>rule</mat-icon>
+                {{ getFieldRuleCount(node) }}
+              </mat-chip>
+            </div>
+          </div>
+
+          <div class="node-stats">
+            <mat-badge [matBadgeContent]="getChildCount(node)"
+                       matBadgeColor="primary"
+                       matBadgeSize="small"
+                       matBadgePosition="above after">
+              <mat-icon matTooltip="Child targets">account_tree</mat-icon>
+            </mat-badge>
+          </div>
+
+          <div class="node-status">
+            <mat-icon *ngIf="getNodeStatusIcon(node)"
+                      [color]="getNodeStatusColor(node)"
+                      [matTooltip]="getNodeStatusTooltip(node)"
+                      class="status-icon">
+              {{ getNodeStatusIcon(node) }}
+            </mat-icon>
+          </div>
+
+          <button
+            mat-icon-button
+            [matMenuTriggerFor]="parentNodeMenu"
+            class="node-menu"
+            (click)="$event.stopPropagation()">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+        </div>
+
+        <!-- Context Menu (same as leaf node) -->
+        <mat-menu #parentNodeMenu="matMenu">
+          <button mat-menu-item (click)="addChild(node)">
+            <mat-icon>add</mat-icon>
+            <span>Add Child Target</span>
+          </button>
+          <button mat-menu-item (click)="duplicateNode(node)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Duplicate</span>
+          </button>
+          <button mat-menu-item (click)="renameNode(node)">
+            <mat-icon>edit</mat-icon>
+            <span>Rename</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="cutNodeToClipboard(node)">
+            <mat-icon>content_cut</mat-icon>
+            <span>Cut</span>
+          </button>
+          <button mat-menu-item (click)="copyNodeToClipboard(node)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Copy</span>
+          </button>
+          <button mat-menu-item (click)="pasteFromClipboard(node)" [disabled]="!cutNode">
+            <mat-icon>content_paste</mat-icon>
+            <span>Paste</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="toggleActive(node)">
+            <mat-icon>{{ node.active ? 'visibility_off' : 'visibility' }}</mat-icon>
+            <span>{{ node.active ? 'Deactivate' : 'Activate' }}</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="deleteNode(node)" class="delete-option">
+            <mat-icon color="warn">delete</mat-icon>
+            <span>Delete</span>
+          </button>
+        </mat-menu>
+
+        <!-- Drag Preview -->
+        <div *cdkDragPreview class="node-drag-preview">
+          <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
+          <span>{{ node.name }}</span>
+          <mat-badge [matBadgeContent]="getChildCount(node) + '+'"
+                     matBadgeSize="small"
+                     matBadgeColor="accent">
+          </mat-badge>
+        </div>
+      </mat-tree-node>
+    </mat-tree>
+  </div>
+
+  <!-- Empty State -->
   <div class="empty-state" *ngIf="!nodes || nodes.length === 0">
-    <mat-icon>folder_open</mat-icon>
-    <p>No targets defined</p>
-    <button mat-raised-button color="primary" (click)="addRootTarget()">
-      <mat-icon>add</mat-icon>
-      Add First Target
-    </button>
+    <div class="empty-content">
+      <mat-icon>folder_open</mat-icon>
+      <h3>No Targets Defined</h3>
+      <p>Start by adding your first mapping target</p>
+      <button mat-raised-button color="primary" (click)="addRootTarget()">
+        <mat-icon>add</mat-icon>
+        Add First Target
+      </button>
+    </div>
+
+    <div class="quick-start">
+      <h4>Quick Start Guide</h4>
+      <ol>
+        <li>
+          <mat-icon>add_circle</mat-icon>
+          Add a target for your main model
+        </li>
+        <li>
+          <mat-icon>settings</mat-icon>
+          Configure the model and processing options
+        </li>
+        <li>
+          <mat-icon>rule</mat-icon>
+          Define field mapping rules
+        </li>
+        <li>
+          <mat-icon>account_tree</mat-icon>
+          Add child targets for related models
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Help -->
+  <div class="keyboard-help" *ngIf="selectedNodeId">
+    <mat-chip-listbox class="shortcut-chips">
+      <mat-chip matTooltip="Rename selected">
+        <mat-icon>keyboard</mat-icon>
+        F2
+      </mat-chip>
+      <mat-chip matTooltip="Delete selected">
+        <mat-icon>keyboard</mat-icon>
+        Del
+      </mat-chip>
+      <mat-chip matTooltip="Cut">
+        <mat-icon>keyboard</mat-icon>
+        Ctrl+X
+      </mat-chip>
+      <mat-chip matTooltip="Copy">
+        <mat-icon>keyboard</mat-icon>
+        Ctrl+C
+      </mat-chip>
+      <mat-chip matTooltip="Paste">
+        <mat-icon>keyboard</mat-icon>
+        Ctrl+V
+      </mat-chip>
+      <mat-chip matTooltip="Duplicate">
+        <mat-icon>keyboard</mat-icon>
+        Ctrl+D
+      </mat-chip>
+    </mat-chip-listbox>
   </div>
 </div>
+
+<!-- Custom Icon Color Pipe -->
+<ng-template #iconColorPipe>
+  <!-- This would be implemented as a pipe -->
+</ng-template>

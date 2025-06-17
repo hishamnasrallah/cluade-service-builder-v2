@@ -125,6 +125,7 @@ export interface BatchOperationRequest {
 }
 
 export interface JSONPathSuggestion {
+  description: string;
   path: string;
   type: string;
   sample_value?: any;
