@@ -100,8 +100,8 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatMenuModule } from '@angular/material/menu';
 
-import { CaseMapper } from '../../../../models/mapper.models';
-import { MapperApiService } from '../../../../services/mapper-api.service';
+import { CaseMapper } from '../../../../../models/mapper.models';
+import { MapperApiService } from '../../../../../services/mapper-api.service';
 import {MatCheckboxModule} from '@angular/material/checkbox';
 import {MatTabsModule} from '@angular/material/tabs';
 import {MatRadioModule} from '@angular/material/radio';

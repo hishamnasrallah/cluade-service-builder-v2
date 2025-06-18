@@ -86,7 +86,7 @@ interface TreeNode {
           <div>
             <strong>What is a Dry Run?</strong>
             <p>A dry run simulates the mapping process without creating or updating any records.
-               It shows you exactly what would happen if you ran the mapper for real.</p>
+              It shows you exactly what would happen if you ran the mapper for real.</p>
           </div>
         </div>
       </div>
@@ -241,7 +241,7 @@ interface TreeNode {
                   <tr mat-row *matRowDef="let row; columns: mappingColumns;"></tr>
                 </table>
 
-                <div class="no-mappings" *ngIf="!node.data?.field_mappings || node.data.field_mappings.length === 0">
+                <div class="no-mappings" *ngIf="!node.data?.field_mappings || node.data?.field_mappings?.length === 0">
                   No field mappings to display
                 </div>
               </div>
@@ -262,15 +262,15 @@ interface TreeNode {
                   <h5>Preview Data:</h5>
                   <pre>{{ formatJson(node.data?.preview_fields || node.data?.preview_list) }}</pre>
 
-                  <div *ngIf="node.data?.summary" class="summary-data">
-                    <h5>Summary:</h5>
-                    <pre>{{ formatJson(node.data.summary) }}</pre>
-                  </div>
+<!--                  <div *ngIf="node.data?.summary" class="summary-data">-->
+<!--                    <h5>Summary:</h5>-->
+<!--                    <pre>{{ formatJson(node.data.summary) }}</pre>-->
+<!--                  </div>-->
 
-                  <div *ngIf="node.data?.error" class="error-data">
-                    <h5>Error:</h5>
-                    <pre class="error-text">{{ node.data.error }}</pre>
-                  </div>
+<!--                  <div *ngIf="node.data?.error" class="error-data">-->
+<!--                    <h5>Error:</h5>-->
+<!--                    <pre class="error-text">{{ node.data.error }}</pre>-->
+<!--                  </div>-->
                 </div>
               </div>
             </div>

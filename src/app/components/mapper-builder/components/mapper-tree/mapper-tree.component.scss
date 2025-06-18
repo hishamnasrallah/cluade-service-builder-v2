@@ -304,8 +304,14 @@ $node-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     color: $primary-color;
   }
 
-  ::ng-deep .mat-badge-content {
+  .badge-count {
     background-color: $accent-color;
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
   }
 }
 
@@ -411,7 +417,7 @@ $node-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     gap: 4px;
     flex-wrap: wrap;
 
-    mat-chip {
+    mat-chip-option {
       font-size: 11px;
       min-height: 24px;
       padding: 2px 8px;

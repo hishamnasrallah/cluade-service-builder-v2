@@ -289,7 +289,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       <mat-icon
         *ngIf="!status?.isSaving && status?.lastSaved && !status?.error"
         class="success-icon"
-        matTooltip="Last saved: {{ status.lastSaved | date:'short' }}">
+        matTooltip="Last saved: {{ status!.lastSaved! | date:'short' }}">
         cloud_done
       </mat-icon>
 
@@ -303,14 +303,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
       <mat-icon
         *ngIf="!status?.isSaving && status?.error"
         class="error-icon"
-        [matTooltip]="'Save failed: ' + status.error">
+        [matTooltip]="'Save failed: ' + status!.error!">
         cloud_off
       </mat-icon>
 
       <span class="status-text">
         <ng-container *ngIf="status?.isSaving">Saving...</ng-container>
         <ng-container *ngIf="!status?.isSaving && status?.lastSaved && !status?.error">
-          Saved {{ getTimeAgo(status.lastSaved) }}
+          Saved {{ getTimeAgo(status!.lastSaved!) }}
         </ng-container>
         <ng-container *ngIf="!status?.isSaving && status?.pendingChanges && !status?.lastSaved && !status?.error">
           Not saved
@@ -384,7 +384,9 @@ export class AutosaveStatusComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  getTimeAgo(date: Date): string {
+  getTimeAgo(date: Date | undefined): string {
+    if (!date) return '';
+
     const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
 
     if (seconds < 30) return 'just now';

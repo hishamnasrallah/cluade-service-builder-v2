@@ -66,11 +66,11 @@
 
         <div class="field-categories" *ngIf="!searchSourceControl.value">
           <mat-chip-listbox class="category-chips">
-            <mat-chip *ngFor="let category of sourceCategories"
-                      (click)="filterByCategory('source', category)"
-                      [selected]="selectedSourceCategory === category">
+            <mat-chip-option *ngFor="let category of sourceCategories"
+                             (click)="filterByCategory('source', category)"
+                             [selected]="selectedSourceCategory === category">
               {{ category }}
-            </mat-chip>
+            </mat-chip-option>
           </mat-chip-listbox>
         </div>
 
@@ -110,12 +110,13 @@
               </span>
             </div>
 
-            <mat-badge *ngIf="field.connected"
-                       [matBadgeContent]="getConnectionCount(field, 'source')"
-                       matBadgeColor="primary"
-                       matBadgeSize="small">
-              <mat-icon class="connection-status">link</mat-icon>
-            </mat-badge>
+            <mat-icon *ngIf="field.connected"
+                      class="connection-status"
+                      [matBadge]="getConnectionCount(field, 'source').toString()"
+                      matBadgeColor="primary"
+                      matBadgeSize="small">
+              link
+            </mat-icon>
 
             <button mat-icon-button
                     [matMenuTriggerFor]="sourceFieldMenu"
@@ -220,15 +221,15 @@
           </mat-card-content>
 
           <mat-card-actions>
-            <button mat-raised-button color="primary" (click)="editConnection(selectedConnection)">
+            <button mat-raised-button color="primary" (click)="editConnection(selectedConnection!)">
               <mat-icon>edit</mat-icon>
               Edit
             </button>
-            <button mat-button (click)="testConnection(selectedConnection)">
+            <button mat-button (click)="testConnection(selectedConnection!)">
               <mat-icon>play_arrow</mat-icon>
               Test
             </button>
-            <button mat-button color="warn" (click)="deleteConnection(selectedConnection)">
+            <button mat-button color="warn" (click)="deleteConnection(selectedConnection!)">
               <mat-icon>delete</mat-icon>
               Delete
             </button>
@@ -246,14 +247,14 @@
           <mat-icon>arrow_forward</mat-icon>
           <strong>{{ hoveredConnection.targetField }}</strong>
           <div class="tooltip-tags">
-            <mat-chip *ngIf="hoveredConnection.transform" class="mini-chip">
+            <span *ngIf="hoveredConnection.transform" class="mini-chip">
               <mat-icon>transform</mat-icon>
               Transform
-            </mat-chip>
-            <mat-chip *ngIf="hoveredConnection.condition" class="mini-chip">
+            </span>
+            <span *ngIf="hoveredConnection.condition" class="mini-chip">
               <mat-icon>rule</mat-icon>
               Conditional
-            </mat-chip>
+            </span>
           </div>
         </div>
       </div>
@@ -417,18 +418,18 @@
 
     <div class="toolbar-section">
       <mat-chip-listbox class="view-options">
-        <mat-chip (click)="toggleConnectionLabels()">
+        <mat-chip-option (click)="toggleConnectionLabels()">
           <mat-icon>label</mat-icon>
           Labels
-        </mat-chip>
-        <mat-chip (click)="toggleAnimations()">
+        </mat-chip-option>
+        <mat-chip-option (click)="toggleAnimations()">
           <mat-icon>animation</mat-icon>
           Animations
-        </mat-chip>
-        <mat-chip (click)="toggleCompactMode()">
+        </mat-chip-option>
+        <mat-chip-option (click)="toggleCompactMode()">
           <mat-icon>view_compact</mat-icon>
           Compact
-        </mat-chip>
+        </mat-chip-option>
       </mat-chip-listbox>
     </div>
 

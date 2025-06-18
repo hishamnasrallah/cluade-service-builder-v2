@@ -65,9 +65,9 @@
                     </mat-icon>
                     <span class="log-time">{{ log.executed_at | date:'short' }}</span>
                     <mat-chip-listbox class="log-status">
-                      <mat-chip [class.success]="log.success" [class.error]="!log.success">
+                      <mat-chip-option [class.success]="log.success" [class.error]="!log.success">
                         {{ log.success ? 'Success' : 'Failed' }}
-                      </mat-chip>
+                      </mat-chip-option>
                     </mat-chip-listbox>
                   </div>
                 </mat-panel-title>

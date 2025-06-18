@@ -49,9 +49,9 @@ import { MapperToolbarComponent } from './components/mapper-toolbar/mapper-toolb
 import { FieldRuleEditorComponent } from './components/field-rule-editor/field-rule-editor.component';
 
 // Dialogs
-import { SaveMapperDialogComponent } from './dialogs/mapper-dialogs/save-mapper-dialog/save-mapper-dialog.component';
-import { LoadMapperDialogComponent } from './dialogs/mapper-dialogs/load-mapper-dialog/load-mapper-dialog.component';
-import { NewMapperDialogComponent, ValidationErrorsDialogComponent } from './dialogs/mapper-dialogs/new-mapper-dialog/new-mapper-dialog.component';
+import { SaveMapperDialogComponent } from './components/dialogs/save-mapper-dialog/save-mapper-dialog.component';
+import { LoadMapperDialogComponent } from './components/dialogs/load-mapper-dialog/load-mapper-dialog.component';
+import { NewMapperDialogComponent } from './components/dialogs/new-mapper-dialog/new-mapper-dialog.component';
 
 // Services
 import { MapperApiService } from '../../services/mapper-api.service';
@@ -120,7 +120,7 @@ const routes: Routes = [
     SaveMapperDialogComponent,
     LoadMapperDialogComponent,
     NewMapperDialogComponent,
-    ValidationErrorsDialogComponent
+    // ValidationErrorsDialogComponent
   ],
   providers: [
     MapperApiService,
@@ -139,6 +139,7 @@ export * from './components/mapper-canvas/mapper-canvas.component';
 export * from './components/preview-panel/preview-panel.component';
 export * from './components/mapper-toolbar/mapper-toolbar.component';
 export * from './components/field-rule-editor/field-rule-editor.component';
-export * from './dialogs/mapper-dialogs/save-mapper-dialog/save-mapper-dialog.component';
-export * from './dialogs/mapper-dialogs/load-mapper-dialog/load-mapper-dialog.component';
-export * from './dialogs/mapper-dialogs/new-mapper-dialog/new-mapper-dialog.component';
+export * from './components/dialogs/save-mapper-dialog/save-mapper-dialog.component';
+export * from './components/dialogs/load-mapper-dialog/load-mapper-dialog.component';
+// @ts-ignore
+export * from './components/dialogs/new-mapper-dialog/new-mapper-dialog.component';

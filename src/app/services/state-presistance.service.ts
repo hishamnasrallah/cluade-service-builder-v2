@@ -1,6 +1,6 @@
 // src/app/services/state-persistence.service.ts
 
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 interface PersistedState {

@@ -11,7 +11,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatBadgeModule } from '@angular/material/badge';
 
-import { ValidationResult, ValidationError } from '../../../../models/mapper.models';
+// Fixed import path - going up 5 levels from dialogs/validation-results-dialog
+import { ValidationResult, ValidationError, ValidationWarning } from '../../../../../models/mapper.models';
 
 interface DialogData {
   result: ValidationResult;
@@ -359,14 +360,15 @@ export class ValidationResultsDialogComponent {
     @Inject(MAT_DIALOG_DATA) public data: DialogData
   ) {
     this.processValidationResult();
-    this.errorCount = data.result.errors.filter(e => e.severity !== 'warning').length;
+    // Fixed: Properly typed errors array
+    this.errorCount = data.result.errors.filter((e: ValidationError) => e.severity !== 'warning').length;
     this.warningCount = (data.result.warnings?.length || 0) +
-      data.result.errors.filter(e => e.severity === 'warning').length;
+      data.result.errors.filter((e: ValidationError) => e.severity === 'warning').length;
   }
 
   private processValidationResult(): void {
-    // Process errors
-    this.data.result.errors.forEach(error => {
+    // Process errors with proper typing
+    this.data.result.errors.forEach((error: ValidationError) => {
       if (error.severity === 'warning') {
         this.addToCategory(this.warningsByCategory, error);
       } else {
@@ -374,8 +376,8 @@ export class ValidationResultsDialogComponent {
       }
     });
 
-    // Process warnings
-    this.data.result.warnings?.forEach(warning => {
+    // Process warnings with proper typing
+    this.data.result.warnings?.forEach((warning: ValidationWarning) => {
       const error: ValidationError = {
         field: warning.field,
         message: warning.message,

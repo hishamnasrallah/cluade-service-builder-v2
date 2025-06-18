@@ -142,7 +142,7 @@ export class MapperSearchService {
 
       // Search child targets
       if (target.children) {
-        target.children.forEach(child => searchTarget(child, currentPath));
+        target.children.forEach((child: MapperTarget) => searchTarget(child, currentPath));
       }
     };
 
@@ -209,7 +209,7 @@ export class MapperSearchService {
 
       // Search child targets
       if (target.children) {
-        target.children.forEach(child => searchTarget(child, currentPath));
+        target.children.forEach((child: MapperTarget) => searchTarget(child, currentPath));
       }
     };
 
@@ -245,7 +245,7 @@ export class MapperSearchService {
 
       // Search child targets
       if (target.children) {
-        target.children.forEach(child => searchTarget(child, currentPath));
+        target.children.forEach((child: MapperTarget) => searchTarget(child, currentPath));
       }
     };
 
@@ -281,7 +281,7 @@ export class MapperSearchService {
 
       // Search child targets
       if (target.children) {
-        target.children.forEach(child => searchTarget(child, currentPath));
+        target.children.forEach((child: MapperTarget) => searchTarget(child, currentPath));
       }
     };
 
@@ -343,7 +343,7 @@ export class MapperSearchService {
 // Search Dialog Component
 import { Component, OnInit, Inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import {FormControl, FormsModule, ReactiveFormsModule} from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -375,7 +375,8 @@ import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
     MatProgressBarModule,
     MatTooltipModule,
     MatExpansionModule,
-    MatBadgeModule
+    MatBadgeModule,
+    FormsModule
   ],
   template: `
     <div class="mapper-search-dialog">

@@ -129,24 +129,24 @@
                 </mat-icon>
                 <span matListItemTitle>{{ target.name }}</span>
                 <span matListItemLine>
-                      {{ target.model }} - {{ target.field_rules?.length || 0 }} rules
-                    </span>
+                  {{ target.model }} - {{ target.field_rules?.length || 0 }} rules
+                </span>
               </mat-list-item>
             </mat-list>
           </div>
 
-          <div class="detail-section" *ngIf="exportPreview?.metadata">
+          <div class="detail-section" *ngIf="exportPreview && exportPreview.metadata">
             <h4>Export Metadata</h4>
             <div class="metadata-preview">
               <div class="metadata-item">
                 <strong>Export Version:</strong> {{ exportPreview.version }}
               </div>
-              <div class="metadata-item">
+              <div class="metadata-item" *ngIf="exportPreview.metadata.total_rules !== undefined">
                 <strong>Total Rules:</strong> {{ exportPreview.metadata.total_rules }}
               </div>
-              <div class="metadata-item">
+              <div class="metadata-item" *ngIf="exportPreview.metadata.dependencies">
                 <strong>Dependencies:</strong>
-                {{ exportPreview.metadata.dependencies?.length || 0 }}
+                {{ exportPreview.metadata.dependencies.length }}
               </div>
             </div>
           </div>

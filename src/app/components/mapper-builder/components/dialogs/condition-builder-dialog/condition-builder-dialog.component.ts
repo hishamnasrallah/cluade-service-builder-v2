@@ -1,7 +1,7 @@
 // src/app/components/mapper-builder/components/dialogs/condition-builder-dialog/condition-builder-dialog.component.ts
 import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -13,6 +13,7 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Observable } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
@@ -41,6 +42,7 @@ interface DialogData {
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,  // Added for ngModel
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -52,10 +54,11 @@ interface DialogData {
     MatTooltipModule,
     MatDividerModule,
     MatAutocompleteModule,
+    MatButtonToggleModule,  // Added for button toggle
     DragDropModule
   ],
-  templateUrl:'condition-builder-dialog.component.html',
-  styleUrl:'condition-builder-dialog.component.scss'
+  templateUrl: 'condition-builder-dialog.component.html',
+  styleUrl: 'condition-builder-dialog.component.scss'
 })
 export class ConditionBuilderDialogComponent implements OnInit {
   builderMode: 'visual' | 'expression' = 'visual';

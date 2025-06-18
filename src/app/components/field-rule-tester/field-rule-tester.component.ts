@@ -1,19 +1,14 @@
-// src/app/components/mapper-builder/components/field-rule-tester/field-rule-tester.component.ts
-
-import { Component, Input, OnInit } from '@angular/core';
+// src/app/components/field-rule-tester/field-rule-tester.component.ts
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatExpansionModule } from '@angular/material/expansion';
-import { MatChipsModule } from '@angular/material/chips';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { MonacoEditorModule } from 'ngx-monaco-editor';
-
+import { MatDividerModule } from '@angular/material/divider';
 import { MapperFieldRule, TestResult } from '../../models/mapper.models';
 import { MapperApiService } from '../../services/mapper-api.service';
 
@@ -22,112 +17,158 @@ import { MapperApiService } from '../../services/mapper-api.service';
   standalone: true,
   imports: [
     CommonModule,
-    ReactiveFormsModule,
+    FormsModule,
     MatCardModule,
-    MatButtonModule,
-    MatIconModule,
     MatFormFieldModule,
     MatInputModule,
-    MatExpansionModule,
-    MatChipsModule,
+    MatButtonModule,
+    MatIconModule,
     MatProgressSpinnerModule,
-    MatTooltipModule,
-    MonacoEditorModule
+    MatDividerModule
   ],
-  templateUrl: './field-rule-tester.component.html',
-  styleUrls: ['./field-rule-tester.component.scss']
-})
-export class FieldRuleTesterComponent implements OnInit {
-  @Input() fieldRule?: MapperFieldRule;
-  @Input() caseData?: any;
-
-  testForm: FormGroup;
-  testResult?: TestResult;
-  isLoading = false;
-
-  editorOptions = {
-    theme: 'vs-light',
-    language: 'json',
-    automaticLayout: true,
-    minimap: { enabled: false }
-  };
-
-  constructor(
-    private fb: FormBuilder,
-    private apiService: MapperApiService
-  ) {
-    this.testForm = this.fb.group({
-      testData: ['{\n  "user": {\n    "name": "John Doe",\n    "age": 30\n  }\n}'],
-      contextOverride: ['{}']
-    });
-  }
-
-  ngOnInit(): void {
-    if (this.caseData) {
-      this.testForm.patchValue({
-        testData: JSON.stringify(this.caseData, null, 2)
-      });
+  templateUrl:'field-rule-tester.component.html',
+  styles: [`
+    .field-rule-tester {
+      max-width: 600px;
+      margin: 16px auto;
     }
-  }
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .full-width {
+      width: 100%;
+    }
+
+    .test-actions {
+      margin: 16px 0;
+      text-align: center;
+    }
+
+    .test-result {
+      margin-top: 16px;
+    }
+
+    .result-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+
+    .result-status.success {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .result-status.error {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .result-details {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .result-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    pre {
+      background-color: #f5f5f5;
+      padding: 8px;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 0;
+    }
+
+    .error-message {
+      color: #c62828;
+    }
+
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px;
+    }
+
+    .loading p {
+      margin-top: 16px;
+      color: #666;
+    }
+  `]
+})
+export class FieldRuleTesterComponent {
+  @Input() fieldRule?: MapperFieldRule;
+  @Output() testCompleted = new EventEmitter<TestResult>();
+
+  testInput = '';
+  testResult?: TestResult;
+  testing = false;
+
+  constructor(private mapperApi: MapperApiService) {}
 
   runTest(): void {
     if (!this.fieldRule || !this.fieldRule.id) return;
 
+    this.testing = true;
+    this.testResult = undefined;
+
+    let testData;
     try {
-      const testData = JSON.parse(this.testForm.get('testData')?.value);
-      const context = JSON.parse(this.testForm.get('contextOverride')?.value);
-
-      this.isLoading = true;
-      this.testResult = undefined;
-
-      this.apiService.testFieldRule(this.fieldRule.id, {
-        data: testData,
-        context: context
-      }).subscribe({
-        next: (result) => {
-          this.testResult = result;
-          this.isLoading = false;
-        },
-        error: (error) => {
-          this.testResult = {
-            success: false,
-            error: error.message || 'Test failed',
-            execution_time: 0
-          };
-          this.isLoading = false;
-        }
-      });
+      testData = JSON.parse(this.testInput || '{}');
     } catch (e) {
+      this.testing = false;
       this.testResult = {
+        field_rule_id: this.fieldRule.id,
+        input_value: this.testInput,
+        output_value: null,
         success: false,
-        error: 'Invalid JSON in test data',
-        execution_time: 0
+        error: 'Invalid JSON input',
+        execution_time_ms: 0
       };
+      return;
     }
+
+    this.mapperApi.testFieldRule(this.fieldRule.id, testData).subscribe({
+      next: (result) => {
+        this.testResult = result;
+        this.testing = false;
+        this.testCompleted.emit(result);
+      },
+      error: (error) => {
+        this.testing = false;
+        this.testResult = {
+          field_rule_id: this.fieldRule!.id!,
+          input_value: testData,
+          output_value: null,
+          success: false,
+          error: error.message || 'Test failed',
+          execution_time_ms: 0
+        };
+      }
+    });
   }
 
-  getExtractedPath(): string {
-    if (!this.testResult || !this.testResult.extracted_value) {
-      return 'No value extracted';
-    }
-    return JSON.stringify(this.testResult.extracted_value, null, 2);
-  }
+  formatJson(value: any): string {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+    if (typeof value === 'string') return value;
 
-  getTransformedValue(): string {
-    if (!this.testResult || !this.testResult.transformed_value) {
-      return 'No transformation applied';
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
     }
-    return JSON.stringify(this.testResult.transformed_value, null, 2);
-  }
-
-  getFinalValue(): string {
-    if (!this.testResult || !this.testResult.final_value) {
-      return 'No final value';
-    }
-    return JSON.stringify(this.testResult.final_value, null, 2);
-  }
-
-  copyToClipboard(text: string): void {
-    navigator.clipboard.writeText(text);
   }
 }

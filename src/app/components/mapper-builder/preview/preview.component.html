@@ -3,14 +3,14 @@
   <!-- Header -->
   <div class="preview-header">
     <h3>Dry Run Preview</h3>
-    <mat-chip-list *ngIf="previewResult?.summary">
-      <mat-chip color="primary" selected>
-        {{ previewResult.summary.record_count }} records
-      </mat-chip>
-      <mat-chip selected>
-        {{ previewResult.summary.execution_time_ms }}ms
-      </mat-chip>
-    </mat-chip-list>
+    <mat-chip-listbox *ngIf="previewResult?.summary">
+      <mat-chip-option color="primary" selected>
+        {{ previewResult?.summary?.record_count || 0 }} records
+      </mat-chip-option>
+      <mat-chip-option selected>
+        {{ previewResult?.summary?.execution_time_ms || 0 }}ms
+      </mat-chip-option>
+    </mat-chip-listbox>
   </div>
 
   <mat-divider></mat-divider>
@@ -62,33 +62,33 @@
                   {{ getActionIcon(previewResult.action) }}
                 </mat-icon>
                 <h4>{{ previewResult.target }}</h4>
-                <mat-chip-list>
-                  <mat-chip [color]="getActionColor(previewResult.action)" selected>
+                <mat-chip-listbox>
+                  <mat-chip-option [color]="getActionColor(previewResult.action)" selected>
                     {{ previewResult.action }}
-                  </mat-chip>
-                </mat-chip-list>
+                  </mat-chip-option>
+                </mat-chip-listbox>
               </div>
 
               <div class="summary-stats" *ngIf="previewResult.summary">
                 <div class="stat-item">
                   <span class="stat-label">Target</span>
-                  <span class="stat-value">{{ previewResult.summary.target_name }}</span>
+                  <span class="stat-value">{{ previewResult.summary?.target_name || '-' }}</span>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Records</span>
-                  <span class="stat-value">{{ previewResult.summary.record_count }}</span>
+                  <span class="stat-value">{{ previewResult.summary?.record_count || 0 }}</span>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Fields Mapped</span>
-                  <span class="stat-value">{{ previewResult.summary.mapped_fields_count }}</span>
+                  <span class="stat-value">{{ previewResult.summary?.mapped_fields_count || 0 }}</span>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Child Targets</span>
-                  <span class="stat-value">{{ previewResult.summary.child_targets_count }}</span>
+                  <span class="stat-value">{{ previewResult.summary?.child_targets_count || 0 }}</span>
                 </div>
                 <div class="stat-item">
                   <span class="stat-label">Execution Time</span>
-                  <span class="stat-value">{{ previewResult.summary.execution_time_ms }}ms</span>
+                  <span class="stat-value">{{ previewResult.summary?.execution_time_ms || 0 }}ms</span>
                 </div>
               </div>
 
@@ -165,9 +165,9 @@
               <ng-container matColumnDef="transform">
                 <th mat-header-cell *matHeaderCellDef>Transform</th>
                 <td mat-cell *matCellDef="let mapping">
-                  <mat-chip-list *ngIf="mapping.transform_applied">
-                    <mat-chip>{{ mapping.transform_applied }}</mat-chip>
-                  </mat-chip-list>
+                  <mat-chip-listbox *ngIf="mapping.transform_applied">
+                    <mat-chip-option>{{ mapping.transform_applied }}</mat-chip-option>
+                  </mat-chip-listbox>
                   <span *ngIf="!mapping.transform_applied" class="no-transform">-</span>
                 </td>
               </ng-container>

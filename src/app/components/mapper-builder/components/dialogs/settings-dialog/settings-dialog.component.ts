@@ -19,8 +19,8 @@ import { MatListModule } from '@angular/material/list';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
-import { MapperAutosaveService } from '../../../../services/mapper-autosave.service';
-import { KeyboardShortcutsService } from '../../../../services/keyboard-shortcuts.service';
+import { MapperAutosaveService } from '../../../../../services/mapper-autosave.service';
+import { KeyboardShortcutsService } from '../../../../../services/keyboard-shortcuts.service';
 
 interface MapperSettings {
   general: {

@@ -13,6 +13,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from 
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { MatTreeNestedDataSource } from '@angular/material/tree';
 import { FormsModule } from '@angular/forms';
+import { MatDividerModule } from '@angular/material/divider';
 
 import { MapperTarget, MapperTreeNode } from '../../../models/mapper.models';
 
@@ -30,10 +31,11 @@ import { MapperTarget, MapperTreeNode } from '../../../models/mapper.models';
     MatInputModule,
     MatTooltipModule,
     MatCheckboxModule,
-    DragDropModule
+    DragDropModule,
+    MatDividerModule,
   ],
-  templateUrl:'target-tree.component.html',
-  styleUrl:'target-tree.component.scss'
+  templateUrl: './target-tree.component.html',
+  styleUrl: './target-tree.component.scss'
 })
 
 export class TargetTreeComponent implements OnInit, OnChanges {

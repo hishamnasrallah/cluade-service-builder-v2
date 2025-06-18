@@ -1,3 +1,20 @@
+// src/app/components/mapper-builder/dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component.scss
+
+:host {
+  display: block;
+}
+
+mat-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+
+  mat-icon {
+    color: var(--primary-color, #3f51b5);
+  }
+}
+
 .dialog-content {
   width: 100%;
   max-height: 600px;
@@ -11,12 +28,12 @@
 
 .form-section {
   margin-bottom: 32px;
-}
 
-.form-section h3 {
-  margin: 0 0 16px 0;
-  color: #333;
-  font-size: 18px;
+  h3 {
+    margin: 0 0 16px 0;
+    color: #333;
+    font-size: 18px;
+  }
 }
 
 .section-description {
@@ -47,6 +64,12 @@ mat-form-field {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+
+  mat-chip-listbox {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
 }
 
 .transform-option {
@@ -60,26 +83,26 @@ mat-form-field {
   padding: 16px;
   border-radius: 4px;
   margin-top: 16px;
-}
 
-.transform-preview h4 {
-  margin: 0 0 8px 0;
-  color: #333;
-}
+  h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+  }
 
-.transform-preview p {
-  margin: 0 0 16px 0;
-  color: #666;
+  p {
+    margin: 0 0 16px 0;
+    color: #666;
+  }
 }
 
 .parameters {
   margin-top: 16px;
-}
 
-.parameters h5 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: #333;
+  h5 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #333;
+  }
 }
 
 .parameter {
@@ -110,17 +133,17 @@ mat-form-field {
   color: #aed581;
   padding: 12px;
   border-radius: 4px;
-}
 
-.example h5 {
-  margin: 0 0 8px 0;
-  color: #fff;
-  font-size: 14px;
-}
+  h5 {
+    margin: 0 0 8px 0;
+    color: #fff;
+    font-size: 14px;
+  }
 
-.example code {
-  font-family: 'Roboto Mono', monospace;
-  font-size: 12px;
+  code {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+  }
 }
 
 .use-lookup-checkbox {
@@ -130,10 +153,10 @@ mat-form-field {
 .lookup-fields {
   display: flex;
   gap: 16px;
-}
 
-.lookup-fields mat-form-field {
-  flex: 1;
+  mat-form-field {
+    flex: 1;
+  }
 }
 
 .condition-type {
@@ -147,25 +170,25 @@ mat-form-field {
   padding: 16px;
   border-radius: 4px;
   margin-top: 16px;
-}
 
-.expression-help h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: #1976d2;
-}
+  h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #1976d2;
+  }
 
-.expression-help ul {
-  margin: 0;
-  padding-left: 20px;
-}
+  ul {
+    margin: 0;
+    padding-left: 20px;
+  }
 
-.expression-help code {
-  background: #fff;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-family: 'Roboto Mono', monospace;
-  font-size: 12px;
+  code {
+    background: #fff;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+  }
 }
 
 .condition-row {
@@ -173,11 +196,11 @@ mat-form-field {
   gap: 12px;
   align-items: center;
   margin-bottom: 16px;
-}
 
-.condition-row mat-form-field {
-  flex: 1;
-  margin-bottom: 0;
+  mat-form-field {
+    flex: 1;
+    margin-bottom: 0;
+  }
 }
 
 .test-results {
@@ -185,11 +208,11 @@ mat-form-field {
   padding: 16px;
   border-radius: 4px;
   margin-top: 24px;
-}
 
-.test-results h4 {
-  margin: 0 0 16px 0;
-  color: #333;
+  h4 {
+    margin: 0 0 16px 0;
+    color: #333;
+  }
 }
 
 .result-item {
@@ -197,12 +220,12 @@ mat-form-field {
   align-items: center;
   gap: 16px;
   margin-bottom: 12px;
-}
 
-.result-item label {
-  font-weight: 500;
-  color: #666;
-  min-width: 140px;
+  label {
+    font-weight: 500;
+    color: #666;
+    min-width: 140px;
+  }
 }
 
 .result-value {
@@ -211,25 +234,39 @@ mat-form-field {
   background: #e3f2fd;
   padding: 4px 8px;
   border-radius: 4px;
-}
 
-.result-value.final {
-  background: #c8e6c9;
-  font-weight: 500;
+  &.final {
+    background: #c8e6c9;
+    font-weight: 500;
+  }
 }
 
 .result-item mat-icon {
   font-size: 20px;
+
+  &.success {
+    color: #4caf50;
+  }
+
+  &.failed {
+    color: #f44336;
+  }
 }
 
-.result-item mat-icon.success {
-  color: #4caf50;
+// Dialog actions
+mat-dialog-actions {
+  padding: 16px 24px !important;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 0 !important;
+
+  button {
+    mat-icon {
+      margin-right: 4px;
+    }
+  }
 }
 
-.result-item mat-icon.failed {
-  color: #f44336;
-}
-
+// Responsive design
 @media (max-width: 768px) {
   .lookup-fields {
     flex-direction: column;
@@ -242,5 +279,25 @@ mat-form-field {
 
   .condition-row mat-form-field {
     margin-bottom: 12px;
+  }
+}
+
+// Material overrides
+::ng-deep {
+  .mat-mdc-dialog-container {
+    .mat-mdc-tab-body-wrapper {
+      flex: 1;
+    }
+  }
+
+  .mat-mdc-chip-listbox {
+    margin: 0;
+  }
+
+  .mat-mdc-option {
+    .field-option,
+    .transform-option {
+      width: 100%;
+    }
   }
 }

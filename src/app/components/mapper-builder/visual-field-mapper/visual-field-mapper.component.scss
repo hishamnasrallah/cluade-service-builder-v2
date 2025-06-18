@@ -163,12 +163,13 @@ $panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     flex-wrap: wrap;
     gap: 4px;
 
-    mat-chip {
+    mat-chip-option {
       font-size: 12px;
       cursor: pointer;
       transition: all 0.2s ease;
 
-      &.mat-chip-selected {
+      // Selected state for mat-chip-option
+      &.mdc-evolution-chip--selected {
         background-color: $primary-color;
         color: white;
       }
@@ -663,7 +664,7 @@ $panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: flex;
     gap: 4px;
 
-    mat-chip {
+    mat-chip-option {
       cursor: pointer;
       font-size: 12px;
 
@@ -671,7 +672,7 @@ $panel-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         background-color: $hover-bg;
       }
 
-      &.mat-chip-selected {
+      &.mdc-evolution-chip--selected {
         background-color: $primary-color;
         color: white;
       }

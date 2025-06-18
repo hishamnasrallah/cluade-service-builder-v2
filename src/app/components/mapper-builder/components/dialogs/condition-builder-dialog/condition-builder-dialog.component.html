@@ -5,7 +5,7 @@
 
 <mat-dialog-content>
   <div class="builder-modes">
-    <mat-chip-listbox [(value)]="builderMode" aria-label="Builder mode">
+    <mat-chip-listbox [(ngModel)]="builderMode" aria-label="Builder mode">
       <mat-chip-option value="visual">
         <mat-icon>visibility</mat-icon>
         Visual Builder
@@ -45,7 +45,7 @@
           <!-- Group Logic Selector -->
           <div class="group-logic-selector">
             <span class="logic-label">Conditions in this group are combined with:</span>
-            <mat-button-toggle-group [(value)]="group.logic" aria-label="Group logic">
+            <mat-button-toggle-group [(ngModel)]="group.logic" aria-label="Group logic">
               <mat-button-toggle value="AND">AND</mat-button-toggle>
               <mat-button-toggle value="OR">OR</mat-button-toggle>
             </mat-button-toggle-group>
@@ -74,10 +74,10 @@
                                   (optionSelected)="onFieldSelected($event.option.value, condition)">
                   <mat-option *ngFor="let field of getFilteredFields(condition.field)"
                               [value]="field.name">
-                        <span class="field-option">
-                          <strong>{{ field.name }}</strong>
-                          <small>{{ field.type }}</small>
-                        </span>
+                    <span class="field-option">
+                      <strong>{{ field.name }}</strong>
+                      <small>{{ field.type }}</small>
+                    </span>
                   </mat-option>
                 </mat-autocomplete>
               </mat-form-field>
@@ -167,7 +167,7 @@
                 [(ngModel)]="expressionText"
                 rows="8"
                 placeholder="e.g., (age > 18 and status == 'active') or user_type in ['admin', 'manager']">
-          </textarea>
+      </textarea>
       <mat-hint>
         Use Python-style boolean expressions. Available operators: ==, !=, >, <, >=, <=, and, or, in, not in
       </mat-hint>

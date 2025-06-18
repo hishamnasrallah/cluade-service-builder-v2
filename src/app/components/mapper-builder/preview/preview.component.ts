@@ -15,7 +15,6 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatListModule } from '@angular/material/list';  // Add this for mat-chip-list
 
 import { MapperTarget, PreviewResult } from '../../../models/mapper.models';
 
@@ -44,8 +43,7 @@ interface TestCase {
     MatTableModule,
     MatChipsModule,
     MatTooltipModule,
-    MatDividerModule,
-    MatListModule  // Add this
+    MatDividerModule
   ],
   templateUrl: './preview.component.html',
   styleUrl: './preview.component.scss'
@@ -85,7 +83,7 @@ export class PreviewComponent implements OnInit {
     }
   }
 
-  onRunPreview(): void {  // Changed from runPreview to onRunPreview
+  onRunPreview(): void {
     const caseId = this.selectedCaseId !== null ? this.selectedCaseId : this.customCaseId;
     if (caseId !== undefined) {
       this.isRunning = true;
@@ -147,5 +145,10 @@ export class PreviewComponent implements OnInit {
       return this.formatJson(result.preview_list);
     }
     return 'No preview data';
+  }
+
+  // Helper getter for summary to avoid null check issues
+  get summary() {
+    return this.previewResult?.summary;
   }
 }

@@ -1,4 +1,4 @@
-<!-- src/app/components/mapper-list/mapper-list.component.html -->
+<!-- src/app/components/mapper-builder/components/mapper-list/mapper-list.component.html -->
 <div class="mapper-list-container">
   <!-- Header -->
   <div class="page-header">
@@ -158,7 +158,8 @@
             </mat-checkbox>
           </th>
           <td mat-cell *matCellDef="let mapper">
-            <mat-checkbox [checked]="isSelected(mapper.id)"
+            <mat-checkbox *ngIf="mapper.id"
+                          [checked]="isSelected(mapper.id)"
                           (change)="toggleSelection(mapper.id)">
             </mat-checkbox>
           </td>
@@ -180,7 +181,7 @@
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Case Type</th>
           <td mat-cell *matCellDef="let mapper">
             <mat-chip-listbox>
-              <mat-chip>{{ mapper.case_type }}</mat-chip>
+              <mat-chip-option>{{ mapper.case_type }}</mat-chip-option>
             </mat-chip-listbox>
           </td>
         </ng-container>
@@ -197,7 +198,9 @@
         <ng-container matColumnDef="targets">
           <th mat-header-cell *matHeaderCellDef>Targets</th>
           <td mat-cell *matCellDef="let mapper">
-            <span class="target-count" [matBadge]="getTargetCount(mapper.id)" matBadgeColor="accent">
+            <span class="target-count"
+                  [matBadge]="mapper.id ? getTargetCount(mapper.id) : 0"
+                  matBadgeColor="accent">
               <mat-icon>flag</mat-icon>
             </span>
           </td>
@@ -270,9 +273,9 @@
         </ng-container>
 
         <!-- Header and Row Definitions -->
-        <tr mat-header-row *matHeaderRowDef="['select', ...displayedColumns]"></tr>
+        <tr mat-header-row *matHeaderRowDef="allDisplayedColumns"></tr>
         <tr mat-row
-            *matRowDef="let row; columns: ['select', ...displayedColumns];"
+            *matRowDef="let row; columns: allDisplayedColumns;"
             class="mapper-row"
             [class.active-mapper]="row.active_ind">
         </tr>
@@ -298,7 +301,7 @@
 
   <!-- Grid View -->
   <div class="mappers-grid" *ngIf="!isLoading && viewMode === 'grid'">
-    <mat-card *ngFor="let mapper of filteredMappers"
+    <mat-card *ngFor="let mapper of filteredMappers; let i = index"
               class="mapper-card"
               [class.active]="mapper.active_ind"
               [class.inactive]="!mapper.active_ind">
@@ -308,7 +311,7 @@
         </mat-card-title>
         <mat-card-subtitle>
           <mat-chip-listbox>
-            <mat-chip>{{ mapper.case_type }}</mat-chip>
+            <mat-chip-option>{{ mapper.case_type }}</mat-chip-option>
           </mat-chip-listbox>
         </mat-card-subtitle>
         <div class="card-menu">
@@ -349,7 +352,7 @@
         <div class="card-stats">
           <div class="stat">
             <mat-icon>flag</mat-icon>
-            <span>{{ getTargetCount(mapper.id) }} targets</span>
+            <span>{{ mapper.id ? getTargetCount(mapper.id) : 0 }} targets</span>
           </div>
           <div class="stat">
             <mat-icon>update</mat-icon>

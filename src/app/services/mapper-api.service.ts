@@ -26,6 +26,7 @@ import {
   ValidationResult
 } from '../models/mapper.models';
 
+
 @Injectable({
   providedIn: 'root'
 })
@@ -37,7 +38,23 @@ export class MapperApiService {
     private http: HttpClient,
     private configService: ConfigService
   ) {}
+  // /**
+  //  * Export a mapper configuration
+  //  * @param mapperId The ID of the mapper to export
+  //  * @returns Observable of the export data
+  //  */
+  // exportMapper(mapperId: number): Observable<MapperExportData> {
+  //   return this.http.get<MapperExportData>(`${this.apiUrl}/mappers/${mapperId}/export`);
+  // }
 
+  // /**
+  //  * Get export preview for a mapper (optional - can use exportMapper instead)
+  //  * @param mapperId The ID of the mapper
+  //  * @returns Observable of the export preview data
+  //  */
+  getExportPreview(mapperId: number): Observable<MapperExportData> {
+    return this.http.get<MapperExportData>(`${this.apiUrl}/mappers/${mapperId}/export-preview`);
+  }
   private getFullUrl(endpoint: string): string {
     const baseUrl = this.configService.getBaseUrl();
     if (!baseUrl) {
@@ -89,7 +106,7 @@ export class MapperApiService {
   }
 
   getAvailableLookups(): Observable<LookupOption[]> {
-    return this.http.get<LookupOption[]>(this.getFullUrl('/api/lookups/'))
+    return this.http.get<LookupOption[]>(this.getFullUrl('/lookups/'))
       .pipe(
         tap(lookups => console.log('Available lookups:', lookups)),
         catchError(this.handleError('getAvailableLookups'))

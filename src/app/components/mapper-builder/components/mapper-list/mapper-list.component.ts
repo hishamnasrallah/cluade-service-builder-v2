@@ -1,5 +1,5 @@
-// src/app/components/mapper-list/mapper-list.component.ts
-import { Component, OnInit, ViewChild, OnDestroy } from '@angular/core';
+// src/app/components/mapper-builder/components/mapper-list/mapper-list.component.ts
+import { Component, OnInit, ViewChild, OnDestroy, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -26,12 +26,13 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 // Models and Services
 import { CaseMapper } from '../../../../models/mapper.models';
 import { MapperApiService } from '../../../../services/mapper-api.service';
-import { NewMapperDialogComponent } from '../../../mapper-builder/components/dialogs/new-mapper-dialog/new-mapper-dialog.component';
-import { ImportMapperDialogComponent } from '../../../mapper-builder/components/dialogs/import-mapper-dialog/import-mapper-dialog.component';
+import { NewMapperDialogComponent } from '../dialogs/new-mapper-dialog/new-mapper-dialog.component';
+import { ImportMapperDialogComponent } from '../dialogs/import-mapper-dialog/import-mapper-dialog.component';
 
 interface MapperStats {
   total: number;
@@ -64,12 +65,13 @@ interface MapperStats {
     MatBadgeModule,
     MatDividerModule,
     MatExpansionModule,
-    MatButtonToggleModule
+    MatButtonToggleModule,
+    MatCheckboxModule
   ],
   templateUrl: './mapper-list.component.html',
   styleUrls: ['./mapper-list.component.scss']
 })
-export class MapperListComponent implements OnInit, OnDestroy {
+export class MapperListComponent implements OnInit, OnDestroy, AfterViewInit {
   private destroy$ = new Subject<void>();
 
   // Table
@@ -78,6 +80,11 @@ export class MapperListComponent implements OnInit, OnDestroy {
 
   dataSource = new MatTableDataSource<CaseMapper>([]);
   displayedColumns = ['name', 'case_type', 'version', 'targets', 'updated_at', 'status', 'actions'];
+
+  // Getter for all columns including select
+  get allDisplayedColumns(): string[] {
+    return ['select', ...this.displayedColumns];
+  }
 
   // Filters
   searchControl = new FormControl('');
@@ -139,7 +146,9 @@ export class MapperListComponent implements OnInit, OnDestroy {
 
         // Mock target counts
         mappers.forEach(mapper => {
-          this.targetCounts.set(mapper.id!, Math.floor(Math.random() * 10) + 1);
+          if (mapper.id) {
+            this.targetCounts.set(mapper.id, Math.floor(Math.random() * 10) + 1);
+          }
         });
       },
       error: (error) => {
@@ -258,7 +267,9 @@ export class MapperListComponent implements OnInit, OnDestroy {
   }
 
   openMapper(mapper: CaseMapper): void {
-    this.router.navigate(['/mapper-builder', mapper.id]);
+    if (mapper.id) {
+      this.router.navigate(['/mapper-builder', mapper.id]);
+    }
   }
 
   editMapper(mapper: CaseMapper): void {
@@ -266,12 +277,16 @@ export class MapperListComponent implements OnInit, OnDestroy {
   }
 
   cloneMapper(mapper: CaseMapper): void {
+    if (!mapper.id) return;
+
     if (confirm(`Create a copy of "${mapper.name}"?`)) {
-      this.apiService.cloneMapper(mapper.id!).subscribe({
+      this.apiService.cloneMapper(mapper.id).subscribe({
         next: (clonedMapper) => {
           this.loadMappers();
           this.showSuccess(`Mapper cloned as "${clonedMapper.name}"`);
-          this.router.navigate(['/mapper-builder', clonedMapper.id]);
+          if (clonedMapper.id) {
+            this.router.navigate(['/mapper-builder', clonedMapper.id]);
+          }
         },
         error: (error) => {
           console.error('Failed to clone mapper:', error);
@@ -282,7 +297,9 @@ export class MapperListComponent implements OnInit, OnDestroy {
   }
 
   exportMapper(mapper: CaseMapper): void {
-    this.apiService.exportMapper(mapper.id!).subscribe({
+    if (!mapper.id) return;
+
+    this.apiService.exportMapper(mapper.id).subscribe({
       next: (exportData) => {
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = window.URL.createObjectURL(blob);
@@ -301,11 +318,13 @@ export class MapperListComponent implements OnInit, OnDestroy {
   }
 
   toggleMapperStatus(mapper: CaseMapper): void {
+    if (!mapper.id) return;
+
     const newStatus = !mapper.active_ind;
     const action = newStatus ? 'activate' : 'deactivate';
 
     if (confirm(`Are you sure you want to ${action} "${mapper.name}"?`)) {
-      this.apiService.updateCaseMapper(mapper.id!, { ...mapper, active_ind: newStatus }).subscribe({
+      this.apiService.updateCaseMapper(mapper.id, { ...mapper, active_ind: newStatus }).subscribe({
         next: () => {
           mapper.active_ind = newStatus;
           this.calculateStats();
@@ -320,13 +339,15 @@ export class MapperListComponent implements OnInit, OnDestroy {
   }
 
   deleteMapper(mapper: CaseMapper): void {
+    if (!mapper.id) return;
+
     if (mapper.active_ind) {
       this.showError('Cannot delete active mapper. Please deactivate it first.');
       return;
     }
 
     if (confirm(`Are you sure you want to delete "${mapper.name}" v${mapper.version}?\n\nThis action cannot be undone.`)) {
-      this.apiService.deleteCaseMapper(mapper.id!).subscribe({
+      this.apiService.deleteCaseMapper(mapper.id).subscribe({
         next: () => {
           this.loadMappers();
           this.showSuccess('Mapper deleted successfully');
@@ -340,15 +361,19 @@ export class MapperListComponent implements OnInit, OnDestroy {
   }
 
   runMapper(mapper: CaseMapper): void {
-    this.router.navigate(['/mapper-builder', mapper.id], {
-      queryParams: { action: 'run' }
-    });
+    if (mapper.id) {
+      this.router.navigate(['/mapper-builder', mapper.id], {
+        queryParams: { action: 'run' }
+      });
+    }
   }
 
   viewHistory(mapper: CaseMapper): void {
-    this.router.navigate(['/mapper-builder', mapper.id], {
-      queryParams: { tab: 'logs' }
-    });
+    if (mapper.id) {
+      this.router.navigate(['/mapper-builder', mapper.id], {
+        queryParams: { tab: 'logs' }
+      });
+    }
   }
 
   // Bulk Actions

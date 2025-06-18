@@ -1,11 +1,10 @@
+// src/app/components/mapper-builder/components/mapper-list/mapper-list.component.scss
 
-//<!-- STYLES: src/app/components/mapper-list/mapper-list.component.scss -->
-<style>
- .mapper-list-container {
-   padding: 24px;
-   max-width: 1400px;
-   margin: 0 auto;
- }
+.mapper-list-container {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
 
 // Header
 .page-header {
@@ -451,4 +450,3 @@
     grid-template-columns: 1fr;
   }
 }
-</style>

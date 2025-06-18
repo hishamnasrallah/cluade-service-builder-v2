@@ -1,5 +1,5 @@
 // src/app/components/mapper-builder/components/dialogs/open-mapper-dialog/open-mapper-dialog.component.ts
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogRef, MatDialogModule } from '@angular/material/dialog';
@@ -17,8 +17,10 @@ import { MatMenuModule } from '@angular/material/menu';
 import { Router } from '@angular/router';
 import { debounceTime } from 'rxjs/operators';
 
-import { CaseMapper } from '../../../../models/mapper.models';
-import { MapperApiService } from '../../../../services/mapper-api.service';
+import { CaseMapper } from '../../../../../models/mapper.models';
+import { MapperApiService } from '../../../../../services/mapper-api.service';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatChipsModule } from '@angular/material/chips';
 
 @Component({
   selector: 'app-open-mapper-dialog',
@@ -37,12 +39,14 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
     MatSelectModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
-    MatMenuModule
+    MatMenuModule,
+    MatDividerModule,
+    MatChipsModule
   ],
-  templateUrl:'open-mapper-dialog.component.html',
-  styleUrl:'open-mapper-dialog.component.scss'
+  templateUrl: 'open-mapper-dialog.component.html',
+  styleUrl: 'open-mapper-dialog.component.scss'
 })
-export class OpenMapperDialogComponent implements OnInit {
+export class OpenMapperDialogComponent implements OnInit, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
@@ -51,7 +55,7 @@ export class OpenMapperDialogComponent implements OnInit {
 
   searchControl = new FormControl('');
   caseTypeControl = new FormControl('');
-  statusControl = new FormControl('');
+  statusControl = new FormControl<string | boolean>('');
 
   caseTypes: string[] = [];
   isLoading = true;
@@ -136,7 +140,9 @@ export class OpenMapperDialogComponent implements OnInit {
     // Apply status filter
     const status = this.statusControl.value;
     if (status !== '' && status !== null) {
-      filteredData = filteredData.filter(mapper => mapper.active_ind === status);
+      // Convert status to boolean for comparison
+      const statusBool = status === true || status === 'true';
+      filteredData = filteredData.filter(mapper => mapper.active_ind === statusBool);
     }
 
     this.dataSource.data = filteredData;

@@ -27,6 +27,7 @@ export interface MapperTarget {
   parent_target?: string;  // UUID
   active_ind: boolean;
   field_rules?: MapperFieldRule[];
+  children?: MapperTarget[];  // Optional children for tree structure
   created_at?: string;
   updated_at?: string;
 }
@@ -154,6 +155,7 @@ export interface LookupValue {
 }
 
 export interface TransformFunction {
+  is_builtin: boolean;
   path: string;
   label: string;
   description?: string;
@@ -164,6 +166,7 @@ export interface TransformFunction {
     default?: any;
   }>;
   example?: string;
+  code?: string;  // Add this line
 }
 
 export interface FilterFunction {
@@ -173,6 +176,22 @@ export interface FilterFunction {
   example?: string;
 }
 
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];  // Ensure this is properly typed
+  warnings?: ValidationWarning[];  // Optional warnings array
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  severity?: 'error' | 'warning' | 'info';
+}
+
+export interface ValidationWarning {
+  field: string;
+  message: string;
+}
 export interface ProcessorFunction {
   path: string;
   label: string;
@@ -295,7 +314,7 @@ export interface UndoableAction {
 // Export/Import formats
 export interface MapperExportData {
   version: string;
-  exported_at: string;
+  exported_at?: string;  // Make optional
   exported_by?: string;
   mapper: CaseMapper;
   targets: MapperTarget[];

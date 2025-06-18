@@ -12,9 +12,12 @@ import { MatStepperModule } from '@angular/material/stepper';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormsModule } from '@angular/forms';
 import { MapperApiService } from '../../../services/mapper-api.service';
 import { MapperStateService } from '../../../services/mapper-state.service';
+import { MapperTarget, MapperFieldRule } from '../../../models/mapper.models';
+import { take } from 'rxjs/operators';
 
 interface Exercise {
   id: string;
@@ -52,6 +55,7 @@ interface ExerciseStep {
     MatCheckboxModule,
     MatDialogModule,
     MatSnackBarModule,
+    MatSlideToggleModule,
     FormsModule
   ],
   template: `
@@ -63,14 +67,14 @@ interface ExerciseStep {
             Case Mapper Exercises
           </mat-card-title>
           <mat-chip-listbox class="progress-chips">
-            <mat-chip color="primary">
+            <mat-chip-option color="primary">
               <mat-icon>check_circle</mat-icon>
               {{ getCompletedCount() }} / {{ exercises.length }} Completed
-            </mat-chip>
-            <mat-chip>
+            </mat-chip-option>
+            <mat-chip-option>
               <mat-icon>timer</mat-icon>
               {{ getTotalTime() }} min
-            </mat-chip>
+            </mat-chip-option>
           </mat-chip-listbox>
         </mat-card-header>
 
@@ -99,8 +103,8 @@ interface ExerciseStep {
             </mat-panel-title>
             <mat-panel-description>
               <mat-chip-listbox>
-                <mat-chip>⭐ Beginner</mat-chip>
-                <mat-chip>20 min</mat-chip>
+                <mat-chip-option>⭐ Beginner</mat-chip-option>
+                <mat-chip-option>20 min</mat-chip-option>
               </mat-chip-listbox>
             </mat-panel-description>
           </mat-expansion-panel-header>
@@ -186,8 +190,8 @@ interface ExerciseStep {
             </mat-panel-title>
             <mat-panel-description>
               <mat-chip-listbox>
-                <mat-chip>⭐⭐⭐ Intermediate</mat-chip>
-                <mat-chip>45 min</mat-chip>
+                <mat-chip-option>⭐⭐⭐ Intermediate</mat-chip-option>
+                <mat-chip-option>45 min</mat-chip-option>
               </mat-chip-listbox>
             </mat-panel-description>
           </mat-expansion-panel-header>
@@ -205,10 +209,10 @@ interface ExerciseStep {
               <div class="features-used">
                 <h5>Features to Practice:</h5>
                 <mat-chip-listbox>
-                  <mat-chip color="primary">Parent-Child Mapping</mat-chip>
-                  <mat-chip color="primary">Array Processing</mat-chip>
-                  <mat-chip color="primary">Transform Functions</mat-chip>
-                  <mat-chip color="primary">Conditional Logic</mat-chip>
+                  <mat-chip-option color="primary">Parent-Child Mapping</mat-chip-option>
+                  <mat-chip-option color="primary">Array Processing</mat-chip-option>
+                  <mat-chip-option color="primary">Transform Functions</mat-chip-option>
+                  <mat-chip-option color="primary">Conditional Logic</mat-chip-option>
                 </mat-chip-listbox>
               </div>
             </div>
@@ -242,8 +246,8 @@ interface ExerciseStep {
             </mat-panel-title>
             <mat-panel-description>
               <mat-chip-listbox>
-                <mat-chip>⭐⭐⭐⭐ Advanced</mat-chip>
-                <mat-chip>60 min</mat-chip>
+                <mat-chip-option>⭐⭐⭐⭐ Advanced</mat-chip-option>
+                <mat-chip-option>60 min</mat-chip-option>
               </mat-chip-listbox>
             </mat-panel-description>
           </mat-expansion-panel-header>
@@ -361,7 +365,7 @@ interface ExerciseStep {
       }
 
       .progress-chips {
-        mat-chip {
+        mat-chip-option {
           background-color: rgba(255, 255, 255, 0.2);
           color: white;
         }
@@ -451,7 +455,7 @@ interface ExerciseStep {
     .features-used {
       margin-top: 16px;
 
-      mat-chip {
+      mat-chip-option {
         font-size: 12px;
       }
     }
@@ -558,7 +562,7 @@ interface ExerciseStep {
       z-index: 99;
     }
 
-    // Responsive
+    /*// Responsive*/
     @media (max-width: 768px) {
       .exercise-runner {
         padding: 16px;
@@ -746,54 +750,55 @@ export class ExerciseRunnerComponent implements OnInit {
 
   validateExercise(exerciseId: string): void {
     if (exerciseId === 'A1') {
-      // Validate the mapper configuration
-      const state = this.stateService.getState$().getValue();
-      const errors = [];
+      // Subscribe to the observable to get the current state
+      this.stateService.getState$().pipe(take(1)).subscribe(state => {
+        const errors: string[] = [];
 
-      // Check mapper exists
-      if (!state.currentMapper || state.currentMapper.case_type !== 'USER_REG') {
-        errors.push('Mapper not created or wrong case type');
-      }
+        // Check mapper exists
+        if (!state.currentMapper || state.currentMapper.case_type !== 'USER_REG') {
+          errors.push('Mapper not created or wrong case type');
+        }
 
-      // Check target exists
-      const userTarget = state.targets.find(t => t.model === 'auth.User');
-      if (!userTarget) {
-        errors.push('User target not found');
-      } else {
-        // Check field rules
-        const rules = userTarget.field_rules || [];
-        const requiredRules = ['username', 'email', 'first_name'];
+        // Check target exists
+        const userTarget = state.targets.find((t: MapperTarget) => t.model === 'auth.User');
+        if (!userTarget) {
+          errors.push('User target not found');
+        } else {
+          // Check field rules
+          const rules = userTarget.field_rules || [];
+          const requiredRules = ['username', 'email', 'first_name'];
 
-        requiredRules.forEach(field => {
-          if (!rules.find(r => r.target_field === field)) {
-            errors.push(`Missing rule for ${field}`);
+          requiredRules.forEach(field => {
+            if (!rules.find((r: MapperFieldRule) => r.target_field === field)) {
+              errors.push(`Missing rule for ${field}`);
+            }
+          });
+
+          // Check transform
+          const firstNameRule = rules.find((r: MapperFieldRule) => r.target_field === 'first_name');
+          if (firstNameRule && !firstNameRule.transform_function_path) {
+            errors.push('First name rule missing transform function');
           }
-        });
-
-        // Check transform
-        const firstNameRule = rules.find(r => r.target_field === 'first_name');
-        if (firstNameRule && !firstNameRule.transform_function_path) {
-          errors.push('First name rule missing transform function');
         }
-      }
 
-      if (errors.length === 0) {
-        this.snackBar.open('✅ Exercise completed successfully!', 'Close', {
-          duration: 5000,
-          panelClass: 'success-snackbar'
-        });
+        if (errors.length === 0) {
+          this.snackBar.open('✅ Exercise completed successfully!', 'Close', {
+            duration: 5000,
+            panelClass: 'success-snackbar'
+          });
 
-        const exercise = this.exercises.find(e => e.id === exerciseId);
-        if (exercise) {
-          exercise.completed = true;
-          this.updateProgress();
+          const exercise = this.exercises.find(e => e.id === exerciseId);
+          if (exercise) {
+            exercise.completed = true;
+            this.updateProgress();
+          }
+        } else {
+          this.snackBar.open(`❌ Validation failed: ${errors.join(', ')}`, 'Close', {
+            duration: 8000,
+            panelClass: 'error-snackbar'
+          });
         }
-      } else {
-        this.snackBar.open(`❌ Validation failed: ${errors.join(', ')}`, 'Close', {
-          duration: 8000,
-          panelClass: 'error-snackbar'
-        });
-      }
+      });
     }
   }
 
@@ -813,24 +818,26 @@ export class ExerciseRunnerComponent implements OnInit {
 
   getContextualHint(): string {
     // Analyze current state and provide appropriate hint
-    const state = this.stateService.getState$().getValue();
+    let hint = '';
 
-    if (!state.currentMapper) {
-      return 'Start by creating a new mapper using the "New" button in the toolbar';
-    }
-
-    if (state.targets.length === 0) {
-      return 'Add a target by right-clicking in the tree area or using the + button';
-    }
-
-    if (state.selectedTargetId) {
-      const target = state.targets.find(t => t.id === state.selectedTargetId);
-      if (target && (!target.field_rules || target.field_rules.length === 0)) {
-        return 'Add field rules using the "Add Field Rule" button in the canvas';
+    this.stateService.getState$().pipe(take(1)).subscribe(state => {
+      if (!state.currentMapper) {
+        hint = 'Start by creating a new mapper using the "New" button in the toolbar';
+      } else if (state.targets.length === 0) {
+        hint = 'Add a target by right-clicking in the tree area or using the + button';
+      } else if (state.selectedTargetId) {
+        const target = state.targets.find((t: MapperTarget) => t.id === state.selectedTargetId);
+        if (target && (!target.field_rules || target.field_rules.length === 0)) {
+          hint = 'Add field rules using the "Add Field Rule" button in the canvas';
+        } else {
+          hint = 'Use the preview panel to test your configuration';
+        }
+      } else {
+        hint = 'Use the preview panel to test your configuration';
       }
-    }
+    });
 
-    return 'Use the preview panel to test your configuration';
+    return hint;
   }
 
   updateProgress(): void {

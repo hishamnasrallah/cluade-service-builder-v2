@@ -12,7 +12,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 
-import { CaseMapper } from '../../../../models/mapper.models';
+import { CaseMapper } from '../../../../../models/mapper.models';
 
 @Component({
   selector: 'app-save-mapper-dialog',

@@ -187,7 +187,7 @@ export class VersionHistoryComponent implements OnInit {
   }
 
   exportVersion(version: MapperVersion): void {
-    this.apiService.exportMapperVersion(version.id).subscribe({
+    this.apiService.getMapperVersions(version.id).subscribe({
       next: (data) => {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = window.URL.createObjectURL(blob);

@@ -1,7 +1,7 @@
 // src/app/components/mapper-builder/dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component.ts
 import { Component, Inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormArray } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormArray, FormsModule } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -22,9 +22,10 @@ import {
   TransformFunction,
   LookupOption,
   ModelField,
-  ConditionOperator
-} from '../../../../models/mapper.models';
-import { MapperApiService } from '../../../../services/mapper-api.service';
+  ConditionOperator,
+  MapperFieldRuleCondition
+} from '../../../../../models/mapper.models';
+import { MapperApiService } from '../../../../../services/mapper-api.service';
 
 interface DialogData {
   rule?: MapperFieldRule;
@@ -39,6 +40,7 @@ interface DialogData {
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -53,8 +55,8 @@ interface DialogData {
     MatAutocompleteModule,
     MatTooltipModule
   ],
-  templateUrl:'field-rule-editor-dialog.component.html',
-  styleUrl:'field-rule-editor-dialog.component.scss'
+  templateUrl: 'field-rule-editor-dialog.component.html',
+  styleUrl: 'field-rule-editor-dialog.component.scss'
 })
 export class FieldRuleEditorDialogComponent implements OnInit {
   ruleForm!: FormGroup;
@@ -114,10 +116,10 @@ export class FieldRuleEditorDialogComponent implements OnInit {
   private loadTargetFields(): void {
     if (this.data.targetModel) {
       this.mapperApi.getModelFields(this.data.targetModel).subscribe({
-        next: (fields) => {
+        next: (fields: ModelField[]) => {
           this.targetFields = fields;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Failed to load model fields:', error);
         }
       });
@@ -208,7 +210,7 @@ export class FieldRuleEditorDialogComponent implements OnInit {
     this.ruleForm.patchValue({ json_path: example });
   }
 
-  addCondition(data?: any): void {
+  addCondition(data?: Partial<MapperFieldRuleCondition>): void {
     const condition = this.fb.group({
       condition_path: [data?.condition_path || '', Validators.required],
       condition_operator: [data?.condition_operator || '==', Validators.required],

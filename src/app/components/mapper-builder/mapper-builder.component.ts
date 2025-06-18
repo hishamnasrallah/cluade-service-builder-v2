@@ -31,10 +31,24 @@ import { MapperApiService } from '../../services/mapper-api.service';
 import { MapperStateService } from '../../services/mapper-state.service';
 import { MapperValidationService } from '../../services/mapper-validation.service';
 import { KeyboardShortcutsService } from '../../services/keyboard-shortcuts.service';
-import { UndoRedoService } from '../../services/undo-redo.service';
+import { MapperUndoRedoService } from '../../services/undo-redo.service';
 
 // Models
-import { CaseMapper, MapperTarget, ModelOption, LookupOption, TransformFunction, FilterFunction } from '../../models/mapper.models';
+import {
+  CaseMapper,
+  MapperTarget,
+  ModelOption,
+  LookupOption,
+  TransformFunction,
+  FilterFunction,
+  ValidationResult, ValidationError
+} from '../../models/mapper.models';
+import {MatTab, MatTabGroup} from '@angular/material/tabs';
+
+import { LogsViewerComponent } from './components/logs-viewer/logs-viewer.component';
+import {
+  ValidationResultsDialogComponent
+} from './components/dialogs/validation-results-dialog/validation-results-dialog';
 
 @Component({
   selector: 'app-mapper-builder',
@@ -54,7 +68,10 @@ import { CaseMapper, MapperTarget, ModelOption, LookupOption, TransformFunction,
     FunctionBrowserComponent,
     TargetDetailsComponent,
     PropertiesEditorComponent,
-    PreviewComponent
+    PreviewComponent,
+    MatTabGroup,
+    MatTab,
+    // LogsViewerComponent
   ],
   templateUrl:'mapper-builder.component.html',
   styleUrl:"mapper-builder.component.scss"
@@ -90,10 +107,11 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     private mapperState: MapperStateService,
     private validation: MapperValidationService,
     private shortcuts: KeyboardShortcutsService,
-    private undoRedo: UndoRedoService,
+    private undoRedo: MapperUndoRedoService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog
-  ) {}
+  ) {
+  }
 
   ngOnInit(): void {
     this.initializeState();
@@ -151,7 +169,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       });
       this.isLoading = false;
     }).catch(error => {
-      this.snackBar.open('Failed to load reference data', 'Retry', { duration: 5000 });
+      this.snackBar.open('Failed to load reference data', 'Retry', {duration: 5000});
       this.isLoading = false;
     });
   }
@@ -226,7 +244,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
           name: result.name,
           ...result
         });
-        this.snackBar.open('New mapper created', 'Close', { duration: 3000 });
+        this.snackBar.open('New mapper created', 'Close', {duration: 3000});
       }
     });
   }
@@ -260,11 +278,11 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
         this.isLoading = false;
         this.lastSaved = new Date();
         this.mapperState.resetDirtyState();
-        this.snackBar.open('Mapper saved successfully', 'Close', { duration: 3000 });
+        this.snackBar.open('Mapper saved successfully', 'Close', {duration: 3000});
       },
       error: (error) => {
         this.isLoading = false;
-        this.snackBar.open('Failed to save mapper', 'Close', { duration: 5000 });
+        this.snackBar.open('Failed to save mapper', 'Close', {duration: 5000});
       }
     });
   }
@@ -272,7 +290,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
   saveAsMapper(): void {
     const dialogRef = this.dialog.open(SaveMapperDialogComponent, {
       width: '500px',
-      data: { mapper: this.currentMapper }
+      data: {mapper: this.currentMapper}
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -285,16 +303,16 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
 
   undo(): void {
     this.undoRedo.undo();  // It doesn't return a state object
-    this.snackBar.open('Action undone', 'Close', { duration: 2000 });
+    this.snackBar.open('Action undone', 'Close', {duration: 2000});
   }
 
   redo(): void {
     this.undoRedo.redo();  // It doesn't return a state object
-    this.snackBar.open('Action redone', 'Close', { duration: 2000 });
+    this.snackBar.open('Action redone', 'Close', {duration: 2000});
   }
 
   validateMapper(): void {
-    const errors = this.validation.validateMapper({
+    const validationResult = this.validation.validateMapper({
       currentMapper: this.currentMapper,
       targets: this.targets,
       selectedTargetId: this.selectedTargetId,
@@ -306,17 +324,38 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       loading: false
     });
 
-    this.validationErrors = errors;
+    // Convert errors array to ValidationResult format
+    const result: ValidationResult = {
+      valid: validationResult.length === 0,
+      errors: validationResult.map(error => ({
+        field: error,
+        message: error,
+        severity: 'error' as const
+      })),
+      warnings: []
+    };
 
-    if (errors.length === 0) {
-      this.snackBar.open('Validation passed!', 'Close', { duration: 3000 });
-    } else {
-      this.snackBar.open(`${errors.length} validation errors found`, 'View', { duration: 5000 })
-        .onAction().subscribe(() => {
-        // Show validation errors dialog
-        console.log('Show validation errors:', errors);
-      });
-    }
+    // Open the validation results dialog
+    const dialogRef = this.dialog.open(ValidationResultsDialogComponent, {
+      width: '800px',
+      maxHeight: '90vh',
+      data: {
+        result: result,
+        mapperName: this.currentMapper?.name || 'Unnamed Mapper'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(response => {
+      if (response?.action === 'navigate') {
+        // Navigate to the error location
+        this.navigateToError(response.error);
+      } else if (response?.action === 'fix') {
+        // Focus on first error
+        if (result.errors.length > 0) {
+          this.navigateToError(result.errors[0]);
+        }
+      }
+    });
   }
 
   togglePreview(): void {
@@ -347,7 +386,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
 
     const dialogRef = this.dialog.open(ExportMapperDialogComponent, {
       width: '500px',
-      data: { mapper: this.currentMapper }
+      data: {mapper: this.currentMapper}
     });
 
     dialogRef.afterClosed().subscribe(result => {
@@ -457,7 +496,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.isLoading = false;
-        this.snackBar.open('Preview failed', 'Close', { duration: 3000 });
+        this.snackBar.open('Preview failed', 'Close', {duration: 3000});
       }
     });
   }
@@ -479,11 +518,11 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       if (mapper && targets) {
         this.mapperState.loadMapper(mapper, targets);
         this.isLoading = false;
-        this.snackBar.open('Mapper loaded successfully', 'Close', { duration: 3000 });
+        this.snackBar.open('Mapper loaded successfully', 'Close', {duration: 3000});
       }
     }).catch(error => {
       this.isLoading = false;
-      this.snackBar.open('Failed to load mapper', 'Close', { duration: 5000 });
+      this.snackBar.open('Failed to load mapper', 'Close', {duration: 5000});
     });
   }
 
@@ -498,7 +537,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     this.mapperApi.exportMapper(this.currentMapper.id!).subscribe({
       next: (data) => {
         // Download the exported data
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -506,10 +545,10 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
         a.click();
         window.URL.revokeObjectURL(url);
 
-        this.snackBar.open('Mapper exported successfully', 'Close', { duration: 3000 });
+        this.snackBar.open('Mapper exported successfully', 'Close', {duration: 3000});
       },
       error: (error) => {
-        this.snackBar.open('Export failed', 'Close', { duration: 3000 });
+        this.snackBar.open('Export failed', 'Close', {duration: 3000});
       }
     });
   }
@@ -526,5 +565,18 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       availableFilters: this.availableFilters,
       loading: false
     }, action);
+  }
+
+  private navigateToError(error: ValidationError): void {
+    // Parse the error field to determine where to navigate
+    const field = error.field.toLowerCase();
+
+    if (field.includes('target')) {
+      // Extract target ID if present in the error message
+      const targetMatch = error.field.match(/target\s+(\S+)/i);
+      if (targetMatch) {
+        this.selectTarget(targetMatch[1]);
+      }
+    }
   }
 }

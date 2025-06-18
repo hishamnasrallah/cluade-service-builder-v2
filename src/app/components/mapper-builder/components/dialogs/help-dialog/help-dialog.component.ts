@@ -48,8 +48,8 @@ interface FAQ {
     MatFormFieldModule,
     MatInputModule
   ],
-  templateUrl:'help-dialog.component.html',
-  styleUrl:'help-dialog.component.scss'
+  templateUrl: 'help-dialog.component.html',
+  styleUrl: 'help-dialog.component.scss'
 })
 export class HelpDialogComponent implements OnInit {
   searchControl = new FormControl('');
@@ -141,7 +141,7 @@ export class HelpDialogComponent implements OnInit {
       title: 'Use Descriptive Names',
       category: 'Naming Conventions',
       icon: 'label',
-      priority: 'primary',
+      priority: 'primary' as const,
       description: 'Give your mappers and targets clear, descriptive names that indicate their purpose.',
       tips: [
         'Include the case type in the mapper name',
@@ -153,7 +153,7 @@ export class HelpDialogComponent implements OnInit {
       title: 'Test with Real Data',
       category: 'Testing',
       icon: 'bug_report',
-      priority: 'accent',
+      priority: 'accent' as const,
       description: 'Always test your mappers with realistic case data before deploying.',
       tips: [
         'Use the Preview feature',
@@ -217,6 +217,10 @@ export class HelpDialogComponent implements OnInit {
 
   openDocumentation(): void {
     window.open('/docs/case-mapper', '_blank');
+  }
+
+  onCategoryChange(category: string): void {
+    this.selectedCategory = category;
   }
 
   close(): void {

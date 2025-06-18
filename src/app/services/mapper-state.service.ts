@@ -343,4 +343,8 @@ export class MapperStateService {
 
     return errors;
   }
+
+  getCurrentState(): MapperState {
+    return this.state$.value;
+  }
 }

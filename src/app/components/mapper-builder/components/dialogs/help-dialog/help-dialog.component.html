@@ -1,3 +1,4 @@
+<!-- src/app/components/mapper-builder/components/dialogs/help-dialog/help-dialog.component.html -->
 <div class="help-dialog">
   <h2 mat-dialog-title>
     <mat-icon>help</mat-icon>
@@ -119,11 +120,11 @@
       <mat-tab label="FAQ">
         <div class="tab-content">
           <div class="faq-categories">
-            <mat-chip-listbox [(value)]="selectedCategory">
-              <mat-chip value="all">All</mat-chip>
-              <mat-chip *ngFor="let cat of faqCategories" [value]="cat">
+            <mat-chip-listbox [value]="selectedCategory" (change)="onCategoryChange($event.value)">
+              <mat-chip-option value="all">All</mat-chip-option>
+              <mat-chip-option *ngFor="let cat of faqCategories" [value]="cat">
                 {{ cat }}
-              </mat-chip>
+              </mat-chip-option>
             </mat-chip-listbox>
           </div>
 

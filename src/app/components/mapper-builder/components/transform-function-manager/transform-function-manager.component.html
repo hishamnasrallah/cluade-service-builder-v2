@@ -1,150 +1,112 @@
-<!-- src/app/components/mapper-builder/components/transform-function-manager/transform-function-manager.component.html -->
+<mat-card class="transform-function-manager">
+  <mat-card-header>
+    <mat-card-title>
+      <mat-icon>functions</mat-icon>
+      Transform Functions
+    </mat-card-title>
+    <div class="header-actions">
+      <button mat-raised-button color="primary" (click)="createNewFunction()">
+        <mat-icon>add</mat-icon>
+        Create New Function
+      </button>
+    </div>
+  </mat-card-header>
 
-<div class="transform-function-manager">
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title>
-        <mat-icon>functions</mat-icon>
-        Transform Functions
-      </mat-card-title>
-      <div class="header-actions">
-        <button mat-raised-button color="primary" (click)="createNewFunction()">
-          <mat-icon>add</mat-icon>
-          Create Function
-        </button>
-      </div>
-    </mat-card-header>
+  <mat-card-content>
+    <mat-tab-group>
+      <mat-tab label="Functions List">
+        <div class="functions-table-container">
+          <table mat-table [dataSource]="transformFunctions" class="functions-table">
+            <!-- Name Column -->
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>Name</th>
+              <td mat-cell *matCellDef="let function">
+                <code>{{ function.path }}</code>
+              </td>
+            </ng-container>
 
-    <mat-card-content>
-      <mat-tab-group>
-        <!-- Functions List Tab -->
-        <mat-tab label="Functions">
-          <div class="functions-table-container">
-            <table mat-table [dataSource]="transformFunctions" class="functions-table">
-              <!-- Name Column -->
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Name</th>
-                <td mat-cell *matCellDef="let func">
-                  <strong>{{ func.label }}</strong>
-                </td>
-              </ng-container>
+            <!-- Description Column -->
+            <ng-container matColumnDef="description">
+              <th mat-header-cell *matHeaderCellDef>Description</th>
+              <td mat-cell *matCellDef="let function">
+                {{ function.description || '-' }}
+              </td>
+            </ng-container>
 
-              <!-- Description Column -->
-              <ng-container matColumnDef="description">
-                <th mat-header-cell *matHeaderCellDef>Description</th>
-                <td mat-cell *matCellDef="let func">
-                  {{ func.description || '-' }}
-                </td>
-              </ng-container>
+            <!-- Module Column -->
+            <ng-container matColumnDef="module">
+              <th mat-header-cell *matHeaderCellDef>Module</th>
+              <td mat-cell *matCellDef="let function">
+                {{ function.path.split('.').slice(0, -1).join('.') }}
+              </td>
+            </ng-container>
 
-              <!-- Module Column -->
-              <ng-container matColumnDef="module">
-                <th mat-header-cell *matHeaderCellDef>Module Path</th>
-                <td mat-cell *matCellDef="let func">
-                  <code>{{ func.path }}</code>
-                </td>
-              </ng-container>
+            <!-- Built-in Column -->
+            <ng-container matColumnDef="builtin">
+              <th mat-header-cell *matHeaderCellDef>Type</th>
+              <td mat-cell *matCellDef="let function">
+                <mat-chip-listbox>
+                  <mat-chip [color]="function.is_builtin ? 'primary' : 'accent'" selected>
+                    {{ function.is_builtin ? 'Built-in' : 'Custom' }}
+                  </mat-chip>
+                </mat-chip-listbox>
+              </td>
+            </ng-container>
 
-              <!-- Built-in Column -->
-              <ng-container matColumnDef="builtin">
-                <th mat-header-cell *matHeaderCellDef>Type</th>
-                <td mat-cell *matCellDef="let func">
-                  <mat-chip-listbox>
-                    <mat-chip [color]="func.is_builtin ? 'primary' : 'accent'">
-                      {{ func.is_builtin ? 'Built-in' : 'Custom' }}
-                    </mat-chip>
-                  </mat-chip-listbox>
-                </td>
-              </ng-container>
+            <!-- Actions Column -->
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef>Actions</th>
+              <td mat-cell *matCellDef="let function">
+                <button mat-icon-button (click)="testFunction(function)" matTooltip="Test">
+                  <mat-icon>play_arrow</mat-icon>
+                </button>
+                <button mat-icon-button (click)="editFunction(function)" matTooltip="Edit" [disabled]="function.is_builtin">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button (click)="deleteFunction(function)" matTooltip="Delete" [disabled]="function.is_builtin">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </ng-container>
 
-              <!-- Actions Column -->
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>Actions</th>
-                <td mat-cell *matCellDef="let func">
-                  <button mat-icon-button (click)="testFunction(func)" matTooltip="Test function">
-                    <mat-icon>play_arrow</mat-icon>
-                  </button>
-                  <button mat-icon-button
-                          (click)="editFunction(func)"
-                          [disabled]="func.is_builtin"
-                          matTooltip="Edit function">
-                    <mat-icon>edit</mat-icon>
-                  </button>
-                  <button mat-icon-button
-                          (click)="deleteFunction(func)"
-                          [disabled]="func.is_builtin"
-                          matTooltip="Delete function"
-                          color="warn">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          </table>
+        </div>
+      </mat-tab>
 
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-            </table>
+      <mat-tab label="Test Function" [disabled]="!selectedFunction">
+        <div class="test-container" *ngIf="selectedFunction">
+          <h3>Testing: {{ selectedFunction.label }}</h3>
+
+          <form [formGroup]="testForm" class="test-form">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Test Value</mat-label>
+              <textarea matInput formControlName="testValue" rows="3"></textarea>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Context Data (JSON)</mat-label>
+              <textarea matInput formControlName="contextData" rows="3"></textarea>
+            </mat-form-field>
+
+            <button mat-raised-button color="primary" (click)="runTest()" [disabled]="!testForm.valid">
+              <mat-icon>play_arrow</mat-icon>
+              Run Test
+            </button>
+          </form>
+
+          <div class="test-result" *ngIf="testResult">
+            <h4>Result:</h4>
+            <mat-card [class.success]="testResult.success" [class.error]="!testResult.success">
+              <mat-card-content>
+                <p><strong>Input:</strong> {{ testResult.input }}</p>
+                <p><strong>Output:</strong> {{ testResult.output }}</p>
+              </mat-card-content>
+            </mat-card>
           </div>
-        </mat-tab>
-
-        <!-- Function Tester Tab -->
-        <mat-tab label="Function Tester" [disabled]="!selectedFunction">
-          <div class="function-tester" *ngIf="selectedFunction">
-            <h3>Test Function: {{ selectedFunction.label }}</h3>
-
-            <form [formGroup]="testForm" class="test-form">
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Test Value</mat-label>
-                <input matInput formControlName="testValue" placeholder="Enter value to transform">
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Context Data (JSON)</mat-label>
-                <textarea matInput
-                          formControlName="contextData"
-                          rows="4"
-                          placeholder='{"case_id": 123, "current_data": {}}'>
-                </textarea>
-              </mat-form-field>
-
-              <button mat-raised-button color="primary" (click)="runTest()" [disabled]="!testForm.valid">
-                <mat-icon>play_arrow</mat-icon>
-                Run Test
-              </button>
-            </form>
-
-            <div class="test-result" *ngIf="testResult">
-              <h4>Test Result:</h4>
-              <mat-card [class.success]="testResult.success" [class.error]="!testResult.success">
-                <mat-card-content>
-                  <div class="result-row">
-                    <strong>Input:</strong> {{ testResult.input }}
-                  </div>
-                  <div class="result-row">
-                    <strong>Output:</strong> {{ testResult.output }}
-                  </div>
-                  <div class="result-row" *ngIf="testResult.error">
-                    <strong>Error:</strong> {{ testResult.error }}
-                  </div>
-                </mat-card-content>
-              </mat-card>
-            </div>
-          </div>
-        </mat-tab>
-
-        <!-- Code Examples Tab -->
-        <mat-tab label="Examples">
-          <div class="examples-container">
-            <mat-expansion-panel *ngFor="let example of getExamples()">
-              <mat-expansion-panel-header>
-                <mat-panel-title>{{ example.name }}</mat-panel-title>
-                <mat-panel-description>{{ example.description }}</mat-panel-description>
-              </mat-expansion-panel-header>
-
-              <pre><code>{{ example.code }}</code></pre>
-            </mat-expansion-panel>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
-    </mat-card-content>
-  </mat-card>
-</div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card-content>
+</mat-card>

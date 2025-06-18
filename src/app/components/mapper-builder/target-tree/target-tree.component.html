@@ -47,8 +47,8 @@
             </mat-icon>
 
             <span class="node-name" [class.searching]="isSearching && !nodeMatchesSearch(node)">
-                  {{ node.name }}
-                </span>
+              {{ node.name }}
+            </span>
 
             <span class="node-model">{{ node.model }}</span>
 
@@ -64,8 +64,8 @@
                 error
               </mat-icon>
               <span *ngIf="node.fieldRuleCount" class="rule-count" matTooltip="{{ node.fieldRuleCount }} field rules">
-                    {{ node.fieldRuleCount }}
-                  </span>
+                {{ node.fieldRuleCount }}
+              </span>
             </div>
           </div>
 
@@ -139,8 +139,8 @@
               </mat-icon>
 
               <span class="node-name" [class.searching]="isSearching && !nodeMatchesSearch(node)">
-                    {{ node.name }}
-                  </span>
+                {{ node.name }}
+              </span>
 
               <span class="node-model">{{ node.model }}</span>
 
@@ -156,21 +156,21 @@
                   error
                 </mat-icon>
                 <span *ngIf="node.fieldRuleCount" class="rule-count" matTooltip="{{ node.fieldRuleCount }} field rules">
-                      {{ node.fieldRuleCount }}
-                    </span>
+                  {{ node.fieldRuleCount }}
+                </span>
               </div>
             </div>
 
             <!-- Node Actions -->
             <div class="node-actions">
-              <button mat-icon-button [matMenuTriggerFor]="nodeMenu" (click)="$event.stopPropagation()">
+              <button mat-icon-button [matMenuTriggerFor]="nodeMenu2" (click)="$event.stopPropagation()">
                 <mat-icon>more_vert</mat-icon>
               </button>
             </div>
           </div>
 
-          <!-- Context Menu (same as above) -->
-          <mat-menu #nodeMenu="matMenu">
+          <!-- Context Menu (same as above but with unique reference) -->
+          <mat-menu #nodeMenu2="matMenu">
             <button mat-menu-item (click)="addChildTarget(node)">
               <mat-icon>add</mat-icon>
               <span>Add Child Target</span>
@@ -239,8 +239,8 @@
     <div class="tree-stats">
       <span>{{ treeNodes.length }} targets</span>
       <span *ngIf="getActiveCount() < treeNodes.length" class="warning">
-            {{ getInactiveCount() }} inactive
-          </span>
+        {{ getInactiveCount() }} inactive
+      </span>
     </div>
   </div>
 </div>

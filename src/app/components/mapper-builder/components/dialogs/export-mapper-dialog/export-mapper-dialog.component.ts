@@ -15,8 +15,20 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatListModule } from '@angular/material/list';
 
-import { CaseMapper, MapperExportData } from '../../../../models/mapper.models';
-import { MapperApiService } from '../../../../services/mapper-api.service';
+import { CaseMapper, MapperExportData, MapperTarget } from '../../../../../models/mapper.models';
+import { MapperApiService } from '../../../../../services/mapper-api.service';
+
+export interface ExportOptions {
+  exportFormat: string;
+  includeMetadata: boolean;
+  includeInactive: boolean;
+  includeExecutionLogs: boolean;
+  includeTestCases: boolean;
+  includeComments: boolean;
+  anonymizeUserData: boolean;
+  excludeSensitivePaths: boolean;
+  fileName: string;
+}
 
 @Component({
   selector: 'app-export-mapper-dialog',
@@ -36,8 +48,8 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
     MatExpansionModule,
     MatListModule
   ],
-  templateUrl:'export-mapper-dialog.component.html',
-  styleUrl:'export-mapper-dialog.component.scss'
+  templateUrl: 'export-mapper-dialog.component.html',
+  styleUrl: 'export-mapper-dialog.component.scss'
 })
 export class ExportMapperDialogComponent {
   exportForm: FormGroup;
@@ -47,7 +59,7 @@ export class ExportMapperDialogComponent {
   constructor(
     private fb: FormBuilder,
     public dialogRef: MatDialogRef<ExportMapperDialogComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: { mapper: CaseMapper; targets?: any[] },
+    @Inject(MAT_DIALOG_DATA) public data: { mapper: CaseMapper; targets?: MapperTarget[] },
     private apiService: MapperApiService
   ) {
     const defaultFileName = `mapper-${data.mapper.name.toLowerCase().replace(/\s+/g, '-')}-v${data.mapper.version}`;
@@ -70,22 +82,35 @@ export class ExportMapperDialogComponent {
 
   loadExportPreview(): void {
     if (this.data.mapper.id) {
-      this.apiService.getExportPreview(this.data.mapper.id).subscribe({
-        next: (preview) => {
+      // Since getExportPreview doesn't exist, we'll use exportMapper to get the data
+      // In a real implementation, you might want to add a preview endpoint
+      this.apiService.exportMapper(this.data.mapper.id).subscribe({
+        next: (preview: MapperExportData) => {
           this.exportPreview = preview;
         },
-        error: (error) => {
+        error: (error: any) => {
           console.error('Failed to load export preview:', error);
           // Create basic preview from available data
           this.exportPreview = {
             version: '1.0',
             exported_at: new Date().toISOString(),
             mapper: this.data.mapper,
-            targets: this.data.targets || []
+            targets: this.data.targets || [],
+            metadata: {
+              total_rules: this.calculateTotalRules(),
+              total_targets: this.data.targets?.length || 0
+            }
           };
         }
       });
     }
+  }
+
+  calculateTotalRules(): number {
+    if (!this.data.targets) return 0;
+    return this.data.targets.reduce((total, target) => {
+      return total + (target.field_rules?.length || 0);
+    }, 0);
   }
 
   getTargetCount(): number {
@@ -101,10 +126,10 @@ export class ExportMapperDialogComponent {
     if (!this.data.mapper.id) return;
 
     this.isExporting = true;
-    const options = this.exportForm.value;
+    const options: ExportOptions = this.exportForm.value;
 
-    this.apiService.exportMapper(this.data.mapper.id, options).subscribe({
-      next: (exportData) => {
+    this.apiService.exportMapper(this.data.mapper.id).subscribe({
+      next: (exportData: MapperExportData) => {
         // Process export data based on options
         const processedData = this.processExportData(exportData, options);
 
@@ -122,21 +147,21 @@ export class ExportMapperDialogComponent {
         this.isExporting = false;
         this.dialogRef.close({ exported: true });
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('Export failed:', error);
         this.isExporting = false;
       }
     });
   }
 
-  processExportData(data: MapperExportData, options: any): MapperExportData {
+  processExportData(data: MapperExportData, options: ExportOptions): MapperExportData {
     // Apply export options
-    const processed = { ...data };
+    const processed: MapperExportData = { ...data };
 
     if (!options.includeMetadata) {
-      delete processed.metadata;
-      delete processed.exported_at;
-      delete processed.exported_by;
+      // Create a new object without metadata fields
+      const { metadata, exported_at, exported_by, ...dataWithoutMeta } = processed;
+      return dataWithoutMeta as MapperExportData;
     }
 
     if (!options.includeInactive && processed.targets) {
@@ -145,14 +170,15 @@ export class ExportMapperDialogComponent {
 
     if (options.anonymizeUserData) {
       if (processed.mapper) {
-        delete processed.mapper.created_by;
-        delete processed.mapper.updated_by;
+        // Create new mapper object without user fields
+        const { created_by, updated_by, ...mapperWithoutUsers } = processed.mapper;
+        processed.mapper = mapperWithoutUsers as CaseMapper;
       }
-      if (processed.targets) {
-        processed.targets.forEach(target => {
-          delete target.created_by;
-          delete target.updated_by;
-        });
+
+      // Remove exported_by if it exists
+      if (processed.exported_by) {
+        const { exported_by, ...processedWithoutExportedBy } = processed;
+        Object.assign(processed, processedWithoutExportedBy);
       }
     }
 

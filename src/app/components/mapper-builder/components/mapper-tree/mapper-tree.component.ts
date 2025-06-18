@@ -14,9 +14,10 @@ import { MatDividerModule } from '@angular/material/divider';
 import { DragDropModule, CdkDragDrop, CdkDragStart, CdkDragEnd, CdkDragMove } from '@angular/cdk/drag-drop';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MapperTreeNode } from '../../../../models/mapper.models';
-import {MatChip, MatChipListbox} from '@angular/material/chips';
-import {MatFormField, MatLabel} from '@angular/material/form-field';
 
 interface FlatNode {
   expandable: boolean;
@@ -56,10 +57,9 @@ interface DragState {
     MatDividerModule,
     MatBadgeModule,
     MatDialogModule,
-    MatChipListbox,
-    MatChip,
-    MatLabel,
-    MatFormField
+    MatChipsModule,
+    MatFormFieldModule,
+    MatInputModule
   ],
   templateUrl: './mapper-tree.component.html',
   styleUrl: './mapper-tree.component.scss'
@@ -165,6 +165,14 @@ export class MapperTreeComponent implements OnChanges {
     return this.nodeIcons[node.model] || this.nodeIcons['default'];
   }
 
+  getNodeIconColor(node: FlatNode): string {
+    if (node.hasErrors) return '#f44336';
+    if (!node.active) return '#9e9e9e';
+    if (node.rootPath) return '#673ab7';
+    if (node.expandable) return '#ff9800';
+    return '#666';
+  }
+
   getNodeStatusIcon(node: FlatNode): string | null {
     if (node.hasErrors) return 'error';
     if (!node.active) return 'pause_circle';
@@ -245,7 +253,7 @@ export class MapperTreeComponent implements OnChanges {
     const treeNodeElement = elements.find(el =>
       el.classList.contains('tree-node') &&
       el.getAttribute('data-node-id') !== this.dragState.draggedNode?.id
-    );
+    ) as HTMLElement | undefined;
 
     if (treeNodeElement) {
       const nodeId = treeNodeElement.getAttribute('data-node-id');

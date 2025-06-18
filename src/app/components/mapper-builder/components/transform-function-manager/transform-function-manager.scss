@@ -1,0 +1,69 @@
+.transform-function-manager {
+  height: 100%;
+}
+
+mat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+mat-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.header-actions {
+  flex-shrink: 0;
+}
+
+.functions-table-container {
+  margin-top: 16px;
+}
+
+.functions-table {
+  width: 100%;
+}
+
+code {
+  background-color: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.test-container {
+  padding: 24px;
+}
+
+.test-form {
+  margin: 24px 0;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.test-result {
+  margin-top: 24px;
+}
+
+.test-result mat-card {
+  margin-top: 16px;
+}
+
+.test-result mat-card.success {
+  border-left: 4px solid #4caf50;
+}
+
+.test-result mat-card.error {
+  border-left: 4px solid #f44336;
+}
+
+::ng-deep .mat-mdc-tab-body-wrapper {
+  flex: 1;
+  height: 100%;
+}

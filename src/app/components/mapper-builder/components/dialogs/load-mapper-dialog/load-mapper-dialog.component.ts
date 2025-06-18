@@ -18,8 +18,8 @@ import {MatTooltip, MatTooltipModule} from '@angular/material/tooltip';
 import { debounceTime, startWith, switchMap } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
 
-import { CaseMapper } from '../../../../models/mapper.models';
-import { MapperApiService } from '../../../../services/mapper-api.service';
+import { CaseMapper } from '../../../../../models/mapper.models';
+import { MapperApiService } from '../../../../../services/mapper-api.service';
 
 @Component({
   selector: 'app-load-mapper-dialog',

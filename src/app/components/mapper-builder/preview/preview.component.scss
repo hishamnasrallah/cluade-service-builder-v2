@@ -19,8 +19,12 @@
     font-weight: 500;
   }
 
-  mat-chip-list {
+  mat-chip-listbox {
     pointer-events: none;
+
+    mat-chip-option {
+      pointer-events: none;
+    }
   }
 }
 
@@ -106,6 +110,12 @@
       margin: 0;
       flex: 1;
       font-size: 16px;
+    }
+
+    mat-chip-listbox {
+      mat-chip-option {
+        pointer-events: none;
+      }
     }
   }
 
@@ -213,6 +223,15 @@
 
     &.failed {
       color: #f44336;
+    }
+  }
+
+  mat-chip-listbox {
+    mat-chip-option {
+      pointer-events: none;
+      min-height: auto;
+      padding: 4px 8px;
+      font-size: 12px;
     }
   }
 }

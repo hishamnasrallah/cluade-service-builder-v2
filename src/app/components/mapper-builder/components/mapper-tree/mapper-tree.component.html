@@ -49,7 +49,7 @@
 
         <!-- Node Content -->
         <div class="node-content">
-          <mat-icon class="node-icon" [style.color]="getNodeIcon(node) | iconColor">
+          <mat-icon class="node-icon" [style.color]="getNodeIconColor(node)">
             {{ getNodeIcon(node) }}
           </mat-icon>
 
@@ -133,10 +133,9 @@
         <div *cdkDragPreview class="node-drag-preview">
           <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
           <span>{{ node.name }}</span>
-          <mat-badge *ngIf="getChildCount(node) > 0"
-                     [matBadgeContent]="getChildCount(node)"
-                     matBadgeSize="small">
-          </mat-badge>
+          <span class="badge-count" *ngIf="getChildCount(node) > 0">
+            {{ getChildCount(node) }}
+          </span>
         </div>
       </mat-tree-node>
 
@@ -172,7 +171,7 @@
             </mat-icon>
           </button>
 
-          <mat-icon class="node-icon" [style.color]="getNodeIcon(node) | iconColor">
+          <mat-icon class="node-icon" [style.color]="getNodeIconColor(node)">
             {{ getNodeIcon(node) }}
           </mat-icon>
 
@@ -196,12 +195,13 @@
           </div>
 
           <div class="node-stats">
-            <mat-badge [matBadgeContent]="getChildCount(node)"
-                       matBadgeColor="primary"
-                       matBadgeSize="small"
-                       matBadgePosition="above after">
-              <mat-icon matTooltip="Child targets">account_tree</mat-icon>
-            </mat-badge>
+            <mat-icon matBadge="{{ getChildCount(node) }}"
+                      matBadgeColor="primary"
+                      matBadgeSize="small"
+                      matBadgePosition="above after"
+                      matTooltip="Child targets">
+              account_tree
+            </mat-icon>
           </div>
 
           <div class="node-status">
@@ -265,10 +265,9 @@
         <div *cdkDragPreview class="node-drag-preview">
           <mat-icon>{{ getNodeIcon(node) }}</mat-icon>
           <span>{{ node.name }}</span>
-          <mat-badge [matBadgeContent]="getChildCount(node) + '+'"
-                     matBadgeSize="small"
-                     matBadgeColor="accent">
-          </mat-badge>
+          <span class="badge-count">
+            {{ getChildCount(node) }}+
+          </span>
         </div>
       </mat-tree-node>
     </mat-tree>
@@ -312,35 +311,30 @@
   <!-- Keyboard Shortcuts Help -->
   <div class="keyboard-help" *ngIf="selectedNodeId">
     <mat-chip-listbox class="shortcut-chips">
-      <mat-chip matTooltip="Rename selected">
+      <mat-chip-option matTooltip="Rename selected">
         <mat-icon>keyboard</mat-icon>
         F2
-      </mat-chip>
-      <mat-chip matTooltip="Delete selected">
+      </mat-chip-option>
+      <mat-chip-option matTooltip="Delete selected">
         <mat-icon>keyboard</mat-icon>
         Del
-      </mat-chip>
-      <mat-chip matTooltip="Cut">
+      </mat-chip-option>
+      <mat-chip-option matTooltip="Cut">
         <mat-icon>keyboard</mat-icon>
         Ctrl+X
-      </mat-chip>
-      <mat-chip matTooltip="Copy">
+      </mat-chip-option>
+      <mat-chip-option matTooltip="Copy">
         <mat-icon>keyboard</mat-icon>
         Ctrl+C
-      </mat-chip>
-      <mat-chip matTooltip="Paste">
+      </mat-chip-option>
+      <mat-chip-option matTooltip="Paste">
         <mat-icon>keyboard</mat-icon>
         Ctrl+V
-      </mat-chip>
-      <mat-chip matTooltip="Duplicate">
+      </mat-chip-option>
+      <mat-chip-option matTooltip="Duplicate">
         <mat-icon>keyboard</mat-icon>
         Ctrl+D
-      </mat-chip>
+      </mat-chip-option>
     </mat-chip-listbox>
   </div>
 </div>
-
-<!-- Custom Icon Color Pipe -->
-<ng-template #iconColorPipe>
-  <!-- This would be implemented as a pipe -->
-</ng-template>

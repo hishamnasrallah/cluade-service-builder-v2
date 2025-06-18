@@ -6,6 +6,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -15,9 +16,19 @@ import { MatStepperModule } from '@angular/material/stepper';
 import { MatListModule } from '@angular/material/list';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatDividerModule } from '@angular/material/divider';
 
-import { MapperExportData } from '../../../../models/mapper.models';
-import { MapperApiService } from '../../../../services/mapper-api.service';
+import { MapperExportData, CaseMapper } from '../../../../../models/mapper.models';
+import { MapperApiService } from '../../../../../services/mapper-api.service';
+
+interface ImportResult {
+  success: boolean;
+  message: string;
+  mapperId?: number;
+  targetsCreated?: number;
+  rulesCreated?: number;
+  error?: string;
+}
 
 @Component({
   selector: 'app-import-mapper-dialog',
@@ -28,6 +39,7 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule,
     MatProgressBarModule,
@@ -36,10 +48,11 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
     MatStepperModule,
     MatListModule,
     MatChipsModule,
-    MatExpansionModule
+    MatExpansionModule,
+    MatDividerModule
   ],
-  templateUrl:"import-mapper-dialog.component.html",
-  styleUrl:"import-mapper-dialog.component.css"
+  templateUrl: 'import-mapper-dialog.component.html',
+  styleUrl: 'import-mapper-dialog.component.scss'
 })
 export class ImportMapperDialogComponent implements OnInit {
   fileForm: FormGroup;
@@ -51,7 +64,7 @@ export class ImportMapperDialogComponent implements OnInit {
   validationErrors: string[] = [];
   validationWarnings: string[] = [];
   isImporting = false;
-  importResult: any = null;
+  importResult: ImportResult | null = null;
   isDragOver = false;
 
   constructor(
@@ -96,6 +109,12 @@ export class ImportMapperDialogComponent implements OnInit {
     this.isDragOver = true;
   }
 
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
   onDrop(event: DragEvent): void {
     event.preventDefault();
     event.stopPropagation();
@@ -116,7 +135,7 @@ export class ImportMapperDialogComponent implements OnInit {
 
   handleFile(file: File): void {
     if (file.type !== 'application/json') {
-      // Show error
+      this.validationErrors = ['Please select a valid JSON file'];
       return;
     }
 
@@ -209,14 +228,22 @@ export class ImportMapperDialogComponent implements OnInit {
     this.isImporting = true;
     const options = this.optionsForm.value;
 
+    // Call the import API
     this.apiService.importMapper(this.importData).subscribe({
-      next: (result) => {
+      next: (result: CaseMapper) => {
+        // Calculate the number of targets and rules from the import data
+        const targetsCreated = this.importData?.targets?.length || 0;
+        const rulesCreated = this.importData?.targets?.reduce(
+          (sum, t) => sum + (t.field_rules?.length || 0),
+          0
+        ) || 0;
+
         this.importResult = {
           success: true,
           message: 'Mapper imported successfully',
-          mapperId: result.mapper_id,
-          targetsCreated: result.target_ids?.length || 0,
-          rulesCreated: this.importData?.targets?.reduce((sum, t) => sum + (t.field_rules?.length || 0), 0) || 0
+          mapperId: result.id,
+          targetsCreated: targetsCreated,
+          rulesCreated: rulesCreated
         };
         this.isImporting = false;
       },
