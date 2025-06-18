@@ -1,8 +1,8 @@
 // src/app/services/mapper-search.service.ts
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { MapperTarget, MapperFieldRule } from '../models/mapper.models';
+import { BehaviorSubject } from 'rxjs';
+import { MapperTarget } from '../models/mapper.models';
 
 export interface SearchResult {
   type: 'target' | 'field' | 'transform' | 'condition';
