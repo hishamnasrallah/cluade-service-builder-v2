@@ -1,278 +1,242 @@
 // src/app/services/keyboard-shortcuts.service.ts
 
-import { Injectable, HostListener } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import { Subject, fromEvent } from 'rxjs';
-import { filter, map } from 'rxjs/operators';
-import { KeyboardShortcut } from '../models/mapper.models';
+import { takeUntil, filter } from 'rxjs/operators';
+
+interface KeyboardShortcut {
+  key: string;
+  modifiers?: ('ctrl' | 'alt' | 'shift' | 'meta')[];
+  description: string;
+  action: () => void;
+  category?: string;
+  enabled?: boolean;
+}
 
 @Injectable({
   providedIn: 'root'
 })
-export class KeyboardShortcutsService {
-  private shortcuts: Map<string, KeyboardShortcut> = new Map();
-  private shortcutTriggered$ = new Subject<KeyboardShortcut>();
-  private enabled = true;
+export class KeyboardShortcutsService implements OnDestroy {
+  private shortcuts = new Map<string, KeyboardShortcut>();
+  private destroy$ = new Subject<void>();
+  private activeElement: HTMLElement | null = null;
 
   constructor() {
     this.initializeGlobalListener();
-    this.registerDefaultShortcuts();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private initializeGlobalListener(): void {
-    fromEvent<KeyboardEvent>(document, 'keydown').pipe(
-      filter(() => this.enabled),
-      filter(event => !this.isInputElement(event.target as Element)),
-      map(event => ({ event, key: this.createShortcutKey(event) })), // Preserve event object
-      filter(({ key }) => this.shortcuts.has(key))
-    ).subscribe(({ event, key }) => {
-      const shortcut = this.shortcuts.get(key);
-      if (shortcut && shortcut.enabled !== false) {
-        event.preventDefault();
-        shortcut.action();
-        this.shortcutTriggered$.next(shortcut);
-      }
-    });
+    fromEvent<KeyboardEvent>(document, 'keydown')
+      .pipe(
+        takeUntil(this.destroy$),
+        filter(event => !this.isInputElement(event.target as HTMLElement))
+      )
+      .subscribe(event => {
+        this.handleKeyboardEvent(event);
+      });
   }
 
-  private isInputElement(target: Element): boolean {
-    const tagName = target.tagName.toLowerCase();
+  private isInputElement(element: HTMLElement): boolean {
+    const tagName = element.tagName.toLowerCase();
     return tagName === 'input' ||
       tagName === 'textarea' ||
       tagName === 'select' ||
-      target.hasAttribute('contenteditable');
+      element.contentEditable === 'true';
   }
 
-  private createShortcutKey(event: KeyboardEvent): string {
+  private handleKeyboardEvent(event: KeyboardEvent): void {
+    const shortcutKey = this.buildShortcutKey(event);
+    const shortcut = this.shortcuts.get(shortcutKey);
+
+    if (shortcut && shortcut.enabled !== false) {
+      event.preventDefault();
+      event.stopPropagation();
+      shortcut.action();
+    }
+  }
+
+  private buildShortcutKey(event: KeyboardEvent): string {
     const parts: string[] = [];
 
     if (event.ctrlKey || event.metaKey) parts.push('ctrl');
     if (event.altKey) parts.push('alt');
     if (event.shiftKey) parts.push('shift');
 
-    // Handle special keys
-    let key = event.key.toLowerCase();
-    if (key === ' ') key = 'space';
-    if (key === 'arrowup') key = 'up';
-    if (key === 'arrowdown') key = 'down';
-    if (key === 'arrowleft') key = 'left';
-    if (key === 'arrowright') key = 'right';
-
-    parts.push(key);
+    parts.push(event.key.toLowerCase());
 
     return parts.join('+');
   }
 
   registerShortcut(shortcut: KeyboardShortcut): void {
-    const key = this.buildShortcutKey(shortcut.key, shortcut.modifiers);
-    this.shortcuts.set(key, shortcut);
+    const key = this.buildShortcutKeyFromConfig(shortcut);
+    this.shortcuts.set(key, { ...shortcut, enabled: shortcut.enabled ?? true });
   }
 
-  unregisterShortcut(key: string, modifiers?: string[]): void {
-    const shortcutKey = this.buildShortcutKey(key, modifiers);
-    this.shortcuts.delete(shortcutKey);
-  }
-
-  private buildShortcutKey(key: string, modifiers?: string[]): string {
+  private buildShortcutKeyFromConfig(shortcut: KeyboardShortcut): string {
     const parts: string[] = [];
 
-    if (modifiers) {
-      if (modifiers.includes('ctrl')) parts.push('ctrl');
-      if (modifiers.includes('alt')) parts.push('alt');
-      if (modifiers.includes('shift')) parts.push('shift');
+    if (shortcut.modifiers) {
+      if (shortcut.modifiers.includes('ctrl')) parts.push('ctrl');
+      if (shortcut.modifiers.includes('alt')) parts.push('alt');
+      if (shortcut.modifiers.includes('shift')) parts.push('shift');
     }
 
-    parts.push(key.toLowerCase());
+    parts.push(shortcut.key.toLowerCase());
 
     return parts.join('+');
   }
 
-  enableShortcuts(): void {
-    this.enabled = true;
+  unregisterShortcut(key: string, modifiers?: string[]): void {
+    const shortcutKey = this.buildShortcutKeyFromConfig({
+      action(): void {
+      }, description: '', key, modifiers: modifiers as any });
+    this.shortcuts.delete(shortcutKey);
   }
 
-  disableShortcuts(): void {
-    this.enabled = false;
+  enableShortcut(key: string, modifiers?: string[]): void {
+    const shortcutKey = this.buildShortcutKeyFromConfig({
+      action(): void {
+      }, description: '', key, modifiers: modifiers as any });
+    const shortcut = this.shortcuts.get(shortcutKey);
+    if (shortcut) {
+      shortcut.enabled = true;
+    }
   }
 
-  getShortcuts(): KeyboardShortcut[] {
+  disableShortcut(key: string, modifiers?: string[]): void {
+    const shortcutKey = this.buildShortcutKeyFromConfig({
+      action(): void {
+      }, description: '', key, modifiers: modifiers as any });
+    const shortcut = this.shortcuts.get(shortcutKey);
+    if (shortcut) {
+      shortcut.enabled = false;
+    }
+  }
+
+  getAllShortcuts(): KeyboardShortcut[] {
     return Array.from(this.shortcuts.values());
   }
 
-  onShortcutTriggered() {
-    return this.shortcutTriggered$.asObservable();
+  getShortcutsByCategory(category: string): KeyboardShortcut[] {
+    return Array.from(this.shortcuts.values())
+      .filter(shortcut => shortcut.category === category);
   }
 
-  private registerDefaultShortcuts(): void {
-    // Default shortcuts for mapper builder
-    const defaultShortcuts: KeyboardShortcut[] = [
-      {
-        key: 's',
-        modifiers: ['ctrl'],
-        description: 'Save mapper',
-        action: () => console.log('Save mapper shortcut')
-      },
-      {
-        key: 'n',
-        modifiers: ['ctrl'],
-        description: 'New mapper',
-        action: () => console.log('New mapper shortcut')
-      },
-      {
-        key: 'o',
-        modifiers: ['ctrl'],
-        description: 'Open/Load mapper',
-        action: () => console.log('Open mapper shortcut')
-      },
-      {
-        key: 'z',
-        modifiers: ['ctrl'],
-        description: 'Undo',
-        action: () => console.log('Undo shortcut')
-      },
-      {
-        key: 'y',
-        modifiers: ['ctrl'],
-        description: 'Redo',
-        action: () => console.log('Redo shortcut')
-      },
-      {
-        key: 'a',
-        modifiers: ['ctrl', 'shift'],
-        description: 'Add new target',
-        action: () => console.log('Add target shortcut')
-      },
-      {
-        key: 'r',
-        modifiers: ['ctrl', 'shift'],
-        description: 'Add new field rule',
-        action: () => console.log('Add rule shortcut')
-      },
-      {
-        key: 'p',
-        modifiers: ['ctrl'],
-        description: 'Toggle preview panel',
-        action: () => console.log('Toggle preview shortcut')
-      },
-      {
-        key: 'f',
-        modifiers: ['ctrl'],
-        description: 'Search/Find',
-        action: () => console.log('Search shortcut')
-      },
-      {
-        key: '?',
-        modifiers: ['shift'],
-        description: 'Show keyboard shortcuts',
-        action: () => console.log('Show shortcuts dialog')
-      }
-    ];
-
-    defaultShortcuts.forEach(shortcut => this.registerShortcut(shortcut));
+  getShortcutDescription(key: string, modifiers?: string[]): string | undefined {
+    const shortcutKey = this.buildShortcutKeyFromConfig({
+      action(): void {
+      }, description: '', key, modifiers: modifiers as any });
+    return this.shortcuts.get(shortcutKey)?.description;
   }
 
-  // Format shortcut for display
   formatShortcut(shortcut: KeyboardShortcut): string {
     const parts: string[] = [];
 
     if (shortcut.modifiers) {
-      if (shortcut.modifiers.includes('ctrl')) {
-        parts.push(this.isMac() ? '⌘' : 'Ctrl');
-      }
-      if (shortcut.modifiers.includes('alt')) {
-        parts.push(this.isMac() ? '⌥' : 'Alt');
-      }
-      if (shortcut.modifiers.includes('shift')) {
-        parts.push(this.isMac() ? '⇧' : 'Shift');
-      }
+      if (shortcut.modifiers.includes('ctrl')) parts.push('Ctrl');
+      if (shortcut.modifiers.includes('alt')) parts.push('Alt');
+      if (shortcut.modifiers.includes('shift')) parts.push('Shift');
     }
 
-    parts.push(this.formatKey(shortcut.key));
+    parts.push(shortcut.key.toUpperCase());
 
-    return parts.join(this.isMac() ? '' : '+');
+    return parts.join('+');
   }
 
-  private formatKey(key: string): string {
-    const keyMap: { [key: string]: string } = {
-      'space': 'Space',
-      'up': '↑',
-      'down': '↓',
-      'left': '←',
-      'right': '→',
-      'enter': '↵',
-      'escape': 'Esc',
-      'delete': 'Del',
-      'backspace': '⌫'
-    };
-
-    return keyMap[key.toLowerCase()] || key.toUpperCase();
-  }
-
-  private isMac(): boolean {
-    return navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  }
+  // Predefined shortcut categories
+  static readonly CATEGORIES = {
+    FILE: 'File Operations',
+    EDIT: 'Edit Operations',
+    VIEW: 'View Operations',
+    NAVIGATION: 'Navigation',
+    TOOLS: 'Tools',
+    HELP: 'Help'
+  };
 }
 
-// Dialog component for showing shortcuts
-import { Component } from '@angular/core';
+// Keyboard shortcuts dialog component
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
+import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTableModule } from '@angular/material/table';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 
 @Component({
   selector: 'app-keyboard-shortcuts-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatDialogModule,
+    MatTabsModule,
+    MatListModule,
+    MatIconModule,
+    MatButtonModule,
+    MatDividerModule,
+    MatChipsModule
+  ],
   template: `
-    <h2 mat-dialog-title>
-      <mat-icon>keyboard</mat-icon>
-      Keyboard Shortcuts
-    </h2>
+    <div class="keyboard-shortcuts-dialog">
+      <h2 mat-dialog-title>
+        <mat-icon>keyboard</mat-icon>
+        Keyboard Shortcuts
+      </h2>
 
-    <mat-dialog-content>
-      <table mat-table [dataSource]="shortcuts" class="shortcuts-table">
-        <ng-container matColumnDef="shortcut">
-          <th mat-header-cell *matHeaderCellDef>Shortcut</th>
-          <td mat-cell *matCellDef="let shortcut">
-            <mat-chip-listbox>
-              <mat-chip class="shortcut-chip">
-                {{ formatShortcut(shortcut) }}
-              </mat-chip>
-            </mat-chip-listbox>
-          </td>
-        </ng-container>
+      <mat-dialog-content>
+        <mat-tab-group>
+          <mat-tab *ngFor="let category of categories" [label]="category.name">
+            <div class="shortcuts-list">
+              <mat-list>
+                <mat-list-item *ngFor="let shortcut of category.shortcuts">
+                  <div matListItemTitle class="shortcut-description">
+                    {{ shortcut.description }}
+                  </div>
+                  <div matListItemMeta class="shortcut-keys">
+                    <mat-chip-listbox>
+                      <mat-chip>{{ formatShortcut(shortcut) }}</mat-chip>
+                    </mat-chip-listbox>
+                  </div>
+                </mat-list-item>
+              </mat-list>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
 
-        <ng-container matColumnDef="description">
-          <th mat-header-cell *matHeaderCellDef>Action</th>
-          <td mat-cell *matCellDef="let shortcut">
-            {{ shortcut.description }}
-          </td>
-        </ng-container>
+        <mat-divider></mat-divider>
 
-        <ng-container matColumnDef="enabled">
-          <th mat-header-cell *matHeaderCellDef>Status</th>
-          <td mat-cell *matCellDef="let shortcut">
-            <mat-icon [class]="shortcut.enabled !== false ? 'enabled' : 'disabled'">
-              {{ shortcut.enabled !== false ? 'check_circle' : 'cancel' }}
-            </mat-icon>
-          </td>
-        </ng-container>
+        <div class="shortcuts-tips">
+          <h3>Tips</h3>
+          <ul>
+            <li>Press <kbd>Shift</kbd> + <kbd>?</kbd> anywhere to open this dialog</li>
+            <li>Most shortcuts work when focus is not in an input field</li>
+            <li>Use <kbd>Esc</kbd> to cancel operations or close dialogs</li>
+            <li>Hold <kbd>Ctrl</kbd> for multi-select operations</li>
+          </ul>
+        </div>
+      </mat-dialog-content>
 
-        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
-      </table>
-
-      <div class="shortcuts-info">
-        <mat-icon>info</mat-icon>
-        <p>Press <strong>Shift + ?</strong> anytime to show this help</p>
-      </div>
-    </mat-dialog-content>
-
-    <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>Close</button>
-    </mat-dialog-actions>
+      <mat-dialog-actions align="end">
+        <button mat-button (click)="close()">Close</button>
+        <button mat-button (click)="printShortcuts()">
+          <mat-icon>print</mat-icon>
+          Print
+        </button>
+      </mat-dialog-actions>
+    </div>
   `,
   styles: [`
+    .keyboard-shortcuts-dialog {
+      min-width: 600px;
+    }
+
     h2 {
       display: flex;
       align-items: center;
@@ -280,63 +244,106 @@ import { MatChipsModule } from '@angular/material/chips';
       margin: 0;
     }
 
-    .shortcuts-table {
-      width: 100%;
-      margin-bottom: 24px;
+    .shortcuts-list {
+      padding: 16px 0;
+      max-height: 400px;
+      overflow-y: auto;
     }
 
-    .shortcut-chip {
+    mat-list-item {
+      height: auto;
+      padding: 8px 0;
+    }
+
+    .shortcut-description {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    .shortcut-keys mat-chip {
       font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
       font-weight: 500;
-      background-color: #e3f2fd;
-      color: #1976d2;
+      background-color: #f5f5f5;
+      color: #333;
     }
 
-    .enabled {
-      color: #4caf50;
-    }
-
-    .disabled {
-      color: #f44336;
-    }
-
-    .shortcuts-info {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px;
-      background-color: #e8f5e9;
+    .shortcuts-tips {
+      margin-top: 24px;
+      padding: 16px;
+      background-color: #f5f5f5;
       border-radius: 4px;
+    }
+
+    .shortcuts-tips h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
       color: #424242;
     }
 
-    .shortcuts-info mat-icon {
-      color: #4caf50;
-    }
-
-    .shortcuts-info p {
+    .shortcuts-tips ul {
       margin: 0;
+      padding-left: 20px;
     }
-  `],
-  standalone: true,
-  imports: [
-    CommonModule,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    MatTableModule,
-    MatChipsModule
-  ]
-})
-export class KeyboardShortcutsDialogComponent {
-  shortcuts: KeyboardShortcut[];
-  displayedColumns = ['shortcut', 'description', 'enabled'];
 
-  constructor(private shortcutsService: KeyboardShortcutsService) {
-    this.shortcuts = this.shortcutsService.getShortcuts();
+    .shortcuts-tips li {
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #666;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 3px 6px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1;
+      color: #333;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      box-shadow: 0 1px 0 #ccc;
+    }
+  `]
+})
+export class KeyboardShortcutsDialogComponent implements OnInit {
+  categories: { name: string; shortcuts: KeyboardShortcut[] }[] = [];
+
+  constructor(
+    private dialogRef: MatDialogRef<KeyboardShortcutsDialogComponent>,
+    private shortcutsService: KeyboardShortcutsService
+  ) {}
+
+  ngOnInit(): void {
+    const allShortcuts = this.shortcutsService.getAllShortcuts();
+    const categoryMap = new Map<string, KeyboardShortcut[]>();
+
+    // Group shortcuts by category
+    allShortcuts.forEach(shortcut => {
+      const category = shortcut.category || 'General';
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, []);
+      }
+      categoryMap.get(category)!.push(shortcut);
+    });
+
+    // Convert to array for template
+    this.categories = Array.from(categoryMap.entries()).map(([name, shortcuts]) => ({
+      name,
+      shortcuts: shortcuts.sort((a, b) => a.description.localeCompare(b.description))
+    }));
   }
 
   formatShortcut(shortcut: KeyboardShortcut): string {
     return this.shortcutsService.formatShortcut(shortcut);
+  }
+
+  close(): void {
+    this.dialogRef.close();
+  }
+
+  printShortcuts(): void {
+    window.print();
   }
 }

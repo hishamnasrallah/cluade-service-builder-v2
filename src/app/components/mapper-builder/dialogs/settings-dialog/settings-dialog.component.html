@@ -1,0 +1,332 @@
+<div class="settings-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>settings</mat-icon>
+    Mapper Builder Settings
+  </h2>
+
+  <mat-dialog-content>
+    <mat-tab-group animationDuration="300ms">
+      <!-- General Settings -->
+      <mat-tab label="General">
+        <div class="tab-content">
+          <form [formGroup]="generalForm">
+            <div class="settings-section">
+              <h3>Appearance</h3>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Theme</mat-label>
+                <mat-select formControlName="theme">
+                  <mat-option value="light">Light</mat-option>
+                  <mat-option value="dark">Dark</mat-option>
+                  <mat-option value="auto">Auto (System)</mat-option>
+                </mat-select>
+                <mat-icon matSuffix>palette</mat-icon>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Language</mat-label>
+                <mat-select formControlName="language">
+                  <mat-option value="en">English</mat-option>
+                  <mat-option value="es">Spanish</mat-option>
+                  <mat-option value="fr">French</mat-option>
+                  <mat-option value="de">German</mat-option>
+                </mat-select>
+                <mat-icon matSuffix>language</mat-icon>
+              </mat-form-field>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Date & Time</h3>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Date Format</mat-label>
+                <mat-select formControlName="dateFormat">
+                  <mat-option value="MM/DD/YYYY">MM/DD/YYYY</mat-option>
+                  <mat-option value="DD/MM/YYYY">DD/MM/YYYY</mat-option>
+                  <mat-option value="YYYY-MM-DD">YYYY-MM-DD</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Time Format</mat-label>
+                <mat-select formControlName="timeFormat">
+                  <mat-option value="12h">12 Hour</mat-option>
+                  <mat-option value="24h">24 Hour</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Defaults</h3>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Default View</mat-label>
+                <mat-select formControlName="defaultView">
+                  <mat-option value="tree">Tree View</mat-option>
+                  <mat-option value="visual">Visual Mapper</mat-option>
+                  <mat-option value="code">Code View</mat-option>
+                </mat-select>
+                <mat-icon matSuffix>view_module</mat-icon>
+              </mat-form-field>
+            </div>
+          </form>
+        </div>
+      </mat-tab>
+
+      <!-- Editor Settings -->
+      <mat-tab label="Editor">
+        <div class="tab-content">
+          <form [formGroup]="editorForm">
+            <div class="settings-section">
+              <h3>Auto-save</h3>
+
+              <mat-slide-toggle formControlName="autoSaveEnabled">
+                Enable auto-save
+              </mat-slide-toggle>
+
+              <mat-form-field
+                appearance="outline"
+                class="full-width"
+                *ngIf="editorForm.get('autoSaveEnabled')?.value">
+                <mat-label>Auto-save interval (seconds)</mat-label>
+                <input matInput type="number" formControlName="autoSaveInterval" min="10" max="300">
+                <mat-hint>How often to save changes automatically</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Code Editor</h3>
+
+              <mat-slide-toggle formControlName="showLineNumbers">
+                Show line numbers
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="wordWrap">
+                Word wrap
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="enableAutoComplete">
+                Enable auto-complete
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="enableSyntaxHighlight">
+                Syntax highlighting
+              </mat-slide-toggle>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Font Size</mat-label>
+                <input matInput type="number" formControlName="fontSize" min="10" max="24">
+                <span matSuffix>px</span>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Tab Size</mat-label>
+                <mat-select formControlName="tabSize">
+                  <mat-option [value]="2">2 spaces</mat-option>
+                  <mat-option [value]="4">4 spaces</mat-option>
+                  <mat-option [value]="8">8 spaces</mat-option>
+                </mat-select>
+              </mat-form-field>
+            </div>
+          </form>
+        </div>
+      </mat-tab>
+
+      <!-- Validation Settings -->
+      <mat-tab label="Validation">
+        <div class="tab-content">
+          <form [formGroup]="validationForm">
+            <div class="settings-section">
+              <h3>Validation Rules</h3>
+
+              <mat-slide-toggle formControlName="validateOnSave">
+                Validate before saving
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="validateOnPreview">
+                Validate before preview
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="showWarnings">
+                Show validation warnings
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="strictMode">
+                Strict validation mode
+                <mat-icon
+                  matSuffix
+                  matTooltip="Enforces all validation rules strictly">
+                  info
+                </mat-icon>
+              </mat-slide-toggle>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Custom Validation Rules</h3>
+              <p class="settings-description">
+                Define custom validation rules for your mappers.
+              </p>
+
+              <mat-list class="custom-rules-list">
+                <mat-list-item>
+                  <mat-icon matListItemIcon>check_circle</mat-icon>
+                  <span matListItemTitle>Require at least one field rule per target</span>
+                  <mat-slide-toggle matListItemMeta></mat-slide-toggle>
+                </mat-list-item>
+
+                <mat-list-item>
+                  <mat-icon matListItemIcon>check_circle</mat-icon>
+                  <span matListItemTitle>Warn on unmapped required fields</span>
+                  <mat-slide-toggle matListItemMeta checked></mat-slide-toggle>
+                </mat-list-item>
+
+                <mat-list-item>
+                  <mat-icon matListItemIcon>check_circle</mat-icon>
+                  <span matListItemTitle>Validate JSON paths exist in case type</span>
+                  <mat-slide-toggle matListItemMeta checked></mat-slide-toggle>
+                </mat-list-item>
+              </mat-list>
+            </div>
+          </form>
+        </div>
+      </mat-tab>
+
+      <!-- Performance Settings -->
+      <mat-tab label="Performance">
+        <div class="tab-content">
+          <form [formGroup]="performanceForm">
+            <div class="settings-section">
+              <h3>Optimization</h3>
+
+              <mat-slide-toggle formControlName="enableCaching">
+                Enable caching
+                <mat-icon
+                  matSuffix
+                  matTooltip="Cache mapper data for better performance">
+                  info
+                </mat-icon>
+              </mat-slide-toggle>
+
+              <mat-slide-toggle formControlName="lazyLoadTargets">
+                Lazy load targets
+                <mat-icon
+                  matSuffix
+                  matTooltip="Load target details only when needed">
+                  info
+                </mat-icon>
+              </mat-slide-toggle>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Limits</h3>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Max Undo History</mat-label>
+                <input matInput type="number" formControlName="maxUndoHistory" min="10" max="100">
+                <mat-hint>Number of undo operations to keep</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Debounce Delay (ms)</mat-label>
+                <input matInput type="number" formControlName="debounceDelay" min="100" max="2000">
+                <mat-hint>Delay before triggering updates</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Memory Usage</h3>
+              <div class="memory-info">
+                <mat-chip-listbox>
+                  <mat-chip>
+                    <mat-icon>memory</mat-icon>
+                    Current: {{ getCurrentMemoryUsage() }}
+                  </mat-chip>
+                  <mat-chip>
+                    <mat-icon>storage</mat-icon>
+                    Cached: {{ getCacheSize() }}
+                  </mat-chip>
+                </mat-chip-listbox>
+
+                <button mat-stroked-button (click)="clearCache()">
+                  <mat-icon>clear</mat-icon>
+                  Clear Cache
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </mat-tab>
+
+      <!-- Keyboard Shortcuts -->
+      <mat-tab label="Shortcuts">
+        <div class="tab-content">
+          <form [formGroup]="shortcutsForm">
+            <div class="settings-section">
+              <h3>Keyboard Shortcuts</h3>
+
+              <mat-slide-toggle formControlName="enableShortcuts">
+                Enable keyboard shortcuts
+              </mat-slide-toggle>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Default Shortcuts</h3>
+
+              <mat-list class="shortcuts-list">
+                <mat-list-item *ngFor="let shortcut of defaultShortcuts">
+                  <mat-icon matListItemIcon>keyboard</mat-icon>
+                  <div matListItemTitle>{{ shortcut.action }}</div>
+                  <div matListItemLine>
+                    <mat-chip-listbox>
+                      <mat-chip>{{ formatShortcut(shortcut) }}</mat-chip>
+                    </mat-chip-listbox>
+                  </div>
+                  <button
+                    mat-icon-button
+                    matListItemMeta
+                    (click)="customizeShortcut(shortcut)"
+                    matTooltip="Customize">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                </mat-list-item>
+              </mat-list>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <div class="settings-section">
+              <h3>Custom Shortcuts</h3>
+              <button mat-stroked-button (click)="addCustomShortcut()">
+                <mat-icon>add</mat-icon>
+                Add Custom Shortcut
+              </button>
+            </div>
+          </form>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="resetToDefaults()">Reset to Defaults</button>
+    <button mat-button (click)="cancel()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="save()">
+      <mat-icon>save</mat-icon>
+      Save Settings
+    </button>
+  </mat-dialog-actions>
+</div>

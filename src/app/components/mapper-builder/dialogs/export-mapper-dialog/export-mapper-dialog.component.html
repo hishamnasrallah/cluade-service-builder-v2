@@ -1,0 +1,184 @@
+<div class="export-mapper-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>download</mat-icon>
+    Export Mapper Configuration
+  </h2>
+
+  <mat-dialog-content>
+    <form [formGroup]="exportForm">
+      <!-- Export Summary -->
+      <div class="export-summary">
+        <h3>Export Summary</h3>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <mat-icon>label</mat-icon>
+            <div>
+              <strong>Mapper Name</strong>
+              <p>{{ data.mapper.name }}</p>
+            </div>
+          </div>
+
+          <div class="summary-item">
+            <mat-icon>category</mat-icon>
+            <div>
+              <strong>Case Type</strong>
+              <p>{{ data.mapper.case_type }}</p>
+            </div>
+          </div>
+
+          <div class="summary-item">
+            <mat-icon>history</mat-icon>
+            <div>
+              <strong>Version</strong>
+              <p>{{ data.mapper.version }}</p>
+            </div>
+          </div>
+
+          <div class="summary-item">
+            <mat-icon>schedule</mat-icon>
+            <div>
+              <strong>Last Modified</strong>
+              <p>{{ data.mapper.updated_at | date:'short' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- Export Options -->
+      <div class="export-options">
+        <h3>Export Options</h3>
+
+        <mat-radio-group formControlName="exportFormat" class="format-group">
+          <mat-radio-button value="json">
+            <mat-icon>code</mat-icon>
+            JSON Format
+            <small>Standard format for re-importing</small>
+          </mat-radio-button>
+
+          <mat-radio-button value="yaml" disabled>
+            <mat-icon>description</mat-icon>
+            YAML Format
+            <small>Human-readable format (coming soon)</small>
+          </mat-radio-button>
+        </mat-radio-group>
+
+        <div class="include-options">
+          <h4>Include in Export:</h4>
+
+          <mat-checkbox formControlName="includeMetadata">
+            <strong>Metadata</strong>
+            <small>Creation date, author, version history</small>
+          </mat-checkbox>
+
+          <mat-checkbox formControlName="includeInactive">
+            <strong>Inactive Targets</strong>
+            <small>Include targets marked as inactive</small>
+          </mat-checkbox>
+
+          <mat-checkbox formControlName="includeExecutionLogs">
+            <strong>Execution Logs</strong>
+            <small>Recent execution history (last 10 runs)</small>
+          </mat-checkbox>
+
+          <mat-checkbox formControlName="includeTestCases">
+            <strong>Test Cases</strong>
+            <small>Sample data for testing imports</small>
+          </mat-checkbox>
+
+          <mat-checkbox formControlName="includeComments">
+            <strong>Comments & Documentation</strong>
+            <small>Field descriptions and mapping notes</small>
+          </mat-checkbox>
+        </div>
+
+        <div class="privacy-options">
+          <h4>Privacy Options:</h4>
+
+          <mat-checkbox formControlName="anonymizeUserData">
+            <strong>Anonymize User Data</strong>
+            <small>Remove usernames and personal info</small>
+          </mat-checkbox>
+
+          <mat-checkbox formControlName="excludeSensitivePaths">
+            <strong>Exclude Sensitive Paths</strong>
+            <small>Remove paths containing sensitive keywords</small>
+          </mat-checkbox>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- Export Details -->
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>info</mat-icon>
+            Export Details
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <div class="export-details">
+          <div class="detail-section">
+            <h4>Targets to Export ({{ getTargetCount() }})</h4>
+            <mat-list>
+              <mat-list-item *ngFor="let target of exportPreview?.targets">
+                <mat-icon matListItemIcon>
+                  {{ target.root_path ? 'list' : 'description' }}
+                </mat-icon>
+                <span matListItemTitle>{{ target.name }}</span>
+                <span matListItemLine>
+                      {{ target.model }} - {{ target.field_rules?.length || 0 }} rules
+                    </span>
+              </mat-list-item>
+            </mat-list>
+          </div>
+
+          <div class="detail-section" *ngIf="exportPreview?.metadata">
+            <h4>Export Metadata</h4>
+            <div class="metadata-preview">
+              <div class="metadata-item">
+                <strong>Export Version:</strong> {{ exportPreview.version }}
+              </div>
+              <div class="metadata-item">
+                <strong>Total Rules:</strong> {{ exportPreview.metadata.total_rules }}
+              </div>
+              <div class="metadata-item">
+                <strong>Dependencies:</strong>
+                {{ exportPreview.metadata.dependencies?.length || 0 }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-expansion-panel>
+
+      <!-- File Name -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Export File Name</mat-label>
+        <input matInput formControlName="fileName" placeholder="mapper-export">
+        <span matSuffix>.json</span>
+        <mat-hint>Leave empty for default naming</mat-hint>
+      </mat-form-field>
+    </form>
+
+    <!-- Progress -->
+    <mat-progress-bar
+      *ngIf="isExporting"
+      mode="indeterminate"
+      class="export-progress">
+    </mat-progress-bar>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cancel()" [disabled]="isExporting">Cancel</button>
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="export()"
+      [disabled]="isExporting">
+      <mat-icon>download</mat-icon>
+      Export
+    </button>
+  </mat-dialog-actions>
+</div>

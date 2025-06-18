@@ -1,0 +1,290 @@
+<div class="import-mapper-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>upload</mat-icon>
+    Import Mapper Configuration
+  </h2>
+
+  <mat-dialog-content>
+    <mat-stepper #stepper linear>
+      <!-- Step 1: Select File -->
+      <mat-step [stepControl]="fileForm" label="Select File">
+        <form [formGroup]="fileForm">
+          <div class="step-content">
+            <div class="import-options">
+              <mat-radio-group formControlName="importMethod" class="import-method-group">
+                <mat-radio-button value="file">Upload File</mat-radio-button>
+                <mat-radio-button value="paste">Paste JSON</mat-radio-button>
+              </mat-radio-group>
+            </div>
+
+            <!-- File Upload -->
+            <div *ngIf="fileForm.get('importMethod')?.value === 'file'" class="file-upload-section">
+              <div class="upload-area"
+                   (click)="fileInput.click()"
+                   (dragover)="onDragOver($event)"
+                   (drop)="onDrop($event)"
+                   [class.drag-over]="isDragOver">
+                <input #fileInput type="file" accept=".json" (change)="onFileSelected($event)" hidden>
+                <mat-icon>cloud_upload</mat-icon>
+                <h3>Drop file here or click to browse</h3>
+                <p>Supports .json files exported from Case Mapper</p>
+              </div>
+
+              <div *ngIf="selectedFile" class="selected-file">
+                <mat-icon>insert_drive_file</mat-icon>
+                <span>{{ selectedFile.name }}</span>
+                <button mat-icon-button (click)="clearFile()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- JSON Paste -->
+            <div *ngIf="fileForm.get('importMethod')?.value === 'paste'" class="json-paste-section">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Paste JSON Configuration</mat-label>
+                <textarea matInput
+                          formControlName="jsonContent"
+                          rows="10"
+                          placeholder="Paste exported mapper JSON here..."></textarea>
+                <mat-error *ngIf="fileForm.get('jsonContent')?.hasError('invalidJson')">
+                  Invalid JSON format
+                </mat-error>
+              </mat-form-field>
+            </div>
+
+            <div class="step-actions">
+              <button mat-raised-button
+                      color="primary"
+                      (click)="parseImportData()"
+                      [disabled]="!canProceedToValidation()">
+                <mat-icon>arrow_forward</mat-icon>
+                Validate Import
+              </button>
+            </div>
+          </div>
+        </form>
+      </mat-step>
+
+      <!-- Step 2: Validation -->
+      <mat-step [stepControl]="validationForm" label="Validate">
+        <form [formGroup]="validationForm">
+          <div class="step-content" *ngIf="importData">
+            <div class="validation-summary">
+              <h3>Import Summary</h3>
+
+              <div class="summary-grid">
+                <div class="summary-item">
+                  <mat-icon>info</mat-icon>
+                  <div>
+                    <strong>Mapper Name</strong>
+                    <p>{{ importData.mapper.name }}</p>
+                  </div>
+                </div>
+
+                <div class="summary-item">
+                  <mat-icon>category</mat-icon>
+                  <div>
+                    <strong>Case Type</strong>
+                    <p>{{ importData.mapper.case_type }}</p>
+                  </div>
+                </div>
+
+                <div class="summary-item">
+                  <mat-icon>history</mat-icon>
+                  <div>
+                    <strong>Version</strong>
+                    <p>{{ importData.mapper.version }}</p>
+                  </div>
+                </div>
+
+                <div class="summary-item">
+                  <mat-icon>account_tree</mat-icon>
+                  <div>
+                    <strong>Targets</strong>
+                    <p>{{ importData.targets?.length || 0 }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <mat-divider></mat-divider>
+
+            <!-- Validation Results -->
+            <div class="validation-results">
+              <div *ngIf="validationErrors.length > 0" class="validation-errors">
+                <h4>
+                  <mat-icon color="warn">error</mat-icon>
+                  Validation Errors
+                </h4>
+                <mat-list>
+                  <mat-list-item *ngFor="let error of validationErrors">
+                    <mat-icon matListItemIcon color="warn">warning</mat-icon>
+                    <span matListItemTitle>{{ error }}</span>
+                  </mat-list-item>
+                </mat-list>
+              </div>
+
+              <div *ngIf="validationWarnings.length > 0" class="validation-warnings">
+                <h4>
+                  <mat-icon color="accent">warning</mat-icon>
+                  Warnings
+                </h4>
+                <mat-list>
+                  <mat-list-item *ngFor="let warning of validationWarnings">
+                    <mat-icon matListItemIcon color="accent">info</mat-icon>
+                    <span matListItemTitle>{{ warning }}</span>
+                  </mat-list-item>
+                </mat-list>
+              </div>
+
+              <div *ngIf="validationErrors.length === 0 && validationWarnings.length === 0"
+                   class="validation-success">
+                <mat-icon color="primary">check_circle</mat-icon>
+                <p>Validation passed! The mapper configuration is ready to import.</p>
+              </div>
+            </div>
+
+            <div class="step-actions">
+              <button mat-button matStepperPrevious>Back</button>
+              <button mat-raised-button
+                      color="primary"
+                      matStepperNext
+                      [disabled]="validationErrors.length > 0">
+                <mat-icon>arrow_forward</mat-icon>
+                Continue
+              </button>
+            </div>
+          </div>
+        </form>
+      </mat-step>
+
+      <!-- Step 3: Import Options -->
+      <mat-step [stepControl]="optionsForm" label="Import Options">
+        <form [formGroup]="optionsForm">
+          <div class="step-content">
+            <h3>Configure Import Options</h3>
+
+            <div class="import-options-section">
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Import Action</mat-label>
+                <mat-select formControlName="importAction">
+                  <mat-option value="new">Create as New Mapper</mat-option>
+                  <mat-option value="version">Create as New Version</mat-option>
+                  <mat-option value="replace">Replace Existing</mat-option>
+                </mat-select>
+              </mat-form-field>
+
+              <mat-checkbox formControlName="setAsActive">
+                Set as active mapper after import
+              </mat-checkbox>
+
+              <mat-checkbox formControlName="preserveIds">
+                Preserve original IDs (if possible)
+              </mat-checkbox>
+
+              <mat-checkbox formControlName="importLogs">
+                Import execution logs (if available)
+              </mat-checkbox>
+            </div>
+
+            <mat-expansion-panel>
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>data_object</mat-icon>
+                  Target Details
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+
+              <div class="targets-preview">
+                <div *ngFor="let target of importData?.targets" class="target-item">
+                  <mat-icon>{{ target.root_path ? 'list' : 'description' }}</mat-icon>
+                  <div class="target-info">
+                    <strong>{{ target.name }}</strong>
+                    <small>{{ target.model }}</small>
+                    <mat-chip-listbox class="field-count">
+                      <mat-chip>{{ target.field_rules?.length || 0 }} rules</mat-chip>
+                    </mat-chip-listbox>
+                  </div>
+                </div>
+              </div>
+            </mat-expansion-panel>
+
+            <div class="step-actions">
+              <button mat-button matStepperPrevious>Back</button>
+              <button mat-raised-button
+                      color="primary"
+                      (click)="performImport()"
+                      [disabled]="isImporting">
+                <mat-icon>upload</mat-icon>
+                Import Mapper
+              </button>
+            </div>
+          </div>
+        </form>
+      </mat-step>
+
+      <!-- Step 4: Complete -->
+      <mat-step label="Complete">
+        <div class="step-content completion-step">
+          <div *ngIf="importResult" class="import-result">
+            <div *ngIf="importResult.success" class="success-result">
+              <mat-icon color="primary">check_circle</mat-icon>
+              <h3>Import Successful!</h3>
+              <p>{{ importResult.message }}</p>
+
+              <div class="result-details">
+                <mat-chip-listbox>
+                  <mat-chip>
+                    <mat-icon>fingerprint</mat-icon>
+                    Mapper ID: {{ importResult.mapperId }}
+                  </mat-chip>
+                  <mat-chip>
+                    <mat-icon>account_tree</mat-icon>
+                    {{ importResult.targetsCreated }} targets
+                  </mat-chip>
+                  <mat-chip>
+                    <mat-icon>rule</mat-icon>
+                    {{ importResult.rulesCreated }} rules
+                  </mat-chip>
+                </mat-chip-listbox>
+              </div>
+            </div>
+
+            <div *ngIf="!importResult.success" class="error-result">
+              <mat-icon color="warn">error</mat-icon>
+              <h3>Import Failed</h3>
+              <p>{{ importResult.message }}</p>
+              <pre *ngIf="importResult.error" class="error-details">{{ importResult.error }}</pre>
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button mat-raised-button
+                    color="primary"
+                    (click)="close()"
+                    *ngIf="importResult?.success">
+              <mat-icon>check</mat-icon>
+              Open Mapper
+            </button>
+            <button mat-button (click)="reset()" *ngIf="!importResult?.success">
+              <mat-icon>refresh</mat-icon>
+              Try Again
+            </button>
+          </div>
+        </div>
+      </mat-step>
+    </mat-stepper>
+
+    <!-- Progress Bar -->
+    <mat-progress-bar
+      *ngIf="isImporting"
+      mode="indeterminate"
+      class="import-progress">
+    </mat-progress-bar>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end" *ngIf="!isImporting">
+    <button mat-button (click)="cancel()">Cancel</button>
+  </mat-dialog-actions>
+</div>

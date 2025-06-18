@@ -1,0 +1,159 @@
+.help-dialog {
+  min-width: 800px;
+  max-width: 1000px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+mat-dialog-content {
+  max-height: 70vh;
+}
+
+.tab-content {
+  padding: 24px;
+}
+
+h3 {
+  margin: 0 0 16px 0;
+  color: #424242;
+  font-size: 18px;
+}
+
+h4 {
+  margin: 16px 0 8px 0;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.quick-start-section p {
+  color: #666;
+  margin-bottom: 24px;
+}
+
+.steps-list {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.steps-list mat-list-item {
+  margin-bottom: 16px;
+}
+
+.video-tutorials {
+  margin-top: 32px;
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.video-card {
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.video-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.search-field {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.topic-content {
+  padding: 16px 0;
+  line-height: 1.6;
+  color: #333;
+}
+
+.related-topics {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.related-topics mat-chip {
+  cursor: pointer;
+}
+
+.faq-categories {
+  margin-bottom: 24px;
+}
+
+.faq-category {
+  margin-top: 16px;
+}
+
+.best-practices {
+  display: grid;
+  gap: 16px;
+}
+
+.practice-card {
+  margin-bottom: 16px;
+}
+
+.practice-card mat-list {
+  margin-top: 16px;
+}
+
+.troubleshooting-section {
+  margin-bottom: 32px;
+}
+
+.issue-content {
+  padding: 16px 0;
+}
+
+.issue-content ul {
+  margin: 8px 0 16px 0;
+  padding-left: 24px;
+  color: #666;
+}
+
+.code-example {
+  margin-top: 16px;
+  background-color: #f5f5f5;
+  padding: 16px;
+  border-radius: 4px;
+}
+
+.code-example pre {
+  margin: 0;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.contact-support {
+  padding: 24px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.contact-support p {
+  color: #666;
+  margin-bottom: 24px;
+}
+
+.support-options {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+mat-divider {
+  margin: 32px 0;
+}

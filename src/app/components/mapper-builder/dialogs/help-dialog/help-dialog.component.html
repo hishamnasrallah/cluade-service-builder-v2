@@ -1,0 +1,239 @@
+<div class="help-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>help</mat-icon>
+    Case Mapper Help
+  </h2>
+
+  <mat-dialog-content>
+    <mat-tab-group animationDuration="300ms">
+      <!-- Getting Started Tab -->
+      <mat-tab label="Getting Started">
+        <div class="tab-content">
+          <div class="quick-start-section">
+            <h3>Quick Start Guide</h3>
+            <p>Follow these steps to create your first mapper:</p>
+
+            <mat-list class="steps-list">
+              <mat-list-item>
+                <mat-icon matListItemIcon color="primary">looks_one</mat-icon>
+                <div matListItemTitle>Create a New Mapper</div>
+                <div matListItemLine>
+                  Click "New Mapper" and select your case type
+                </div>
+              </mat-list-item>
+
+              <mat-list-item>
+                <mat-icon matListItemIcon color="primary">looks_two</mat-icon>
+                <div matListItemTitle>Add Target Models</div>
+                <div matListItemLine>
+                  Drag models from the Models tab or click "Add Target"
+                </div>
+              </mat-list-item>
+
+              <mat-list-item>
+                <mat-icon matListItemIcon color="primary">looks_3</mat-icon>
+                <div matListItemTitle>Map Fields</div>
+                <div matListItemLine>
+                  Define how JSON fields map to model fields
+                </div>
+              </mat-list-item>
+
+              <mat-list-item>
+                <mat-icon matListItemIcon color="primary">looks_4</mat-icon>
+                <div matListItemTitle>Test Your Mapper</div>
+                <div matListItemLine>
+                  Use the Preview tab to test with sample data
+                </div>
+              </mat-list-item>
+
+              <mat-list-item>
+                <mat-icon matListItemIcon color="primary">looks_5</mat-icon>
+                <div matListItemTitle>Save and Activate</div>
+                <div matListItemLine>
+                  Save your mapper and set it as active
+                </div>
+              </mat-list-item>
+            </mat-list>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="video-tutorials">
+            <h3>Video Tutorials</h3>
+            <div class="video-grid">
+              <mat-card class="video-card" *ngFor="let video of videoTutorials">
+                <mat-card-header>
+                  <mat-icon mat-card-avatar>{{ video.icon }}</mat-icon>
+                  <mat-card-title>{{ video.title }}</mat-card-title>
+                  <mat-card-subtitle>{{ video.duration }}</mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <p>{{ video.description }}</p>
+                </mat-card-content>
+                <mat-card-actions>
+                  <button mat-button color="primary" (click)="watchVideo(video)">
+                    <mat-icon>play_circle</mat-icon>
+                    Watch
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Topics Tab -->
+      <mat-tab label="Help Topics">
+        <div class="tab-content">
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Search help topics</mat-label>
+            <input matInput [formControl]="searchControl" placeholder="Type to search...">
+            <mat-icon matPrefix>search</mat-icon>
+          </mat-form-field>
+
+          <mat-accordion>
+            <mat-expansion-panel *ngFor="let topic of filteredTopics">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>{{ topic.icon }}</mat-icon>
+                  {{ topic.title }}
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+
+              <div class="topic-content" [innerHTML]="topic.content"></div>
+
+              <div class="related-topics" *ngIf="topic.relatedTopics && topic.relatedTopics.length > 0">
+                <h4>Related Topics</h4>
+                <mat-chip-listbox>
+                  <mat-chip *ngFor="let related of topic.relatedTopics" (click)="openTopic(related)">
+                    {{ related }}
+                  </mat-chip>
+                </mat-chip-listbox>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </div>
+      </mat-tab>
+
+      <!-- FAQ Tab -->
+      <mat-tab label="FAQ">
+        <div class="tab-content">
+          <div class="faq-categories">
+            <mat-chip-listbox [(value)]="selectedCategory">
+              <mat-chip value="all">All</mat-chip>
+              <mat-chip *ngFor="let cat of faqCategories" [value]="cat">
+                {{ cat }}
+              </mat-chip>
+            </mat-chip-listbox>
+          </div>
+
+          <mat-accordion>
+            <mat-expansion-panel *ngFor="let faq of getFilteredFAQs()">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  {{ faq.question }}
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+
+              <p>{{ faq.answer }}</p>
+
+              <mat-chip-listbox class="faq-category">
+                <mat-chip>{{ faq.category }}</mat-chip>
+              </mat-chip-listbox>
+            </mat-expansion-panel>
+          </mat-accordion>
+        </div>
+      </mat-tab>
+
+      <!-- Best Practices Tab -->
+      <mat-tab label="Best Practices">
+        <div class="tab-content">
+          <div class="best-practices">
+            <mat-card class="practice-card" *ngFor="let practice of bestPractices">
+              <mat-card-header>
+                <mat-icon mat-card-avatar [color]="practice.priority">
+                  {{ practice.icon }}
+                </mat-icon>
+                <mat-card-title>{{ practice.title }}</mat-card-title>
+                <mat-card-subtitle>{{ practice.category }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <p>{{ practice.description }}</p>
+                <mat-list *ngIf="practice.tips">
+                  <mat-list-item *ngFor="let tip of practice.tips">
+                    <mat-icon matListItemIcon>check</mat-icon>
+                    <span matListItemTitle>{{ tip }}</span>
+                  </mat-list-item>
+                </mat-list>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Troubleshooting Tab -->
+      <mat-tab label="Troubleshooting">
+        <div class="tab-content">
+          <div class="troubleshooting-section">
+            <h3>Common Issues and Solutions</h3>
+
+            <mat-accordion>
+              <mat-expansion-panel *ngFor="let issue of commonIssues">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon color="warn">warning</mat-icon>
+                    {{ issue.problem }}
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+
+                <div class="issue-content">
+                  <h4>Symptoms</h4>
+                  <ul>
+                    <li *ngFor="let symptom of issue.symptoms">{{ symptom }}</li>
+                  </ul>
+
+                  <h4>Solution</h4>
+                  <p>{{ issue.solution }}</p>
+
+                  <div class="code-example" *ngIf="issue.example">
+                    <h4>Example</h4>
+                    <pre><code>{{ issue.example }}</code></pre>
+                  </div>
+                </div>
+              </mat-expansion-panel>
+            </mat-accordion>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <div class="contact-support">
+            <h3>Still Need Help?</h3>
+            <p>If you can't find the answer to your question, contact our support team.</p>
+            <div class="support-options">
+              <button mat-raised-button color="primary">
+                <mat-icon>email</mat-icon>
+                Email Support
+              </button>
+              <button mat-stroked-button>
+                <mat-icon>chat</mat-icon>
+                Live Chat
+              </button>
+              <button mat-stroked-button>
+                <mat-icon>bug_report</mat-icon>
+                Report Issue
+              </button>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="openDocumentation()">
+      <mat-icon>open_in_new</mat-icon>
+      Full Documentation
+    </button>
+    <button mat-raised-button (click)="close()">Close</button>
+  </mat-dialog-actions>
+</div>
