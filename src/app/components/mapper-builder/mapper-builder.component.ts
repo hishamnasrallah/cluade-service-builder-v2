@@ -1,134 +1,104 @@
 // src/app/components/mapper-builder/mapper-builder.component.ts
-
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Subject, takeUntil, forkJoin, firstValueFrom, combineLatest } from 'rxjs';
-// import { map } from 'rxjs/operators';
-import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatDividerModule } from '@angular/material/divider';
-import {MatTab, MatTabGroup, MatTabsModule} from '@angular/material/tabs';
-import { Router, ActivatedRoute } from '@angular/router';
-import { map, take } from 'rxjs/operators';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Subject, takeUntil } from 'rxjs';
 
-import { MapperTreeComponent } from './components/mapper-tree/mapper-tree.component';
-import { MapperCanvasComponent } from './components/mapper-canvas/mapper-canvas.component';
-import { PreviewPanelComponent } from './components/preview-panel/preview-panel.component';
-import { MapperToolbarComponent } from './components/mapper-toolbar/mapper-toolbar.component';
-import { ExecutionLogsComponent } from './execution-logs/execution-logs.component';
-import { VersionHistoryComponent } from './version-history/version-history.component';
-import { VisualFieldMapperComponent } from './visual-field-mapper/visual-field-mapper.component';
-import { SaveMapperDialogComponent } from './dialogs/mapper-dialogs/save-mapper-dialog/save-mapper-dialog.component';
-import { LoadMapperDialogComponent } from './dialogs/mapper-dialogs/load-mapper-dialog/load-mapper-dialog.component';
+// Child Components
+import { TargetTreeComponent } from './target-tree/target-tree.component';
+import { ModelBrowserComponent } from './model-browser/model-browser.component';
+import { FunctionBrowserComponent } from './function-browser/function-browser.component';
+import { TargetDetailsComponent } from './target-details/target-details.component';
+import { PropertiesEditorComponent } from './properties-editor/properties-editor.component';
+import { PreviewComponent } from './preview/preview.component';
 
-import { MapperStateService } from '../../services/mapper-state.service';
+// Dialogs
+import { NewMapperDialogComponent } from './dialogs/new-mapper-dialog/new-mapper-dialog.component';
+import { OpenMapperDialogComponent } from './dialogs/open-mapper-dialog/open-mapper-dialog.component';
+import { SaveMapperDialogComponent } from './dialogs/save-mapper-dialog/save-mapper-dialog.component';
+import { ImportMapperDialogComponent } from './dialogs/import-mapper-dialog/import-mapper-dialog.component';
+import { ExportMapperDialogComponent } from './dialogs/export-mapper-dialog/export-mapper-dialog.component';
+
+// Services
 import { MapperApiService } from '../../services/mapper-api.service';
+import { MapperStateService } from '../../services/mapper-state.service';
 import { MapperValidationService } from '../../services/mapper-validation.service';
-import { KeyboardShortcutsService, KeyboardShortcutsDialogComponent } from '../../services/keyboard-shortcuts.service';
+import { KeyboardShortcutsService } from '../../services/keyboard-shortcuts.service';
 import { MapperUndoRedoService } from '../../services/undo-redo.service';
-import { MapperStatePersistenceService } from '../../services/state-persistence.service';
-import {
-  ModelField,
-  ProcessorFunction,
-  JSONPathSuggestion,
-  MapperVersion,
-  CaseMapper,
-  MapperTarget
-} from '../../models/mapper.models';
-import {
-  NewMapperDialogComponent,
-  ValidationErrorsDialogComponent
-} from './dialogs/mapper-dialogs/new-mapper-dialog/new-mapper-dialog.component';
-import { ExerciseRunnerComponent } from './exercise-runner/exercise-runner.component';
-import {FieldRuleTesterComponent} from '../field-rule-tester/field-rule-tester.component';
-import {
-  TransformFunctionManagerComponent
-} from './components/transform-function-manager/transform-function-manager.component';
-import {BatchOperationsComponent} from './components/batch-operations/batch-operations.component';
+
+// Models
+import { CaseMapper, MapperTarget, ModelOption, LookupOption, TransformFunction, FilterFunction } from '../../models/mapper.models';
 
 @Component({
   selector: 'app-mapper-builder',
   standalone: true,
   imports: [
     CommonModule,
-    MatSidenavModule,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressBarModule,
+    MatSidenavModule,
+    MatDividerModule,
     MatSnackBarModule,
     MatDialogModule,
-    MatTooltipModule,
-    MatMenuModule,
-    MatDividerModule,
-    MapperTreeComponent,
-    MapperCanvasComponent,
-    PreviewPanelComponent,
-    ExerciseRunnerComponent,
-    MapperToolbarComponent,
-    VersionHistoryComponent,
-    ExecutionLogsComponent,
-    VisualFieldMapperComponent,
-    MatTab,
-    MatTabGroup,
-    FieldRuleTesterComponent,
-    TransformFunctionManagerComponent
+    MatProgressSpinnerModule,
+    TargetTreeComponent,
+    ModelBrowserComponent,
+    FunctionBrowserComponent,
+    TargetDetailsComponent,
+    PropertiesEditorComponent,
+    PreviewComponent
   ],
   templateUrl:'mapper-builder.component.html',
-  styleUrl:'mapper-builder.component.scss'
+  styleUrl:"mapper-builder.component.scss"
 })
 export class MapperBuilderComponent implements OnInit, OnDestroy {
-  private destroy$ = new Subject<void>();
+  // State
+  currentMapper?: CaseMapper;
+  targets: MapperTarget[] = [];
+  selectedTargetId?: string;
+  selectedTarget?: MapperTarget;
+  previewResult?: any;
 
-  // State observables
-  isDirty$ = this.stateService.isDirty$();
-  isLoading$ = this.stateService.isLoading$();
-  currentMapper$ = this.stateService.getCurrentMapper$();
-  targetHierarchy$ = this.stateService.getTargetHierarchy$();
-  selectedTargetId$ = this.stateService.getState$().pipe(
-    map(state => state.selectedTargetId)
-  );
-  selectedTarget$ = this.stateService.getSelectedTarget$();
-  availableModels$ = this.stateService.getAvailableModels$();
-  availableLookups$ = this.stateService.getAvailableLookups$();
-  availableTransforms$ = this.stateService.getAvailableTransforms$();
-  availableFilters$ = this.stateService.getAvailableFilters$();
-  previewResult$ = this.stateService.getPreviewResult$();
-  showExerciseRunner = false;
-  activeView: 'tree' | 'visual' = 'tree';
-  modelFields: any[] = [];
-  jsonPathSuggestions: string[] = [];
-  availableProcessors: any[] = [];
-  showLogs = false;
-  showVersionHistory = false;
-  showVisualMapper = false;
+  // Reference data
+  availableModels: ModelOption[] = [];
+  availableLookups: LookupOption[] = [];
+  availableTransforms: TransformFunction[] = [];
+  availableFilters: FilterFunction[] = [];
 
   // UI state
+  isLoading = false;
+  loadingMessage = '';
   showPreview = false;
-  sidenavWidth = 320;
-  previewWidth = 400;
+  isDirty = false;
+  canUndo = false;
+  canRedo = false;
+  lastSaved?: Date;
+  validationErrors: string[] = [];
 
+  private destroy$ = new Subject<void>();
 
   constructor(
-    private stateService: MapperStateService,
-    private apiService: MapperApiService,
-    private validationService: MapperValidationService,
+    private mapperApi: MapperApiService,
+    private mapperState: MapperStateService,
+    private validation: MapperValidationService,
+    private shortcuts: KeyboardShortcutsService,
+    private undoRedo: MapperUndoRedoService,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog,
-    private router: Router,
-    private route: ActivatedRoute
+    private dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
+    this.initializeState();
     this.loadReferenceData();
-    this.checkRouteParams();
+    this.registerKeyboardShortcuts();
   }
 
   ngOnDestroy(): void {
@@ -136,439 +106,423 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  toggleExerciseRunner(): void {
-    this.showExerciseRunner = !this.showExerciseRunner;
+  private initializeState(): void {
+    // Subscribe to state changes
+    this.mapperState.getState$()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(state => {
+        this.currentMapper = state.currentMapper;
+        this.targets = state.targets;
+        this.selectedTargetId = state.selectedTargetId;
+        this.selectedTarget = state.targets.find(t => t.id === state.selectedTargetId);
+        this.isDirty = state.isDirty;
+        this.previewResult = state.previewResult;
+        this.availableModels = state.availableModels;
+        this.availableLookups = state.availableLookups;
+        this.availableTransforms = state.availableTransforms;
+        this.availableFilters = state.availableFilters;
+      });
+
+    // Subscribe to undo/redo state
+    this.undoRedo.canUndo()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(can => this.canUndo = can);
+
+    this.undoRedo.canRedo()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(can => this.canRedo = can);
   }
 
-  onLoadExercise(exerciseId: string): void {
-    // Load exercise template
-    switch (exerciseId) {
-      case 'A1':
-        this.loadExerciseA1();
-        break;
-      case 'B2':
-        this.loadExerciseB2();
-        break;
-      case 'C1':
-        this.loadExerciseC1();
-        break;
-    }
+  private loadReferenceData(): void {
+    this.isLoading = true;
+    this.loadingMessage = 'Loading reference data...';
+
+    Promise.all([
+      this.mapperApi.getAvailableModels().toPromise(),
+      this.mapperApi.getAvailableLookups().toPromise(),
+      this.mapperApi.getTransformFunctions().toPromise(),
+      this.mapperApi.getFilterFunctions().toPromise()
+    ]).then(([models, lookups, transforms, filters]) => {
+      this.mapperState.setReferenceData({
+        models: models || [],
+        lookups: lookups || [],
+        transforms: transforms || [],
+        filters: filters || []
+      });
+      this.isLoading = false;
+    }).catch(error => {
+      this.snackBar.open('Failed to load reference data', 'Retry', { duration: 5000 });
+      this.isLoading = false;
+    });
   }
 
-  private loadExerciseA1(): void {
-    // Create mapper for Exercise A1
-    const mapper: CaseMapper = {
-      name: 'User Registration Mapper',
-      case_type: 'USER_REG',
-      version: 1,
-      active_ind: true
-    };
+  private registerKeyboardShortcuts(): void {
+    this.shortcuts.registerShortcut({
+      key: 'n',
+      modifiers: ['ctrl'],
+      description: 'New mapper',
+      action: () => this.newMapper()
+    });
 
-    const target: MapperTarget = {
-      id: uuidv4(),
-      name: 'User Target',
-      model: 'auth.User',
-      case_mapper: 0,
-      active_ind: true,
-      field_rules: []
-    };
+    this.shortcuts.registerShortcut({
+      key: 'o',
+      modifiers: ['ctrl'],
+      description: 'Open mapper',
+      action: () => this.openMapper()
+    });
 
-    this.stateService.loadMapper(mapper, [target]);
-    this.snackBar.open('Exercise A1 template loaded', 'Close', { duration: 3000 });
+    this.shortcuts.registerShortcut({
+      key: 's',
+      modifiers: ['ctrl'],
+      description: 'Save mapper',
+      action: () => this.saveMapper()
+    });
+
+    this.shortcuts.registerShortcut({
+      key: 's',
+      modifiers: ['ctrl', 'shift'],
+      description: 'Save as',
+      action: () => this.saveAsMapper()
+    });
+
+    this.shortcuts.registerShortcut({
+      key: 'z',
+      modifiers: ['ctrl'],
+      description: 'Undo',
+      action: () => this.undo()
+    });
+
+    this.shortcuts.registerShortcut({
+      key: 'y',
+      modifiers: ['ctrl'],
+      description: 'Redo',
+      action: () => this.redo()
+    });
+
+    this.shortcuts.registerShortcut({
+      key: 'p',
+      modifiers: ['ctrl'],
+      description: 'Toggle preview',
+      action: () => this.togglePreview()
+    });
+
+    this.shortcuts.registerShortcut({
+      key: 'f5',
+      description: 'Validate',
+      action: () => this.validateMapper()
+    });
   }
 
-  getSelectedFieldRule(): MapperFieldRule | undefined {
-    const state = this.stateService.getState$().getValue();
-    if (!state.selectedTargetId) return undefined;
-
-    const target = state.targets.find(t => t.id === state.selectedTargetId);
-    return target?.field_rules?.[0]; // Or track selected rule
-  }
-
-  getTestCaseData(): any {
-    // Return test data for the current case type
-    const mapper = this.stateService.getState$().getValue().currentMapper;
-    if (!mapper) return {};
-
-    // Return sample data based on case type
-    const sampleData: { [key: string]: any } = {
-      'USER_REG': {
-        username: 'johndoe',
-        email: 'john@example.com',
-        full_name: 'John Doe',
-        is_active: true
-      },
-      'ORDER': {
-        order_id: 'ORD-001',
-        customer: 'ACME Corp',
-        items: [
-          { sku: 'WIDGET-A', quantity: 10, price: 29.99 }
-        ]
-      }
-    };
-
-    return sampleData[mapper.case_type] || {};
-  }
-
-  openBatchOperations(): void {
-    const state = this.stateService.getState$().getValue();
-
-    const dialogRef = this.dialog.open(BatchOperationsComponent, {
-      width: '600px',
-      data: {
-        targets: state.targets,
-        selectedTargets: state.selectedTargetId ? [state.selectedTargetId] : []
-      }
+  // Toolbar actions
+  newMapper(): void {
+    const dialogRef = this.dialog.open(NewMapperDialogComponent, {
+      width: '500px'
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        // Reload targets after batch operation
-        this.loadMapper(state.currentMapper!.id!.toString());
+        this.mapperState.createNewMapper(result.caseType);
+        this.mapperState.updateTarget(this.mapperState.generateTargetId(), {
+          name: result.name,
+          ...result
+        });
+        this.snackBar.open('New mapper created', 'Close', { duration: 3000 });
       }
     });
   }
 
-  onShowExerciseGuide(exerciseId: string): void {
-    // Show visual guide for exercise
-    const guides: { [key: string]: string } = {
-      'B2': 'For array processing, create a parent target for Order and child targets for OrderItems with root_path set to "items"',
-      'C1': 'Use expression conditions and post-processor functions for complex business rules'
+  openMapper(): void {
+    const dialogRef = this.dialog.open(OpenMapperDialogComponent, {
+      width: '800px',
+      height: '600px'
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.loadMapper(result.id);
+      }
+    });
+  }
+
+  saveMapper(): void {
+    if (!this.currentMapper || !this.isDirty) return;
+
+    this.isLoading = true;
+    this.loadingMessage = 'Saving mapper...';
+
+    const saveRequest = {
+      case_mapper: this.currentMapper,
+      targets: this.targets
     };
 
-    this.snackBar.open(guides[exerciseId] || 'Follow the exercise instructions', 'Close', {
-      duration: 10000
-    });
-  }
-  private loadReferenceData(): void {
-    this.stateService.setLoading(true);
-
-    forkJoin({
-      models: this.apiService.getAvailableModels(),
-      lookups: this.apiService.getAvailableLookups(),
-      transforms: this.apiService.getTransformFunctions(),
-      filters: this.apiService.getFilterFunctions()
-    }).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: (data) => {
-        this.stateService.setReferenceData(data);
-        this.stateService.setLoading(false);
+    this.mapperApi.saveMapperConfiguration(saveRequest).subscribe({
+      next: (result) => {
+        this.isLoading = false;
+        this.lastSaved = new Date();
+        this.mapperState.resetDirtyState();
+        this.snackBar.open('Mapper saved successfully', 'Close', { duration: 3000 });
       },
       error: (error) => {
-        console.error('Failed to load reference data:', error);
-        this.snackBar.open('Failed to load reference data', 'Close', { duration: 5000 });
-        this.stateService.setLoading(false);
+        this.isLoading = false;
+        this.snackBar.open('Failed to save mapper', 'Close', { duration: 5000 });
       }
     });
   }
 
-  private checkRouteParams(): void {
-    this.route.queryParams.pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(params => {
-      if (params['mapperId']) {
-        this.loadMapper(params['mapperId']);
-      } else if (params['caseType']) {
-        this.createNewMapper(params['caseType']);
-      }
-    });
-  }
-
-  private loadMapper(mapperId: string): void {
-    this.stateService.setLoading(true);
-
-    forkJoin({
-      mapper: this.apiService.getCaseMapper(parseInt(mapperId)),
-      targets: this.apiService.getMapperTargets(parseInt(mapperId))
-    }).pipe(
-      takeUntil(this.destroy$)
-    ).subscribe({
-      next: ({ mapper, targets }) => {
-        this.stateService.loadMapper(mapper, targets);
-        this.stateService.setLoading(false);
-      },
-      error: (error) => {
-        console.error('Failed to load mapper:', error);
-        this.snackBar.open('Failed to load mapper', 'Close', { duration: 5000 });
-        this.stateService.setLoading(false);
-      }
-    });
-  }
-
-  private createNewMapper(caseType: string): void {
-    this.stateService.createNewMapper(caseType);
-  }
-
-  onNewMapper(): void {
-    // Get the current dirty state
-    this.isDirty$.pipe(take(1)).subscribe(isDirty => {
-      if (isDirty) {
-        if (!confirm('You have unsaved changes. Continue without saving?')) {
-          return;
-        }
-      }
-
-      const dialogRef = this.dialog.open(NewMapperDialogComponent, {
-        width: '400px',
-        data: { caseTypes: ['CitizenRequest', 'VacationRequest', 'EducationRequest'] }
-      });
-
-      dialogRef.afterClosed().subscribe(result => {
-        if (result) {
-          this.stateService.createNewMapper(result.caseType);
-        }
-      });
-    });
-  }
-
-  onLoadMapper(): void {
-    const dialogRef = this.dialog.open(LoadMapperDialogComponent, {
-      width: '600px',
-      maxHeight: '80vh'
+  saveAsMapper(): void {
+    const dialogRef = this.dialog.open(SaveMapperDialogComponent, {
+      width: '500px',
+      data: { mapper: this.currentMapper }
     });
 
-    dialogRef.afterClosed().subscribe(mapper => {
-      if (mapper) {
-        this.loadMapper(mapper.id);
-      }
-    });
-  }
-
-  onSaveMapper(): void {
-    this.saveMapper();
-  }
-
-  onValidateAndSave(): void {
-    // Get current state
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      const errors = this.validationService.validateMapper(state);
-
-      if (errors.length > 0) {
-        const dialogRef = this.dialog.open(ValidationErrorsDialogComponent, {
-          width: '500px',
-          data: { errors }
-        });
-
-        dialogRef.afterClosed().subscribe(forceSave => {
-          if (forceSave) {
-            this.saveMapper();
-          }
-        });
-      } else {
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        // Create new version or copy
         this.saveMapper();
       }
     });
   }
 
-  private saveMapper(): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      if (!state.currentMapper) {
-        this.snackBar.open('No mapper to save', 'Close', { duration: 3000 });
-        return;
-      }
-
-      this.stateService.setLoading(true);
-
-      const saveRequest = {
-        case_mapper: state.currentMapper,
-        targets: state.targets
-      };
-
-      this.apiService.saveMapperConfiguration(saveRequest).pipe(
-        takeUntil(this.destroy$)
-      ).subscribe({
-        next: (result) => {
-          this.stateService.resetDirtyState();
-          this.stateService.setLoading(false);
-          this.snackBar.open('Mapper saved successfully', 'Close', { duration: 3000 });
-        },
-        error: (error) => {
-          console.error('Failed to save mapper:', error);
-          this.stateService.setLoading(false);
-          this.snackBar.open('Failed to save mapper', 'Close', { duration: 5000 });
-        }
-      });
-    });
-  }
-
-  onExportMapper(): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      const exportData = {
-        mapper: state.currentMapper,
-        targets: state.targets,
-        exportDate: new Date().toISOString()
-      };
-
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `mapper-${state.currentMapper?.name || 'export'}-${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      this.snackBar.open('Mapper exported successfully', 'Close', { duration: 3000 });
-    });
-  }
-
-  onImportMapper(): void {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-
-    input.onchange = (event: any) => {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e: any) => {
-          try {
-            const data = JSON.parse(e.target.result);
-            if (data.mapper && data.targets) {
-              this.stateService.loadMapper(data.mapper, data.targets);
-              this.snackBar.open('Mapper imported successfully', 'Close', { duration: 3000 });
-            } else {
-              throw new Error('Invalid mapper file format');
-            }
-          } catch (error) {
-            this.snackBar.open('Failed to import mapper', 'Close', { duration: 5000 });
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-
-    input.click();
-  }
-
-  onAddTarget(): void {
-    this.stateService.addTarget({
-      name: 'New Target',
-      model: '',
-      active_ind: true
-    });
-  }
-
-  onNodeSelected(nodeId: string): void {
-    this.stateService.selectTarget(nodeId);
-  }
-
-  onNodeDropped(event: any): void {
-    this.stateService.moveTarget(event.node.id, event.newParentId);
-  }
-
-  onNodeDeleted(nodeId: string): void {
-    if (confirm('Are you sure you want to delete this target and all its children?')) {
-      this.stateService.deleteTarget(nodeId);
+  undo(): void {
+    const state = this.undoRedo.undo();
+    if (state) {
+      this.snackBar.open(`Undone: ${state.description}`, 'Close', { duration: 2000 });
     }
   }
 
-  onNodeAdded(parentId: string): void {
-    this.stateService.addTarget({
-      name: 'New Child Target',
-      model: '',
-      parent_target: parentId,
-      active_ind: true
-    });
+  redo(): void {
+    const state = this.undoRedo.redo();
+    if (state) {
+      this.snackBar.open(`Redone: ${state.description}`, 'Close', { duration: 2000 });
+    }
   }
 
-  onTargetUpdated(updates: any): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      if (state.selectedTargetId) {
-        this.stateService.updateTarget(state.selectedTargetId, updates);
-      }
+  validateMapper(): void {
+    const errors = this.validation.validateMapper({
+      currentMapper: this.currentMapper,
+      targets: this.targets,
+      selectedTargetId: this.selectedTargetId,
+      isDirty: this.isDirty,
+      availableModels: this.availableModels,
+      availableLookups: this.availableLookups,
+      availableTransforms: this.availableTransforms,
+      availableFilters: this.availableFilters,
+      loading: false
     });
-  }
 
-  onFieldRuleAdded(rule: any): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      if (state.selectedTargetId) {
-        this.stateService.addFieldRule(state.selectedTargetId, rule);
-      }
-    });
-  }
+    this.validationErrors = errors;
 
-  onFieldRuleUpdated(event: { ruleId: number; updates: any }): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      if (state.selectedTargetId) {
-        this.stateService.updateFieldRule(state.selectedTargetId, event.ruleId, event.updates);
-      }
-    });
-  }
-
-  onFieldRuleDeleted(ruleId: number): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      if (state.selectedTargetId) {
-        this.stateService.deleteFieldRule(state.selectedTargetId, ruleId);
-      }
-    });
-  }
-
-  onRunPreview(caseId: number): void {
-    this.stateService.getState$().pipe(take(1)).subscribe(state => {
-      if (!state.selectedTargetId) {
-        this.snackBar.open('Please select a target first', 'Close', { duration: 3000 });
-        return;
-      }
-
-      this.stateService.setLoading(true);
-
-      this.apiService.runDryRun(caseId, state.selectedTargetId).pipe(
-        takeUntil(this.destroy$)
-      ).subscribe({
-        next: (result) => {
-          this.stateService.setPreviewResult(result);
-          this.stateService.setLoading(false);
-        },
-        error: (error) => {
-          console.error('Preview failed:', error);
-          this.stateService.setLoading(false);
-          this.snackBar.open('Preview failed', 'Close', { duration: 5000 });
-        }
+    if (errors.length === 0) {
+      this.snackBar.open('Validation passed!', 'Close', { duration: 3000 });
+    } else {
+      this.snackBar.open(`${errors.length} validation errors found`, 'View', { duration: 5000 })
+        .onAction().subscribe(() => {
+        // Show validation errors dialog
+        console.log('Show validation errors:', errors);
       });
-    });
+    }
   }
 
   togglePreview(): void {
     this.showPreview = !this.showPreview;
   }
 
-  showKeyboardShortcuts() {
+  runMapper(): void {
+    if (!this.selectedTarget) return;
 
+    // Show run dialog to get case ID
+    console.log('Run mapper for target:', this.selectedTarget);
   }
 
-  onLoadVersion($event: MapperVersion) {
+  importMapper(): void {
+    const dialogRef = this.dialog.open(ImportMapperDialogComponent, {
+      width: '600px'
+    });
 
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.loadMapperFromImport(result);
+      }
+    });
   }
 
-  onCompareVersions($event: { v1: MapperVersion; v2: MapperVersion }) {
+  exportMapper(): void {
+    if (!this.currentMapper) return;
 
+    const dialogRef = this.dialog.open(ExportMapperDialogComponent, {
+      width: '500px',
+      data: { mapper: this.currentMapper }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.performExport(result);
+      }
+    });
   }
 
-  viewVersionHistory(): void {
-    this.showVersionHistory = !this.showVersionHistory;
-    if (this.showVersionHistory) {
-      this.showLogs = false;
-      this.showVisualMapper = false;
+  searchInMapper(): void {
+    // Implement search functionality
+    console.log('Search in mapper');
+  }
+
+  showHelp(): void {
+    // Show help dialog
+    console.log('Show help');
+  }
+
+  showSettings(): void {
+    // Show settings dialog
+    console.log('Show settings');
+  }
+
+  // Target management
+  selectTarget(targetId: string): void {
+    this.mapperState.selectTarget(targetId);
+  }
+
+  addTarget(target: Partial<MapperTarget>): void {
+    this.mapperState.addTarget(target);
+    this.saveUndoState('ADD_TARGET');
+  }
+
+  addNewTarget(): void {
+    this.addTarget({
+      name: 'New Target',
+      model: '',
+      active_ind: true
+    });
+  }
+
+  addTargetFromModel(model: ModelOption): void {
+    this.addTarget({
+      name: model.model,
+      model: `${model.app_label}.${model.model}`,
+      active_ind: true
+    });
+  }
+
+  updateTarget(update: { id: string; changes: Partial<MapperTarget> }): void {
+    this.mapperState.updateTarget(update.id, update.changes);
+    this.saveUndoState('UPDATE_TARGET');
+  }
+
+  deleteTarget(targetId: string): void {
+    this.mapperState.deleteTarget(targetId);
+    this.saveUndoState('DELETE_TARGET');
+  }
+
+  moveTarget(event: { targetId: string; newParentId?: string }): void {
+    this.mapperState.moveTarget(event.targetId, event.newParentId);
+    this.saveUndoState('MOVE_TARGET');
+  }
+
+  updateTargetProperty(event: { property: string; value: any }): void {
+    if (this.selectedTargetId) {
+      this.mapperState.updateTarget(this.selectedTargetId, {
+        [event.property]: event.value
+      });
     }
   }
 
-  viewExecutionLogs(): void {
-    this.showLogs = !this.showLogs;
-    if (this.showLogs) {
-      this.showVisualMapper = false;
-      this.showVersionHistory = false;
+  // Field rule management
+  addFieldRule(rule: any): void {
+    if (this.selectedTargetId) {
+      this.mapperState.addFieldRule(this.selectedTargetId, rule);
+      this.saveUndoState('ADD_FIELD_RULE');
     }
   }
 
-  toggleVisualMapper(): void {
-    this.showVisualMapper = !this.showVisualMapper;
-    if (this.showVisualMapper) {
-      this.showLogs = false;
-      this.showVersionHistory = false;
-      this.activeView = 'visual';
+  updateFieldRule(event: { ruleId: number; changes: any }): void {
+    if (this.selectedTargetId) {
+      this.mapperState.updateFieldRule(this.selectedTargetId, event.ruleId, event.changes);
+      this.saveUndoState('UPDATE_FIELD_RULE');
     }
+  }
+
+  deleteFieldRule(ruleId: number): void {
+    if (this.selectedTargetId) {
+      this.mapperState.deleteFieldRule(this.selectedTargetId, ruleId);
+      this.saveUndoState('DELETE_FIELD_RULE');
+    }
+  }
+
+  // Preview
+  runPreview(caseId: number): void {
+    if (!this.selectedTarget) return;
+
+    this.isLoading = true;
+    this.loadingMessage = 'Running preview...';
+
+    this.mapperApi.runDryRun(caseId, this.selectedTarget.id!).subscribe({
+      next: (result) => {
+        this.mapperState.setPreviewResult(result);
+        this.isLoading = false;
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.snackBar.open('Preview failed', 'Close', { duration: 3000 });
+      }
+    });
+  }
+
+  // Helper methods
+  getTotalFieldRules(): number {
+    return this.targets.reduce((sum, target) =>
+      sum + (target.field_rules?.length || 0), 0);
+  }
+
+  private loadMapper(mapperId: number): void {
+    this.isLoading = true;
+    this.loadingMessage = 'Loading mapper...';
+
+    Promise.all([
+      this.mapperApi.getCaseMapper(mapperId).toPromise(),
+      this.mapperApi.getMapperTargets(mapperId).toPromise()
+    ]).then(([mapper, targets]) => {
+      if (mapper && targets) {
+        this.mapperState.loadMapper(mapper, targets);
+        this.isLoading = false;
+        this.snackBar.open('Mapper loaded successfully', 'Close', { duration: 3000 });
+      }
+    }).catch(error => {
+      this.isLoading = false;
+      this.snackBar.open('Failed to load mapper', 'Close', { duration: 5000 });
+    });
+  }
+
+  private loadMapperFromImport(data: any): void {
+    // Load imported mapper data
+    console.log('Load from import:', data);
+  }
+
+  private performExport(options: any): void {
+    if (!this.currentMapper) return;
+
+    this.mapperApi.exportMapper(this.currentMapper.id!).subscribe({
+      next: (data) => {
+        // Download the exported data
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mapper-${this.currentMapper!.name}-v${this.currentMapper!.version}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        this.snackBar.open('Mapper exported successfully', 'Close', { duration: 3000 });
+      },
+      error: (error) => {
+        this.snackBar.open('Export failed', 'Close', { duration: 3000 });
+      }
+    });
+  }
+
+  private saveUndoState(action: string): void {
+    this.undoRedo.saveMapperState({
+      currentMapper: this.currentMapper,
+      targets: this.targets,
+      selectedTargetId: this.selectedTargetId
+    }, action);
   }
 }

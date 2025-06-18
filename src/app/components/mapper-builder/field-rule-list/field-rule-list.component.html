@@ -1,0 +1,199 @@
+<div class="field-rule-list">
+  <!-- Search/Filter -->
+  <div class="list-header" *ngIf="fieldRules.length > 0">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search field rules</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchTerm" (input)="filterRules()" placeholder="Search by field or path...">
+      <button mat-icon-button matSuffix *ngIf="searchTerm" (click)="clearSearch()">
+        <mat-icon>clear</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <div class="list-actions">
+      <button mat-icon-button (click)="expandAll()" matTooltip="Expand all">
+        <mat-icon>unfold_more</mat-icon>
+      </button>
+      <button mat-icon-button (click)="collapseAll()" matTooltip="Collapse all">
+        <mat-icon>unfold_less</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <!-- Rules List -->
+  <div class="rules-container"
+       cdkDropList
+       (cdkDropListDropped)="drop($event)"
+       [cdkDropListDisabled]="isFiltering">
+
+    <mat-accordion multi>
+      <mat-expansion-panel *ngFor="let rule of filteredRules; let i = index"
+                           [expanded]="expandedRules.has(rule.id!)"
+                           (expandedChange)="onExpansionChange(rule.id!, $event)"
+                           cdkDrag
+                           [cdkDragDisabled]="isFiltering"
+                           class="rule-panel">
+
+        <!-- Rule Header -->
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+                <span class="drag-handle" cdkDragHandle *ngIf="!isFiltering">
+                  <mat-icon>drag_indicator</mat-icon>
+                </span>
+
+            <span class="rule-number">{{ getOriginalIndex(rule) + 1 }}</span>
+
+            <span class="rule-field">{{ rule.target_field }}</span>
+
+            <mat-icon class="rule-arrow">arrow_back</mat-icon>
+
+            <span class="rule-path">{{ rule.json_path }}</span>
+          </mat-panel-title>
+
+          <mat-panel-description>
+            <div class="rule-chips">
+              <mat-chip *ngIf="rule.transform_function_path" color="primary">
+                <mat-icon>transform</mat-icon>
+                {{ getTransformLabel(rule.transform_function_path) }}
+              </mat-chip>
+
+              <mat-chip *ngIf="rule.condition_expression || (rule.conditions && rule.conditions.length > 0)" color="accent">
+                <mat-icon>rule</mat-icon>
+                Conditional
+              </mat-chip>
+
+              <mat-chip *ngIf="rule.source_lookup && rule.target_lookup">
+                <mat-icon>swap_horiz</mat-icon>
+                Lookup
+              </mat-chip>
+
+              <mat-chip *ngIf="rule.default_value">
+                <mat-icon>backup</mat-icon>
+                Default
+              </mat-chip>
+            </div>
+
+            <button mat-icon-button
+                    [matMenuTriggerFor]="ruleMenu"
+                    (click)="$event.stopPropagation()">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <!-- Rule Details -->
+        <div class="rule-details">
+          <div class="detail-row">
+            <label>Target Field:</label>
+            <code>{{ rule.target_field }}</code>
+          </div>
+
+          <div class="detail-row">
+            <label>JSON Path:</label>
+            <code>{{ rule.json_path }}</code>
+          </div>
+
+          <div class="detail-row" *ngIf="rule.transform_function_path">
+            <label>Transform Function:</label>
+            <code>{{ rule.transform_function_path }}</code>
+          </div>
+
+          <div class="detail-row" *ngIf="rule.default_value">
+            <label>Default Value:</label>
+            <span class="default-value">{{ rule.default_value }}</span>
+          </div>
+
+          <div class="detail-row" *ngIf="rule.source_lookup && rule.target_lookup">
+            <label>Lookup Translation:</label>
+            <span>{{ getLookupLabel(rule.source_lookup) }} → {{ getLookupLabel(rule.target_lookup) }}</span>
+          </div>
+
+          <div class="conditions-section" *ngIf="rule.condition_expression || (rule.conditions && rule.conditions.length > 0)">
+            <label>Conditions:</label>
+
+            <div class="condition-expression" *ngIf="rule.condition_expression">
+              <mat-icon>code</mat-icon>
+              <code>{{ rule.condition_expression }}</code>
+            </div>
+
+            <div class="simple-conditions" *ngIf="rule.conditions && rule.conditions.length > 0">
+              <div *ngFor="let condition of rule.conditions" class="condition-item">
+                <span class="condition-path">{{ condition.condition_path }}</span>
+                <span class="condition-operator">{{ condition.condition_operator }}</span>
+                <span class="condition-value">"{{ condition.condition_value }}"</span>
+                <mat-chip *ngIf="condition.group">{{ condition.group }}</mat-chip>
+              </div>
+            </div>
+          </div>
+
+          <div class="rule-actions">
+            <button mat-button (click)="editRule(rule)">
+              <mat-icon>edit</mat-icon>
+              Edit Rule
+            </button>
+
+            <button mat-button (click)="testRule(rule)">
+              <mat-icon>play_arrow</mat-icon>
+              Test
+            </button>
+
+            <button mat-button color="warn" (click)="deleteRule(rule)">
+              <mat-icon>delete</mat-icon>
+              Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- Rule Menu -->
+        <mat-menu #ruleMenu="matMenu">
+          <button mat-menu-item (click)="editRule(rule)">
+            <mat-icon>edit</mat-icon>
+            <span>Edit</span>
+          </button>
+
+          <button mat-menu-item (click)="duplicateRule(rule)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Duplicate</span>
+          </button>
+
+          <mat-divider></mat-divider>
+
+          <button mat-menu-item (click)="testRule(rule)">
+            <mat-icon>play_arrow</mat-icon>
+            <span>Test Rule</span>
+          </button>
+
+          <button mat-menu-item (click)="viewHistory(rule)">
+            <mat-icon>history</mat-icon>
+            <span>View History</span>
+          </button>
+
+          <mat-divider></mat-divider>
+
+          <button mat-menu-item (click)="deleteRule(rule)" class="delete-action">
+            <mat-icon>delete</mat-icon>
+            <span>Delete</span>
+          </button>
+        </mat-menu>
+      </mat-expansion-panel>
+    </mat-accordion>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="fieldRules.length === 0">
+    <mat-icon>rule</mat-icon>
+    <h3>No Field Rules</h3>
+    <p>Field rules define how data is mapped from the source JSON to the target model fields.</p>
+    <button mat-raised-button color="primary" (click)="addRule()">
+      <mat-icon>add</mat-icon>
+      Add First Rule
+    </button>
+  </div>
+
+  <!-- No Results -->
+  <div class="no-results" *ngIf="fieldRules.length > 0 && filteredRules.length === 0 && searchTerm">
+    <mat-icon>search_off</mat-icon>
+    <p>No rules match "{{ searchTerm }}"</p>
+    <button mat-button (click)="clearSearch()">Clear Search</button>
+  </div>
+</div>

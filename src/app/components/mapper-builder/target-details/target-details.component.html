@@ -1,0 +1,237 @@
+<div class="target-details">
+  <mat-card class="details-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon class="target-icon">{{ getTargetIcon() }}</mat-icon>
+        {{ target.name }}
+      </mat-card-title>
+      <mat-card-subtitle>
+        Target Configuration
+        <span *ngIf="target.id" class="target-id">ID: {{ target.id }}</span>
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="targetForm" class="target-form">
+        <mat-tab-group animationDuration="200ms">
+          <!-- Basic Settings Tab -->
+          <mat-tab label="Basic Settings">
+            <div class="tab-content">
+              <div class="form-section">
+                <h3>General Information</h3>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Target Name</mat-label>
+                  <input matInput formControlName="name" placeholder="Enter target name" required>
+                  <mat-error *ngIf="targetForm.get('name')?.hasError('required')">
+                    Name is required
+                  </mat-error>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Django Model</mat-label>
+                  <mat-select formControlName="model" required (selectionChange)="onModelChange($event.value)">
+                    <mat-option>
+                      <ngx-mat-select-search
+                        [formControl]="modelSearchControl"
+                        placeholderLabel="Search models..."
+                        noEntriesFoundLabel="No matching models">
+                      </ngx-mat-select-search>
+                    </mat-option>
+                    <mat-optgroup *ngFor="let group of getModelGroups()" [label]="group.app">
+                      <mat-option *ngFor="let model of group.models"
+                                  [value]="getModelValue(model)">
+                        {{ model.model }}
+                        <span class="model-hint">{{ model.app_label }}.{{ model.model }}</span>
+                      </mat-option>
+                    </mat-optgroup>
+                  </mat-select>
+                  <mat-hint>Format: app_label.ModelName</mat-hint>
+                  <mat-error *ngIf="targetForm.get('model')?.hasError('required')">
+                    Model is required
+                  </mat-error>
+                </mat-form-field>
+
+                <mat-checkbox formControlName="active_ind" color="primary">
+                  Active
+                  <mat-icon class="help-icon" matTooltip="Inactive targets are ignored during mapping">
+                    help_outline
+                  </mat-icon>
+                </mat-checkbox>
+              </div>
+
+              <mat-divider></mat-divider>
+
+              <div class="form-section" *ngIf="target.parent_target">
+                <h3>Nested Target Settings</h3>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Root Path (JSONPath)</mat-label>
+                  <input matInput
+                         formControlName="root_path"
+                         placeholder="e.g., items.*.details"
+                         required>
+                  <mat-hint>JSONPath to array in parent data</mat-hint>
+                  <mat-error *ngIf="targetForm.get('root_path')?.hasError('required')">
+                    Root path is required for nested targets
+                  </mat-error>
+                </mat-form-field>
+
+                <p class="info-text">
+                  <mat-icon>info</mat-icon>
+                  This target will process each item in the array at the specified path.
+                </p>
+              </div>
+            </div>
+          </mat-tab>
+
+          <!-- Advanced Settings Tab -->
+          <mat-tab label="Advanced Settings">
+            <div class="tab-content">
+              <div class="form-section">
+                <h3>Processing Functions</h3>
+
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      <mat-icon>search</mat-icon>
+                      Finder Function
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ targetForm.get('finder_function_path')?.value || 'Not configured' }}
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Finder Function Path</mat-label>
+                    <input matInput
+                           formControlName="finder_function_path"
+                           placeholder="e.g., myapp.finders.find_user_by_email">
+                    <button mat-icon-button matSuffix (click)="browseFinderFunctions()">
+                      <mat-icon>search</mat-icon>
+                    </button>
+                    <mat-hint>Python path to function that finds existing records</mat-hint>
+                  </mat-form-field>
+                </mat-expansion-panel>
+
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      <mat-icon>settings</mat-icon>
+                      Processor Function
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ targetForm.get('processor_function_path')?.value || 'Not configured' }}
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Processor Function Path</mat-label>
+                    <input matInput
+                           formControlName="processor_function_path"
+                           placeholder="e.g., myapp.processors.prepare_user_data">
+                    <button mat-icon-button matSuffix (click)="browseProcessorFunctions()">
+                      <mat-icon>search</mat-icon>
+                    </button>
+                    <mat-hint>Python path to pre-processing function</mat-hint>
+                  </mat-form-field>
+                </mat-expansion-panel>
+
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      <mat-icon>done_all</mat-icon>
+                      Post-Processor Function
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ targetForm.get('post_processor_path')?.value || 'Not configured' }}
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Post-Processor Function Path</mat-label>
+                    <input matInput
+                           formControlName="post_processor_path"
+                           placeholder="e.g., myapp.processors.post_process_user">
+                    <button mat-icon-button matSuffix (click)="browsePostProcessorFunctions()">
+                      <mat-icon>search</mat-icon>
+                    </button>
+                    <mat-hint>Python path to post-processing function</mat-hint>
+                  </mat-form-field>
+                </mat-expansion-panel>
+
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      <mat-icon>filter_alt</mat-icon>
+                      Filter Function
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      {{ targetForm.get('filter_function_path')?.value || 'Not configured' }}
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+
+                  <mat-form-field appearance="outline">
+                    <mat-label>Filter Function Path</mat-label>
+                    <input matInput
+                           formControlName="filter_function_path"
+                           placeholder="e.g., myapp.filters.is_valid_user">
+                    <button mat-icon-button matSuffix (click)="browseFilterFunctions()">
+                      <mat-icon>search</mat-icon>
+                    </button>
+                    <mat-hint>Python path to filter function (for array processing)</mat-hint>
+                  </mat-form-field>
+                </mat-expansion-panel>
+              </div>
+            </div>
+          </mat-tab>
+
+          <!-- Field Rules Tab -->
+          <mat-tab label="Field Rules">
+            <div class="tab-content">
+              <div class="field-rules-header">
+                <h3>Field Mapping Rules ({{ target.field_rules?.length || 0 }})</h3>
+                <button mat-raised-button color="primary" (click)="addFieldRule()">
+                  <mat-icon>add</mat-icon>
+                  Add Field Rule
+                </button>
+              </div>
+
+              <app-field-rule-list
+                [fieldRules]="target.field_rules || []"
+                [targetModel]="targetForm.get('model')?.value"
+                [availableTransforms]="availableTransforms"
+                [availableLookups]="availableLookups"
+                (ruleUpdated)="onFieldRuleUpdated($event)"
+                (ruleDeleted)="onFieldRuleDeleted($event)"
+                (ruleReordered)="onFieldRulesReordered($event)">
+              </app-field-rule-list>
+
+              <div class="no-rules" *ngIf="!target.field_rules || target.field_rules.length === 0">
+                <mat-icon>rule</mat-icon>
+                <p>No field rules defined</p>
+                <button mat-button color="primary" (click)="addFieldRule()">
+                  Add your first field rule
+                </button>
+              </div>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
+      </form>
+    </mat-card-content>
+
+    <mat-card-actions>
+      <button mat-button (click)="resetForm()">
+        <mat-icon>refresh</mat-icon>
+        Reset
+      </button>
+      <button mat-raised-button
+              color="primary"
+              (click)="saveTarget()"
+              [disabled]="!targetForm.valid || !isFormDirty()">
+        <mat-icon>save</mat-icon>
+        Save Changes
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

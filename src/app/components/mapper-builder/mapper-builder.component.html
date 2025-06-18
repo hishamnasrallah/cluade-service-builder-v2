@@ -1,222 +1,193 @@
-<!-- Update mapper-builder.component.html -->
+<div class="mapper-builder">
+  <!-- Top Toolbar -->
+  <mat-toolbar class="mapper-toolbar">
+    <button mat-icon-button (click)="newMapper()" title="New Mapper (Ctrl+N)">
+      <mat-icon>add_circle</mat-icon>
+    </button>
+    <button mat-icon-button (click)="openMapper()" title="Open Mapper (Ctrl+O)">
+      <mat-icon>folder_open</mat-icon>
+    </button>
+    <button mat-icon-button (click)="saveMapper()" title="Save (Ctrl+S)" [disabled]="!isDirty">
+      <mat-icon>save</mat-icon>
+    </button>
+    <button mat-icon-button (click)="saveAsMapper()" title="Save As (Ctrl+Shift+S)">
+      <mat-icon>save_as</mat-icon>
+    </button>
 
-<div class="mapper-builder-container">
-  <!-- Add the toolbar -->
-  <app-mapper-toolbar
-    [isDirty]="isDirty$ | async"
-    [isLoading]="isLoading$ | async"
-    [currentMapper]="currentMapper$ | async"
-    (newMapper)="onNewMapper()"
-    (loadMapper)="onLoadMapper()"
-    (saveMapper)="onSaveMapper()"
-    (exportMapper)="onExportMapper()"
-    (importMapper)="onImportMapper()">
-  </app-mapper-toolbar>
+    <mat-divider vertical></mat-divider>
 
-  <!-- Loading bar -->
-  <mat-progress-bar
-    *ngIf="isLoading$ | async"
-    mode="indeterminate"
-    class="loading-bar">
-  </mat-progress-bar>
-  <!-- Main Content Area with Tabs -->
-  <mat-sidenav-container class="main-container">
-    <!-- Left Sidebar - Mapper Tree -->
-    <mat-sidenav
-      mode="side"
-      opened
-      [style.width.px]="sidenavWidth"
-      class="mapper-tree-sidenav">
+    <button mat-icon-button (click)="undo()" title="Undo (Ctrl+Z)" [disabled]="!canUndo">
+      <mat-icon>undo</mat-icon>
+    </button>
+    <button mat-icon-button (click)="redo()" title="Redo (Ctrl+Y)" [disabled]="!canRedo">
+      <mat-icon>redo</mat-icon>
+    </button>
 
-      <div class="sidenav-header">
-        <h3>Mapper Hierarchy</h3>
-        <div class="header-actions">
-          <button mat-icon-button (click)="onAddTarget()" matTooltip="Add new target">
-            <mat-icon>add_circle</mat-icon>
-          </button>
-          <button mat-icon-button [matMenuTriggerFor]="viewMenu" matTooltip="View options">
-            <mat-icon>view_module</mat-icon>
+    <mat-divider vertical></mat-divider>
+
+    <button mat-icon-button (click)="validateMapper()" title="Validate (F5)">
+      <mat-icon>check_circle</mat-icon>
+    </button>
+    <button mat-icon-button (click)="togglePreview()" title="Preview (Ctrl+P)" [class.active]="showPreview">
+      <mat-icon>visibility</mat-icon>
+    </button>
+    <button mat-icon-button (click)="runMapper()" title="Run">
+      <mat-icon>play_arrow</mat-icon>
+    </button>
+
+    <mat-divider vertical></mat-divider>
+
+    <button mat-icon-button (click)="importMapper()" title="Import">
+      <mat-icon>upload</mat-icon>
+    </button>
+    <button mat-icon-button (click)="exportMapper()" title="Export">
+      <mat-icon>download</mat-icon>
+    </button>
+
+    <span class="spacer"></span>
+
+    <!-- Mapper Info -->
+    <div class="mapper-info" *ngIf="currentMapper">
+      <span class="mapper-name">{{ currentMapper.name }}</span>
+      <span class="mapper-version">v{{ currentMapper.version }}</span>
+      <mat-icon class="status-icon" [class.active]="currentMapper.active_ind">
+        {{ currentMapper.active_ind ? 'check_circle' : 'cancel' }}
+      </mat-icon>
+    </div>
+
+    <span class="spacer"></span>
+
+    <button mat-icon-button (click)="searchInMapper()" title="Search (Ctrl+F)">
+      <mat-icon>search</mat-icon>
+    </button>
+    <button mat-icon-button (click)="showHelp()" title="Help">
+      <mat-icon>help</mat-icon>
+    </button>
+    <button mat-icon-button (click)="showSettings()" title="Settings">
+      <mat-icon>settings</mat-icon>
+    </button>
+  </mat-toolbar>
+
+  <!-- Main Content Area -->
+  <mat-sidenav-container class="mapper-content">
+    <!-- Left Sidebar -->
+    <mat-sidenav mode="side" opened class="left-sidebar">
+      <mat-tab-group>
+        <mat-tab label="Structure">
+          <app-target-tree
+            [targets]="targets"
+            [selectedTargetId]="selectedTargetId"
+            (targetSelected)="selectTarget($event)"
+            (targetAdded)="addTarget($event)"
+            (targetDeleted)="deleteTarget($event)"
+            (targetMoved)="moveTarget($event)">
+          </app-target-tree>
+        </mat-tab>
+
+        <mat-tab label="Models">
+          <app-model-browser
+            [models]="availableModels"
+            (modelSelected)="addTargetFromModel($event)">
+          </app-model-browser>
+        </mat-tab>
+
+        <mat-tab label="Functions">
+          <app-function-browser
+            [transforms]="availableTransforms"
+            [filters]="availableFilters">
+          </app-function-browser>
+        </mat-tab>
+      </mat-tab-group>
+    </mat-sidenav>
+
+    <!-- Main Canvas -->
+    <mat-sidenav-content class="main-canvas">
+      <div class="canvas-container">
+        <app-target-details
+          *ngIf="selectedTarget"
+          [target]="selectedTarget"
+          [availableModels]="availableModels"
+          [availableLookups]="availableLookups"
+          [availableTransforms]="availableTransforms"
+          (targetUpdated)="updateTarget($event)"
+          (fieldRuleAdded)="addFieldRule($event)"
+          (fieldRuleUpdated)="updateFieldRule($event)"
+          (fieldRuleDeleted)="deleteFieldRule($event)">
+        </app-target-details>
+
+        <div *ngIf="!selectedTarget" class="no-selection">
+          <mat-icon>settings_input_component</mat-icon>
+          <h2>No Target Selected</h2>
+          <p>Select a target from the tree or add a new one to get started.</p>
+          <button mat-raised-button color="primary" (click)="addNewTarget()">
+            <mat-icon>add</mat-icon>
+            Add Target
           </button>
         </div>
       </div>
 
-      <mat-menu #viewMenu="matMenu">
-        <button mat-menu-item (click)="activeView = 'tree'">
-          <mat-icon>account_tree</mat-icon>
-          <span>Tree View</span>
-        </button>
-        <button mat-menu-item (click)="toggleVisualMapper()">
-          <mat-icon>drag_indicator</mat-icon>
-          <span>Visual Field Mapper</span>
-        </button>
-        <mat-divider></mat-divider>
-        <button mat-menu-item (click)="viewExecutionLogs()">
-          <mat-icon>history</mat-icon>
-          <span>Execution Logs</span>
-        </button>
-        <button mat-menu-item (click)="viewVersionHistory()">
-          <mat-icon>timeline</mat-icon>
-          <span>Version History</span>
-        </button>
-      </mat-menu>
-
-      <mat-divider></mat-divider>
-
-      <div class="tree-container" *ngIf="activeView === 'tree'">
-        <app-mapper-tree
-          [nodes]="targetHierarchy$ | async"
-          [selectedNodeId]="selectedTargetId$ | async"
-          (nodeSelected)="onNodeSelected($event)"
-          (nodeDropped)="onNodeDropped($event)"
-          (nodeDeleted)="onNodeDeleted($event)"
-          (nodeAdded)="onNodeAdded($event)">
-        </app-mapper-tree>
-      </div>
-    </mat-sidenav>
-
-    <!-- Main Canvas Area -->
-    <mat-sidenav-content class="canvas-container">
-      <mat-tab-group class="main-tabs" *ngIf="!showLogs && !showVersionHistory && !showVisualMapper && !showExerciseRunner">
-        <mat-tab label="Configuration">
-          <div class="canvas-wrapper">
-            <app-mapper-canvas
-              [selectedTarget]="selectedTarget$ | async"
-              [availableModels]="availableModels$ | async"
-              [availableLookups]="availableLookups$ | async"
-              [availableTransforms]="availableTransforms$ | async"
-              [availableFilters]="availableFilters$ | async"
-              [availableProcessors]="availableProcessors"
-              (targetUpdated)="onTargetUpdated($event)"
-              (fieldRuleAdded)="onFieldRuleAdded($event)"
-              (fieldRuleUpdated)="onFieldRuleUpdated($event)"
-              (fieldRuleDeleted)="onFieldRuleDeleted($event)">
-            </app-mapper-canvas>
-          </div>
-        </mat-tab>
-        <mat-tab label="Transform Functions">
-          <div class="tab-content">
-            <app-transform-function-manager></app-transform-function-manager>
-          </div>
-        </mat-tab>
-
-        <mat-tab label="Field Testing">
-          <div class="tab-content">
-            <app-field-rule-tester
-              [fieldRule]="getSelectedFieldRule()"
-              [caseData]="getTestCaseData()">
-            </app-field-rule-tester>
-          </div>
-        </mat-tab>
-      </mat-tab-group>
-      <!-- Exercise Runner View -->
-      <div class="exercise-runner-wrapper" *ngIf="showExerciseRunner">
-        <app-exercise-runner
-          (loadExercise)="onLoadExercise($event)"
-          (showGuide)="onShowExerciseGuide($event)">
-        </app-exercise-runner>
-      </div>
-      <!-- Visual Field Mapper View -->
-      <div class="visual-mapper-wrapper" *ngIf="showVisualMapper">
-        <app-visual-field-mapper
-          [targetModel]="(selectedTarget$ | async)?.model || ''"
-          [modelFields]="modelFields"
-          [jsonPathSuggestions]="jsonPathSuggestions"
-          [fieldRules]="(selectedTarget$ | async)?.field_rules || []"
-          [availableTransforms]="availableTransforms$ | async"
-          (ruleCreated)="onFieldRuleAdded($event)"
-          (ruleUpdated)="onFieldRuleUpdated($event)"
-          (ruleDeleted)="onFieldRuleDeleted($event)">
-        </app-visual-field-mapper>
-      </div>
-
-      <!-- Execution Logs View -->
-      <div class="logs-wrapper" *ngIf="showLogs">
-        <app-execution-logs
-          [mapperId]="(currentMapper$ | async)?.id"
-          [targetId]="selectedTargetId$ | async">
-        </app-execution-logs>
-      </div>
-
-      <!-- Version History View -->
-      <div class="version-history-wrapper" *ngIf="showVersionHistory">
-        <app-version-history
-          [mapper]="currentMapper$ | async"
-          (loadVersion)="onLoadVersion($event)"
-          (compareVersions)="onCompareVersions($event)">
-        </app-version-history>
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" *ngIf="isLoading">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>{{ loadingMessage }}</p>
       </div>
     </mat-sidenav-content>
 
-    <!-- Right Sidebar - Preview Panel -->
-    <mat-sidenav
-      mode="side"
-      position="end"
-      [opened]="showPreview"
-      [style.width.px]="previewWidth"
-      class="preview-sidenav">
+    <!-- Right Sidebar -->
+    <mat-sidenav mode="side" opened position="end" class="right-sidebar">
+      <mat-tab-group>
+        <mat-tab label="Properties">
+          <app-properties-editor
+            *ngIf="selectedTarget"
+            [target]="selectedTarget"
+            (propertyChanged)="updateTargetProperty($event)">
+          </app-properties-editor>
+        </mat-tab>
 
-      <div class="sidenav-header">
-        <h3>Preview</h3>
-        <button mat-icon-button (click)="togglePreview()" matTooltip="Close preview">
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
+        <mat-tab label="Preview" [disabled]="!showPreview">
+          <app-preview
+            *ngIf="showPreview && selectedTarget"
+            [target]="selectedTarget"
+            [previewResult]="previewResult"
+            (runPreview)="runPreview($event)">
+          </app-preview>
+        </mat-tab>
 
-      <mat-divider></mat-divider>
-
-      <app-preview-panel
-        [previewResult]="previewResult$ | async"
-        [selectedTarget]="selectedTarget$ | async"
-        (runPreviewEvent)="onRunPreview($event)">
-      </app-preview-panel>
+        <mat-tab label="Logs">
+          <div class="logs-panel">
+            <h3>Execution Logs</h3>
+            <p>View execution history and debug information here.</p>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
     </mat-sidenav>
   </mat-sidenav-container>
 
-  <!-- Floating Action Buttons -->
-  <div class="fab-container">
-    <button
-      mat-fab
-      color="warn"
-      (click)="toggleExerciseRunner()"
-      matTooltip="Practice Exercises"
-      matTooltipPosition="left"
-      class="exercise-fab">
-      <mat-icon>school</mat-icon>
-    </button>
-    <button
-      mat-fab
-      color="accent"
-      (click)="openBatchOperations()"
-      matTooltip="Batch Operations"
-      matTooltipPosition="left">
-      <mat-icon>layers</mat-icon>
-    </button>
-    <button
-      mat-fab
-      color="accent"
-      (click)="togglePreview()"
-      matTooltip="Toggle preview panel"
-      matTooltipPosition="left">
-      <mat-icon>{{ showPreview ? 'visibility_off' : 'visibility' }}</mat-icon>
-    </button>
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span *ngIf="currentMapper">{{ currentMapper.case_type }}</span>
+      <span *ngIf="targets.length > 0">{{ targets.length }} targets</span>
+      <span *ngIf="getTotalFieldRules() > 0">{{ getTotalFieldRules() }} rules</span>
+    </div>
 
-    <button
-      mat-fab
-      color="primary"
-      (click)="onValidateAndSave()"
-      matTooltip="Validate & Save"
-      matTooltipPosition="left"
-      [disabled]="!(isDirty$ | async) || (isLoading$ | async)">
-      <mat-icon>save</mat-icon>
-    </button>
+    <div class="status-center">
+      <span *ngIf="lastSaved">Last saved: {{ lastSaved | date:'short' }}</span>
+      <span *ngIf="isDirty" class="unsaved-indicator">
+            <mat-icon>edit</mat-icon>
+            Unsaved changes
+          </span>
+    </div>
 
-    <button
-      mat-mini-fab
-      (click)="showKeyboardShortcuts()"
-      matTooltip="Keyboard shortcuts (Shift + ?)"
-      matTooltipPosition="left"
-      class="help-fab">
-      <mat-icon>keyboard</mat-icon>
-    </button>
+    <div class="status-right">
+          <span *ngIf="validationErrors.length > 0" class="validation-status error">
+            <mat-icon>error</mat-icon>
+            {{ validationErrors.length }} errors
+          </span>
+      <span *ngIf="validationErrors.length === 0 && currentMapper" class="validation-status success">
+            <mat-icon>check_circle</mat-icon>
+            Valid
+          </span>
+    </div>
   </div>
 </div>

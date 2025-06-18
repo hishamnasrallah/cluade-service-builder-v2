@@ -1,0 +1,225 @@
+
+<div class="function-browser">
+  <!-- Search -->
+  <div class="browser-header">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search functions</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchTerm" (input)="filterFunctions()" placeholder="Type to search...">
+      <button mat-icon-button matSuffix *ngIf="searchTerm" (click)="clearSearch()">
+        <mat-icon>clear</mat-icon>
+      </button>
+    </mat-form-field>
+  </div>
+
+  <!-- Function Tabs -->
+  <mat-tab-group animationDuration="200ms" class="function-tabs">
+    <!-- Transform Functions Tab -->
+    <mat-tab label="Transforms">
+      <div class="tab-content">
+        <div class="function-groups">
+          <mat-expansion-panel *ngFor="let group of filteredTransformGroups"
+                               [expanded]="group.expanded || hasSearchTerm()">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <mat-icon>functions</mat-icon>
+                {{ group.name }}
+                <mat-chip class="function-count">{{ group.functions.length }}</mat-chip>
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+
+            <div class="function-list">
+              <mat-card *ngFor="let func of group.functions"
+                        class="function-card"
+                        [attr.data-function-path]="func.path">
+
+                <mat-card-header>
+                  <mat-card-title>
+                    <mat-icon class="function-icon">transform</mat-icon>
+                    {{ func.label }}
+                  </mat-card-title>
+                  <mat-card-subtitle>
+                    <code>{{ func.path }}</code>
+                  </mat-card-subtitle>
+                </mat-card-header>
+
+                <mat-card-content>
+                  <p class="function-description">{{ func.description }}</p>
+
+                  <div *ngIf="func.parameters && func.parameters.length > 0" class="parameters">
+                    <h4>Parameters:</h4>
+                    <div *ngFor="let param of func.parameters" class="parameter-item">
+                      <span class="param-name">{{ param.name }}</span>
+                      <span class="param-type">{{ param.type }}</span>
+                      <mat-icon *ngIf="param.required" class="required-icon" matTooltip="Required">
+                        star
+                      </mat-icon>
+                      <span *ngIf="param.default !== undefined" class="param-default">
+                            = {{ param.default }}
+                          </span>
+                    </div>
+                  </div>
+
+                  <div *ngIf="func.example" class="example">
+                    <h4>Example:</h4>
+                    <code class="example-code">{{ func.example }}</code>
+                  </div>
+                </mat-card-content>
+
+                <mat-card-actions>
+                  <button mat-button (click)="copyFunctionPath(func)" matTooltip="Copy function path">
+                    <mat-icon>content_copy</mat-icon>
+                    Copy Path
+                  </button>
+                  <button mat-button (click)="viewFunctionDetails(func)" matTooltip="View details">
+                    <mat-icon>info</mat-icon>
+                    Details
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
+          </mat-expansion-panel>
+
+          <!-- No Results -->
+          <div class="no-results" *ngIf="filteredTransformGroups.length === 0 && searchTerm">
+            <mat-icon>search_off</mat-icon>
+            <p>No transform functions match "{{ searchTerm }}"</p>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Filter Functions Tab -->
+    <mat-tab label="Filters">
+      <div class="tab-content">
+        <div class="function-list">
+          <mat-card *ngFor="let func of filteredFilters"
+                    class="function-card"
+                    [attr.data-function-path]="func.path">
+
+            <mat-card-header>
+              <mat-card-title>
+                <mat-icon class="function-icon">filter_alt</mat-icon>
+                {{ func.label }}
+              </mat-card-title>
+              <mat-card-subtitle>
+                <code>{{ func.path }}</code>
+              </mat-card-subtitle>
+            </mat-card-header>
+
+            <mat-card-content>
+              <p class="function-description">{{ func.description }}</p>
+
+              <div *ngIf="func.example" class="example">
+                <h4>Example:</h4>
+                <code class="example-code">{{ func.example }}</code>
+              </div>
+            </mat-card-content>
+
+            <mat-card-actions>
+              <button mat-button (click)="copyFunctionPath(func)" matTooltip="Copy function path">
+                <mat-icon>content_copy</mat-icon>
+                Copy Path
+              </button>
+            </mat-card-actions>
+          </mat-card>
+
+          <!-- No Results -->
+          <div class="no-results" *ngIf="filteredFilters.length === 0 && searchTerm">
+            <mat-icon>search_off</mat-icon>
+            <p>No filter functions match "{{ searchTerm }}"</p>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Processor Functions Tab -->
+    <mat-tab label="Processors">
+      <div class="tab-content">
+        <div class="processor-sections">
+          <!-- Finder Functions -->
+          <div class="processor-section">
+            <h3>
+              <mat-icon>search</mat-icon>
+              Finder Functions
+            </h3>
+            <p class="section-description">
+              Functions to find existing records before creating new ones
+            </p>
+            <div class="function-list">
+              <mat-card *ngFor="let func of getProcessorsByType('finder')"
+                        class="function-card">
+                <mat-card-header>
+                  <mat-card-title>{{ func.label }}</mat-card-title>
+                  <mat-card-subtitle><code>{{ func.path }}</code></mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <p>{{ func.description }}</p>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <!-- Processor Functions -->
+          <div class="processor-section">
+            <h3>
+              <mat-icon>settings</mat-icon>
+              Processor Functions
+            </h3>
+            <p class="section-description">
+              Functions to process data before mapping
+            </p>
+            <div class="function-list">
+              <mat-card *ngFor="let func of getProcessorsByType('processor')"
+                        class="function-card">
+                <mat-card-header>
+                  <mat-card-title>{{ func.label }}</mat-card-title>
+                  <mat-card-subtitle><code>{{ func.path }}</code></mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <p>{{ func.description }}</p>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <!-- Post-Processor Functions -->
+          <div class="processor-section">
+            <h3>
+              <mat-icon>done_all</mat-icon>
+              Post-Processor Functions
+            </h3>
+            <p class="section-description">
+              Functions to run after mapping is complete
+            </p>
+            <div class="function-list">
+              <mat-card *ngFor="let func of getProcessorsByType('post_processor')"
+                        class="function-card">
+                <mat-card-header>
+                  <mat-card-title>{{ func.label }}</mat-card-title>
+                  <mat-card-subtitle><code>{{ func.path }}</code></mat-card-subtitle>
+                </mat-card-header>
+                <mat-card-content>
+                  <p>{{ func.description }}</p>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+
+  <!-- Footer -->
+  <div class="browser-footer">
+    <div class="footer-stats">
+      <span>{{ transforms.length }} transforms</span>
+      <span>{{ filters.length }} filters</span>
+      <span>{{ processors.length }} processors</span>
+    </div>
+  </div>
+</div>

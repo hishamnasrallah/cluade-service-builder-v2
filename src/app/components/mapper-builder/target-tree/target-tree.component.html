@@ -1,0 +1,246 @@
+<div class="target-tree">
+  <!-- Tree Header -->
+  <div class="tree-header">
+    <div class="header-content">
+      <h3>Target Structure</h3>
+      <div class="header-actions">
+        <button mat-icon-button (click)="expandAll()" matTooltip="Expand All">
+          <mat-icon>unfold_more</mat-icon>
+        </button>
+        <button mat-icon-button (click)="collapseAll()" matTooltip="Collapse All">
+          <mat-icon>unfold_less</mat-icon>
+        </button>
+        <button mat-icon-button (click)="addRootTarget()" matTooltip="Add Root Target" color="primary">
+          <mat-icon>add</mat-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Box -->
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search targets</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchTerm" (input)="filterTree()" placeholder="Type to search...">
+      <button mat-icon-button matSuffix *ngIf="searchTerm" (click)="clearSearch()">
+        <mat-icon>clear</mat-icon>
+      </button>
+    </mat-form-field>
+  </div>
+
+  <!-- Tree Content -->
+  <div class="tree-content" cdkDropList (cdkDropListDropped)="drop($event)">
+    <mat-tree [dataSource]="dataSource" [treeControl]="treeControl" class="mapper-tree">
+      <!-- Tree node template -->
+      <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding
+                     [class.selected]="node.id === selectedTargetId"
+                     [class.inactive]="!node.active"
+                     [class.has-errors]="node.hasErrors"
+                     cdkDrag
+                     [cdkDragData]="node"
+                     (click)="selectTarget(node)">
+
+        <div class="tree-node-content">
+          <!-- Node Icon & Name -->
+          <div class="node-info">
+            <mat-icon class="node-icon" [class.root]="!node.data.parent_target">
+              {{ getTargetIcon(node) }}
+            </mat-icon>
+
+            <span class="node-name" [class.searching]="isSearching && !nodeMatchesSearch(node)">
+                  {{ node.name }}
+                </span>
+
+            <span class="node-model">{{ node.model }}</span>
+
+            <!-- Status Indicators -->
+            <div class="node-indicators">
+              <mat-icon *ngIf="node.rootPath" class="indicator array" matTooltip="Array Processing">
+                all_inclusive
+              </mat-icon>
+              <mat-icon *ngIf="!node.active" class="indicator inactive" matTooltip="Inactive">
+                block
+              </mat-icon>
+              <mat-icon *ngIf="node.hasErrors" class="indicator error" matTooltip="Has validation errors">
+                error
+              </mat-icon>
+              <span *ngIf="node.fieldRuleCount" class="rule-count" matTooltip="{{ node.fieldRuleCount }} field rules">
+                    {{ node.fieldRuleCount }}
+                  </span>
+            </div>
+          </div>
+
+          <!-- Node Actions -->
+          <div class="node-actions">
+            <button mat-icon-button [matMenuTriggerFor]="nodeMenu" (click)="$event.stopPropagation()">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <!-- Context Menu -->
+        <mat-menu #nodeMenu="matMenu">
+          <button mat-menu-item (click)="addChildTarget(node)">
+            <mat-icon>add</mat-icon>
+            <span>Add Child Target</span>
+          </button>
+          <button mat-menu-item (click)="duplicateTarget(node)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Duplicate</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="editTarget(node)">
+            <mat-icon>edit</mat-icon>
+            <span>Edit Properties</span>
+          </button>
+          <button mat-menu-item (click)="toggleActive(node)">
+            <mat-icon>{{ node.active ? 'block' : 'check_circle' }}</mat-icon>
+            <span>{{ node.active ? 'Disable' : 'Enable' }}</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="moveUp(node)" [disabled]="!canMoveUp(node)">
+            <mat-icon>arrow_upward</mat-icon>
+            <span>Move Up</span>
+          </button>
+          <button mat-menu-item (click)="moveDown(node)" [disabled]="!canMoveDown(node)">
+            <mat-icon>arrow_downward</mat-icon>
+            <span>Move Down</span>
+          </button>
+          <mat-divider></mat-divider>
+          <button mat-menu-item (click)="deleteTarget(node)" class="delete-action">
+            <mat-icon>delete</mat-icon>
+            <span>Delete</span>
+          </button>
+        </mat-menu>
+      </mat-tree-node>
+
+      <!-- Tree node with children -->
+      <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild">
+        <div class="mat-tree-node">
+          <button mat-icon-button matTreeNodeToggle
+                  [attr.aria-label]="'Toggle ' + node.name"
+                  class="toggle-button">
+            <mat-icon class="mat-icon-rtl-mirror">
+              {{ treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right' }}
+            </mat-icon>
+          </button>
+
+          <div class="tree-node-content"
+               [class.selected]="node.id === selectedTargetId"
+               [class.inactive]="!node.active"
+               [class.has-errors]="node.hasErrors"
+               cdkDrag
+               [cdkDragData]="node"
+               (click)="selectTarget(node)">
+
+            <!-- Node Icon & Name -->
+            <div class="node-info">
+              <mat-icon class="node-icon" [class.root]="!node.data.parent_target">
+                {{ getTargetIcon(node) }}
+              </mat-icon>
+
+              <span class="node-name" [class.searching]="isSearching && !nodeMatchesSearch(node)">
+                    {{ node.name }}
+                  </span>
+
+              <span class="node-model">{{ node.model }}</span>
+
+              <!-- Status Indicators -->
+              <div class="node-indicators">
+                <mat-icon *ngIf="node.rootPath" class="indicator array" matTooltip="Array Processing">
+                  all_inclusive
+                </mat-icon>
+                <mat-icon *ngIf="!node.active" class="indicator inactive" matTooltip="Inactive">
+                  block
+                </mat-icon>
+                <mat-icon *ngIf="node.hasErrors" class="indicator error" matTooltip="Has validation errors">
+                  error
+                </mat-icon>
+                <span *ngIf="node.fieldRuleCount" class="rule-count" matTooltip="{{ node.fieldRuleCount }} field rules">
+                      {{ node.fieldRuleCount }}
+                    </span>
+              </div>
+            </div>
+
+            <!-- Node Actions -->
+            <div class="node-actions">
+              <button mat-icon-button [matMenuTriggerFor]="nodeMenu" (click)="$event.stopPropagation()">
+                <mat-icon>more_vert</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Context Menu (same as above) -->
+          <mat-menu #nodeMenu="matMenu">
+            <button mat-menu-item (click)="addChildTarget(node)">
+              <mat-icon>add</mat-icon>
+              <span>Add Child Target</span>
+            </button>
+            <button mat-menu-item (click)="duplicateTarget(node)">
+              <mat-icon>content_copy</mat-icon>
+              <span>Duplicate</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="editTarget(node)">
+              <mat-icon>edit</mat-icon>
+              <span>Edit Properties</span>
+            </button>
+            <button mat-menu-item (click)="toggleActive(node)">
+              <mat-icon>{{ node.active ? 'block' : 'check_circle' }}</mat-icon>
+              <span>{{ node.active ? 'Disable' : 'Enable' }}</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="moveUp(node)" [disabled]="!canMoveUp(node)">
+              <mat-icon>arrow_upward</mat-icon>
+              <span>Move Up</span>
+            </button>
+            <button mat-menu-item (click)="moveDown(node)" [disabled]="!canMoveDown(node)">
+              <mat-icon>arrow_downward</mat-icon>
+              <span>Move Down</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="deleteTarget(node)" class="delete-action">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </mat-menu>
+        </div>
+
+        <!-- Children -->
+        <div [class.tree-invisible]="!treeControl.isExpanded(node)"
+             role="group"
+             cdkDropList
+             [cdkDropListData]="node.children"
+             (cdkDropListDropped)="drop($event)">
+          <ng-container matTreeNodeOutlet></ng-container>
+        </div>
+      </mat-nested-tree-node>
+    </mat-tree>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="treeNodes.length === 0">
+      <mat-icon>folder_open</mat-icon>
+      <p>No targets defined</p>
+      <button mat-raised-button color="primary" (click)="addRootTarget()">
+        <mat-icon>add</mat-icon>
+        Add First Target
+      </button>
+    </div>
+
+    <!-- No Results -->
+    <div class="no-results" *ngIf="treeNodes.length > 0 && isSearching && !hasSearchResults">
+      <mat-icon>search_off</mat-icon>
+      <p>No targets match "{{ searchTerm }}"</p>
+      <button mat-button (click)="clearSearch()">Clear Search</button>
+    </div>
+  </div>
+
+  <!-- Tree Footer -->
+  <div class="tree-footer">
+    <div class="tree-stats">
+      <span>{{ treeNodes.length }} targets</span>
+      <span *ngIf="getActiveCount() < treeNodes.length" class="warning">
+            {{ getInactiveCount() }} inactive
+          </span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,147 @@
+<div class="properties-editor">
+  <!-- Header -->
+  <div class="editor-header">
+    <h3>Properties</h3>
+    <button mat-icon-button (click)="refreshProperties()" matTooltip="Refresh">
+      <mat-icon>refresh</mat-icon>
+    </button>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Property Groups -->
+  <div class="property-groups">
+    <mat-expansion-panel *ngFor="let group of propertyGroups"
+                         [expanded]="group.expanded"
+                         (expandedChange)="group.expanded = $event">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <mat-icon>{{ group.icon }}</mat-icon>
+          {{ group.name }}
+        </mat-panel-title>
+        <mat-panel-description>
+          {{ group.properties.length }} properties
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="property-list">
+        <div *ngFor="let prop of group.properties" class="property-item">
+          <!-- Property Label -->
+          <div class="property-label">
+            <span>{{ prop.label }}</span>
+            <mat-icon *ngIf="prop.hint"
+                      class="help-icon"
+                      [matTooltip]="prop.hint">
+              help_outline
+            </mat-icon>
+          </div>
+
+          <!-- Property Value -->
+          <div class="property-value">
+            <!-- Text Input -->
+            <mat-form-field *ngIf="prop.type === 'text'" appearance="outline">
+              <input matInput
+                     [(ngModel)]="prop.value"
+                     (ngModelChange)="onPropertyChange(prop)"
+                     [readonly]="prop.readonly">
+            </mat-form-field>
+
+            <!-- Number Input -->
+            <mat-form-field *ngIf="prop.type === 'number'" appearance="outline">
+              <input matInput
+                     type="number"
+                     [(ngModel)]="prop.value"
+                     (ngModelChange)="onPropertyChange(prop)">
+            </mat-form-field>
+
+            <!-- Boolean (shown as chip) -->
+            <mat-chip-listbox *ngIf="prop.type === 'boolean'"
+                              [value]="prop.value"
+                              (change)="onBooleanChange(prop, $event)">
+              <mat-chip-option [value]="true" color="primary">True</mat-chip-option>
+              <mat-chip-option [value]="false">False</mat-chip-option>
+            </mat-chip-listbox>
+
+            <!-- Select -->
+            <mat-form-field *ngIf="prop.type === 'select'" appearance="outline">
+              <mat-select [(ngModel)]="prop.value" (ngModelChange)="onPropertyChange(prop)">
+                <mat-option *ngFor="let option of prop.options" [value]="option.value">
+                  {{ option.label }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <!-- Readonly -->
+            <div *ngIf="prop.type === 'readonly'" class="readonly-value">
+              <code>{{ prop.value }}</code>
+              <button mat-icon-button
+                      (click)="copyValue(prop.value)"
+                      matTooltip="Copy">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </mat-expansion-panel>
+
+    <!-- No Properties -->
+    <div class="no-properties" *ngIf="propertyGroups.length === 0">
+      <mat-icon>tune</mat-icon>
+      <p>No properties available</p>
+    </div>
+  </div>
+
+  <!-- Advanced Properties -->
+  <div class="advanced-section">
+    <button mat-button (click)="toggleAdvanced()" class="advanced-toggle">
+      <mat-icon>{{ showAdvanced ? 'expand_less' : 'expand_more' }}</mat-icon>
+      Advanced Properties
+    </button>
+
+    <div class="advanced-properties" *ngIf="showAdvanced">
+      <div class="property-item">
+        <div class="property-label">Created At</div>
+        <div class="property-value readonly-value">
+          {{ target.created_at ? (target.created_at | date:'short') : 'N/A' }}
+        </div>
+      </div>
+
+      <div class="property-item">
+        <div class="property-label">Updated At</div>
+        <div class="property-value readonly-value">
+          {{ target.updated_at ? (target.updated_at | date:'short') : 'N/A' }}
+        </div>
+      </div>
+
+      <div class="property-item">
+        <div class="property-label">Content Type ID</div>
+        <div class="property-value readonly-value">
+          {{ target.content_type || 'Auto-resolved' }}
+        </div>
+      </div>
+
+      <div class="property-item">
+        <div class="property-label">Field Rules Count</div>
+        <div class="property-value readonly-value">
+          {{ target.field_rules?.length || 0 }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="editor-actions">
+    <button mat-button (click)="resetProperties()">
+      <mat-icon>refresh</mat-icon>
+      Reset
+    </button>
+    <button mat-raised-button
+            color="primary"
+            (click)="applyChanges()"
+            [disabled]="!hasChanges">
+      <mat-icon>check</mat-icon>
+      Apply
+    </button>
+  </div>
+</div>

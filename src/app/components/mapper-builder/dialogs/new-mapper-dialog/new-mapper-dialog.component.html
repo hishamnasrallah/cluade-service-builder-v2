@@ -1,0 +1,56 @@
+<h2 mat-dialog-title>
+  <mat-icon>add_circle</mat-icon>
+  New Case Mapper
+</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="mapperForm">
+    <mat-form-field appearance="outline">
+      <mat-label>Mapper Name</mat-label>
+      <input matInput formControlName="name" placeholder="Enter mapper name" required>
+      <mat-error *ngIf="mapperForm.get('name')?.hasError('required')">
+        Name is required
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Case Type</mat-label>
+      <mat-select formControlName="caseType" required>
+        <mat-option *ngFor="let type of caseTypes" [value]="type">
+          {{ type }}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="mapperForm.get('caseType')?.hasError('required')">
+        Case type is required
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Description</mat-label>
+      <textarea matInput formControlName="description" rows="3"
+                placeholder="Optional description"></textarea>
+    </mat-form-field>
+
+    <mat-checkbox formControlName="createFromTemplate" color="primary">
+      Create from template
+    </mat-checkbox>
+
+    <mat-form-field appearance="outline" *ngIf="mapperForm.get('createFromTemplate')?.value">
+      <mat-label>Template</mat-label>
+      <mat-select formControlName="template">
+        <mat-option value="basic">Basic User Mapping</mat-option>
+        <mat-option value="employee">Employee Onboarding</mat-option>
+        <mat-option value="nested">Nested Data Example</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onCreate()" [disabled]="!mapperForm.valid || isLoading">
+    <mat-spinner diameter="20" *ngIf="isLoading"></mat-spinner>
+    <mat-icon *ngIf="!isLoading">add</mat-icon>
+    Create Mapper
+  </button>
+</mat-dialog-actions>

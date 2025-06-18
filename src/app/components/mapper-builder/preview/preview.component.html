@@ -1,0 +1,226 @@
+<div class="preview-panel">
+  <!-- Header -->
+  <div class="preview-header">
+    <h3>Dry Run Preview</h3>
+    <mat-chip-listbox *ngIf="previewResult?.summary">
+      <mat-chip color="primary">
+        {{ previewResult.summary.record_count }} records
+      </mat-chip>
+      <mat-chip>
+        {{ previewResult.summary.execution_time_ms }}ms
+      </mat-chip>
+    </mat-chip-listbox>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Test Case Selection -->
+  <div class="test-case-section">
+    <mat-form-field appearance="outline" class="case-selector">
+      <mat-label>Test Case</mat-label>
+      <mat-select [(ngModel)]="selectedCaseId" (selectionChange)="onCaseChange()">
+        <mat-option *ngFor="let testCase of testCases" [value]="testCase.id">
+          {{ testCase.name }}
+          <span class="case-date">{{ testCase.created_at | date:'short' }}</span>
+        </mat-option>
+        <mat-option [value]="null">
+          <em>Custom Case ID...</em>
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field *ngIf="selectedCaseId === null" appearance="outline" class="case-input">
+      <mat-label>Case ID</mat-label>
+      <input matInput
+             type="number"
+             [(ngModel)]="customCaseId"
+             placeholder="Enter case ID">
+    </mat-form-field>
+
+    <button mat-raised-button
+            color="primary"
+            (click)="runPreview()"
+            [disabled]="!canRunPreview() || isRunning">
+      <mat-icon>{{ isRunning ? 'hourglass_empty' : 'play_arrow' }}</mat-icon>
+      {{ isRunning ? 'Running...' : 'Run Preview' }}
+    </button>
+  </div>
+
+  <!-- Preview Results -->
+  <div class="preview-content" *ngIf="previewResult && !isRunning">
+    <mat-tab-group animationDuration="200ms">
+      <!-- Summary Tab -->
+      <mat-tab label="Summary">
+        <div class="tab-content">
+          <div class="summary-card">
+            <div class="summary-header">
+              <mat-icon [class]="getActionClass(previewResult.action)">
+                {{ getActionIcon(previewResult.action) }}
+              </mat-icon>
+              <h4>{{ previewResult.target }}</h4>
+              <mat-chip [color]="getActionColor(previewResult.action)">
+                {{ previewResult.action }}
+              </mat-chip>
+            </div>
+
+            <div class="summary-stats" *ngIf="previewResult.summary">
+              <div class="stat-item">
+                <span class="stat-label">Target</span>
+                <span class="stat-value">{{ previewResult.summary.target_name }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Records</span>
+                <span class="stat-value">{{ previewResult.summary.record_count }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Fields Mapped</span>
+                <span class="stat-value">{{ previewResult.summary.mapped_fields_count }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Child Targets</span>
+                <span class="stat-value">{{ previewResult.summary.child_targets_count }}</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-label">Execution Time</span>
+                <span class="stat-value">{{ previewResult.summary.execution_time_ms }}ms</span>
+              </div>
+            </div>
+
+            <div class="error-message" *ngIf="previewResult.error">
+              <mat-icon>error</mat-icon>
+              <span>{{ previewResult.error }}</span>
+            </div>
+          </div>
+
+          <!-- Child Targets -->
+          <div class="child-targets" *ngIf="previewResult.children && previewResult.children.length > 0">
+            <h4>Child Targets</h4>
+            <mat-expansion-panel *ngFor="let child of previewResult.children">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>{{ getActionIcon(child.action) }}</mat-icon>
+                  {{ child.target }}
+                </mat-panel-title>
+                <mat-panel-description>
+                  {{ child.action }} -
+                  {{ child.preview_list ? child.preview_list.length : 1 }} record(s)
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <div class="child-preview">
+                <pre>{{ formatPreview(child) }}</pre>
+              </div>
+            </mat-expansion-panel>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Field Mappings Tab -->
+      <mat-tab label="Field Mappings" [disabled]="!previewResult.field_mappings">
+        <div class="tab-content">
+          <table mat-table [dataSource]="previewResult.field_mappings || []" class="mappings-table">
+            <!-- Source Path Column -->
+            <ng-container matColumnDef="source_path">
+              <th mat-header-cell *matHeaderCellDef>Source Path</th>
+              <td mat-cell *matCellDef="let mapping">
+                <code>{{ mapping.source_path }}</code>
+              </td>
+            </ng-container>
+
+            <!-- Target Field Column -->
+            <ng-container matColumnDef="target_field">
+              <th mat-header-cell *matHeaderCellDef>Target Field</th>
+              <td mat-cell *matCellDef="let mapping">
+                <code>{{ mapping.target_field }}</code>
+              </td>
+            </ng-container>
+
+            <!-- Source Value Column -->
+            <ng-container matColumnDef="source_value">
+              <th mat-header-cell *matHeaderCellDef>Source Value</th>
+              <td mat-cell *matCellDef="let mapping">
+                <span class="value-preview">{{ formatValue(mapping.source_value) }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Mapped Value Column -->
+            <ng-container matColumnDef="mapped_value">
+              <th mat-header-cell *matHeaderCellDef>Mapped Value</th>
+              <td mat-cell *matCellDef="let mapping">
+                <span class="value-preview">{{ formatValue(mapping.mapped_value) }}</span>
+              </td>
+            </ng-container>
+
+            <!-- Transform Column -->
+            <ng-container matColumnDef="transform">
+              <th mat-header-cell *matHeaderCellDef>Transform</th>
+              <td mat-cell *matCellDef="let mapping">
+                <mat-chip *ngIf="mapping.transform_applied">
+                  {{ mapping.transform_applied }}
+                </mat-chip>
+                <span *ngIf="!mapping.transform_applied" class="no-transform">-</span>
+              </td>
+            </ng-container>
+
+            <!-- Condition Column -->
+            <ng-container matColumnDef="condition">
+              <th mat-header-cell *matHeaderCellDef>Condition</th>
+              <td mat-cell *matCellDef="let mapping">
+                <mat-icon *ngIf="mapping.condition_matched !== undefined"
+                          [class]="mapping.condition_matched ? 'success' : 'failed'"
+                          [matTooltip]="mapping.condition_matched ? 'Condition matched' : 'Condition not matched'">
+                  {{ mapping.condition_matched ? 'check_circle' : 'cancel' }}
+                </mat-icon>
+                <span *ngIf="mapping.condition_matched === undefined" class="no-condition">-</span>
+              </td>
+            </ng-container>
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+          </table>
+        </div>
+      </mat-tab>
+
+      <!-- Raw Data Tab -->
+      <mat-tab label="Raw Data">
+        <div class="tab-content">
+          <div class="raw-data-section">
+            <h4>Preview Fields</h4>
+            <pre class="json-preview">{{ formatJson(previewResult.preview_fields) }}</pre>
+          </div>
+
+          <div class="raw-data-section" *ngIf="previewResult.preview_list">
+            <h4>Preview List ({{ previewResult.preview_list.length }} items)</h4>
+            <mat-expansion-panel *ngFor="let item of previewResult.preview_list; let i = index">
+              <mat-expansion-panel-header>
+                <mat-panel-title>Item {{ i + 1 }}</mat-panel-title>
+              </mat-expansion-panel-header>
+              <pre class="json-preview">{{ formatJson(item) }}</pre>
+            </mat-expansion-panel>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isRunning">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Running dry run preview...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!previewResult && !isRunning">
+    <mat-icon>visibility</mat-icon>
+    <h3>No Preview Available</h3>
+    <p>Select a test case and run preview to see the mapping results.</p>
+  </div>
+
+  <!-- Error State -->
+  <div class="error-state" *ngIf="error">
+    <mat-icon>error_outline</mat-icon>
+    <h3>Preview Failed</h3>
+    <p>{{ error }}</p>
+    <button mat-button (click)="clearError()">Clear</button>
+  </div>
+</div>

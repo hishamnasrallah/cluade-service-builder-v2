@@ -1,0 +1,319 @@
+<h2 mat-dialog-title>
+  <mat-icon>{{ data.rule ? 'edit' : 'add' }}</mat-icon>
+  {{ data.rule ? 'Edit' : 'Create' }} Field Rule
+</h2>
+
+<mat-dialog-content class="dialog-content">
+  <form [formGroup]="ruleForm">
+    <mat-tab-group animationDuration="200ms">
+      <!-- Basic Tab -->
+      <mat-tab label="Basic">
+        <div class="tab-content">
+          <div class="form-section">
+            <h3>Field Mapping</h3>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Target Field</mat-label>
+              <input matInput
+                     formControlName="target_field"
+                     [matAutocomplete]="targetFieldAuto"
+                     placeholder="e.g., username"
+                     required>
+              <mat-autocomplete #targetFieldAuto="matAutocomplete">
+                <mat-option *ngFor="let field of filteredTargetFields | async"
+                            [value]="field.name">
+                      <span class="field-option">
+                        <strong>{{ field.name }}</strong>
+                        <span class="field-type">{{ field.type }}</span>
+                      </span>
+                </mat-option>
+              </mat-autocomplete>
+              <mat-error *ngIf="ruleForm.get('target_field')?.hasError('required')">
+                Target field is required
+              </mat-error>
+              <mat-hint>Field in the target Django model</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>JSON Path</mat-label>
+              <input matInput
+                     formControlName="json_path"
+                     placeholder="e.g., user.profile.username"
+                     required>
+              <button mat-icon-button matSuffix
+                      (click)="testJsonPath()"
+                      matTooltip="Test path">
+                <mat-icon>play_arrow</mat-icon>
+              </button>
+              <mat-error *ngIf="ruleForm.get('json_path')?.hasError('required')">
+                JSON path is required
+              </mat-error>
+              <mat-hint>Path to data in source JSON (dot notation)</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Default Value</mat-label>
+              <input matInput
+                     formControlName="default_value"
+                     placeholder="Value to use if path is empty or condition fails">
+              <mat-hint>Optional: Used when no data found or condition fails</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <div class="form-section">
+            <h3>Common JSONPath Examples</h3>
+            <div class="path-examples">
+              <mat-chip-listbox (change)="applyPathExample($event.value)">
+                <mat-chip-option value="field_name">Simple field</mat-chip-option>
+                <mat-chip-option value="parent.child">Nested field</mat-chip-option>
+                <mat-chip-option value="items.0.name">Array index</mat-chip-option>
+                <mat-chip-option value="items.*.name">All array items</mat-chip-option>
+              </mat-chip-listbox>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Transform Tab -->
+      <mat-tab label="Transform">
+        <div class="tab-content">
+          <div class="form-section">
+            <h3>Data Transformation</h3>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Transform Function</mat-label>
+              <mat-select formControlName="transform_function_path">
+                <mat-option value="">No transformation</mat-option>
+                <mat-optgroup *ngFor="let group of transformGroups" [label]="group.name">
+                  <mat-option *ngFor="let transform of group.transforms"
+                              [value]="transform.path">
+                        <span class="transform-option">
+                          <mat-icon>transform</mat-icon>
+                          {{ transform.label }}
+                        </span>
+                  </mat-option>
+                </mat-optgroup>
+              </mat-select>
+              <mat-hint>Optional: Function to transform the data</mat-hint>
+            </mat-form-field>
+
+            <div class="transform-preview" *ngIf="selectedTransform">
+              <h4>{{ selectedTransform.label }}</h4>
+              <p>{{ selectedTransform.description }}</p>
+
+              <div *ngIf="selectedTransform.parameters && selectedTransform.parameters.length > 0"
+                   class="parameters">
+                <h5>Parameters:</h5>
+                <div *ngFor="let param of selectedTransform.parameters" class="parameter">
+                  <span class="param-name">{{ param.name }}</span>
+                  <span class="param-type">({{ param.type }})</span>
+                  <mat-icon *ngIf="param.required" class="required-icon">star</mat-icon>
+                </div>
+              </div>
+
+              <div *ngIf="selectedTransform.example" class="example">
+                <h5>Example:</h5>
+                <code>{{ selectedTransform.example }}</code>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>Lookup Translation</h3>
+            <p class="section-description">
+              Translate codes between different lookup systems
+            </p>
+
+            <mat-checkbox formControlName="use_lookup" class="use-lookup-checkbox">
+              Use lookup translation
+            </mat-checkbox>
+
+            <div class="lookup-fields" *ngIf="ruleForm.get('use_lookup')?.value">
+              <mat-form-field appearance="outline">
+                <mat-label>Source Lookup</mat-label>
+                <mat-select formControlName="source_lookup" required>
+                  <mat-option *ngFor="let lookup of data.availableLookups"
+                              [value]="lookup.id">
+                    {{ lookup.label }} ({{ lookup.code }})
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Lookup system in source data</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Target Lookup</mat-label>
+                <mat-select formControlName="target_lookup" required>
+                  <mat-option *ngFor="let lookup of data.availableLookups"
+                              [value]="lookup.id">
+                    {{ lookup.label }} ({{ lookup.code }})
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Lookup system for target field</mat-hint>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Conditions Tab -->
+      <mat-tab label="Conditions">
+        <div class="tab-content">
+          <div class="form-section">
+            <h3>Conditional Mapping</h3>
+            <p class="section-description">
+              Apply this field rule only when certain conditions are met
+            </p>
+
+            <mat-radio-group formControlName="condition_type" class="condition-type">
+              <mat-radio-button value="always">Always apply</mat-radio-button>
+              <mat-radio-button value="expression">Python expression</mat-radio-button>
+              <mat-radio-button value="simple">Simple conditions</mat-radio-button>
+            </mat-radio-group>
+          </div>
+
+          <!-- Expression Condition -->
+          <div class="form-section" *ngIf="ruleForm.get('condition_type')?.value === 'expression'">
+            <mat-form-field appearance="outline">
+              <mat-label>Condition Expression</mat-label>
+              <textarea matInput
+                        formControlName="condition_expression"
+                        rows="3"
+                        placeholder="e.g., data.get('status') == 'active' and data.get('age') >= 18">
+                  </textarea>
+              <mat-hint>Python expression using 'data' variable</mat-hint>
+            </mat-form-field>
+
+            <div class="expression-help">
+              <h4>Available Variables:</h4>
+              <ul>
+                <li><code>data</code> - The source data dictionary</li>
+                <li><code>context</code> - Additional context variables</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Simple Conditions -->
+          <div class="form-section" *ngIf="ruleForm.get('condition_type')?.value === 'simple'">
+            <div formArrayName="conditions">
+              <div *ngFor="let condition of conditionsArray.controls; let i = index"
+                   [formGroupName]="i"
+                   class="condition-row">
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Field Path</mat-label>
+                  <input matInput formControlName="condition_path" placeholder="e.g., status">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Operator</mat-label>
+                  <mat-select formControlName="condition_operator">
+                    <mat-option value="==">Equals (==)</mat-option>
+                    <mat-option value="!=">Not Equals (!=)</mat-option>
+                    <mat-option value=">">Greater Than (>)</mat-option>
+                    <mat-option value="<">Less Than (<)</mat-option>
+                    <mat-option value=">=">Greater or Equal (>=)</mat-option>
+                    <mat-option value="<=">Less or Equal (<=)</mat-option>
+                    <mat-option value="in">In List</mat-option>
+                    <mat-option value="not in">Not In List</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline">
+                  <mat-label>Value</mat-label>
+                  <input matInput formControlName="condition_value">
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" *ngIf="i < conditionsArray.length - 1">
+                  <mat-label>Logic</mat-label>
+                  <mat-select formControlName="group">
+                    <mat-option value="AND">AND</mat-option>
+                    <mat-option value="OR">OR</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <button mat-icon-button (click)="removeCondition(i)" color="warn">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            <button mat-button (click)="addCondition()" color="primary">
+              <mat-icon>add</mat-icon>
+              Add Condition
+            </button>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Test Tab -->
+      <mat-tab label="Test">
+        <div class="tab-content">
+          <div class="form-section">
+            <h3>Test Field Rule</h3>
+            <p class="section-description">
+              Test your field rule with sample data
+            </p>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Test JSON Data</mat-label>
+              <textarea matInput
+                        [(ngModel)]="testData"
+                        [ngModelOptions]="{standalone: true}"
+                        rows="8"
+                        placeholder='{"user": {"profile": {"username": "john_doe"}}}'>
+                  </textarea>
+              <mat-hint>Enter sample JSON data to test the mapping</mat-hint>
+            </mat-form-field>
+
+            <button mat-raised-button color="primary" (click)="runTest()" [disabled]="!ruleForm.valid">
+              <mat-icon>play_arrow</mat-icon>
+              Run Test
+            </button>
+
+            <div class="test-results" *ngIf="testResult">
+              <h4>Test Results:</h4>
+
+              <div class="result-item">
+                <label>Source Path:</label>
+                <code>{{ ruleForm.get('json_path')?.value }}</code>
+              </div>
+
+              <div class="result-item">
+                <label>Extracted Value:</label>
+                <span class="result-value">{{ testResult.sourceValue }}</span>
+              </div>
+
+              <div class="result-item" *ngIf="ruleForm.get('transform_function_path')?.value">
+                <label>After Transform:</label>
+                <span class="result-value">{{ testResult.transformedValue }}</span>
+              </div>
+
+              <div class="result-item">
+                <label>Final Value:</label>
+                <span class="result-value final">{{ testResult.finalValue }}</span>
+              </div>
+
+              <div class="result-item" *ngIf="testResult.conditionResult !== undefined">
+                <label>Condition Result:</label>
+                <mat-icon [class]="testResult.conditionResult ? 'success' : 'failed'">
+                  {{ testResult.conditionResult ? 'check_circle' : 'cancel' }}
+                </mat-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button
+          color="primary"
+          (click)="onSave()"
+          [disabled]="!ruleForm.valid">
+    <mat-icon>save</mat-icon>
+    {{ data.rule ? 'Update' : 'Create' }} Rule
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,108 @@
+<div class="model-browser">
+  <!-- Search -->
+  <div class="browser-header">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search models</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [(ngModel)]="searchTerm" (input)="filterModels()" placeholder="Type to search...">
+      <button mat-icon-button matSuffix *ngIf="searchTerm" (click)="clearSearch()">
+        <mat-icon>clear</mat-icon>
+      </button>
+    </mat-form-field>
+  </div>
+
+  <!-- Model Groups -->
+  <div class="model-groups">
+    <mat-accordion multi>
+      <mat-expansion-panel *ngFor="let group of filteredGroups"
+                           [expanded]="group.expanded || hasSearchTerm()">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>folder</mat-icon>
+            {{ group.name }}
+            <mat-chip-listbox class="model-count">
+              <mat-chip>{{ group.models.length }}</mat-chip>
+            </mat-chip-listbox>
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <div class="model-list">
+          <mat-card *ngFor="let model of group.models"
+                    class="model-card"
+                    (click)="selectModel(model)"
+                    [matBadge]="model.fields?.length || 0"
+                    matBadgePosition="above after"
+                    matBadgeSize="small">
+
+            <mat-card-header>
+              <mat-card-title>
+                <mat-icon class="model-icon">table_chart</mat-icon>
+                {{ model.model }}
+              </mat-card-title>
+              <mat-card-subtitle>
+                {{ model.app_label }}.{{ model.model }}
+              </mat-card-subtitle>
+            </mat-card-header>
+
+            <mat-card-content *ngIf="expandedModel === model">
+              <div class="model-details">
+                <h4>Fields ({{ model.fields?.length || 0 }})</h4>
+                <div class="field-list">
+                  <div *ngFor="let field of getDisplayFields(model)" class="field-item">
+                    <mat-icon class="field-icon" [matTooltip]="getFieldTypeTooltip(field.type)">
+                      {{ getFieldIcon(field.type) }}
+                    </mat-icon>
+                    <span class="field-name">{{ field.name }}</span>
+                    <span class="field-type">{{ field.type }}</span>
+                    <mat-icon *ngIf="field.required" class="required-icon" matTooltip="Required field">
+                      star
+                    </mat-icon>
+                  </div>
+
+                  <div *ngIf="model.fields && model.fields.length > 5" class="more-fields">
+                    ... and {{ model.fields.length - 5 }} more fields
+                  </div>
+                </div>
+              </div>
+            </mat-card-content>
+
+            <mat-card-actions>
+              <button mat-button color="primary" (click)="addTarget(model, $event)">
+                <mat-icon>add</mat-icon>
+                Add Target
+              </button>
+              <button mat-button (click)="toggleDetails(model, $event)">
+                <mat-icon>{{ expandedModel === model ? 'expand_less' : 'expand_more' }}</mat-icon>
+                {{ expandedModel === model ? 'Hide' : 'Show' }} Fields
+              </button>
+            </mat-card-actions>
+          </mat-card>
+        </div>
+      </mat-expansion-panel>
+    </mat-accordion>
+
+    <!-- No Results -->
+    <div class="no-results" *ngIf="filteredGroups.length === 0 && searchTerm">
+      <mat-icon>search_off</mat-icon>
+      <h3>No models found</h3>
+      <p>No models match "{{ searchTerm }}"</p>
+      <button mat-button (click)="clearSearch()">Clear Search</button>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="models.length === 0 && !searchTerm">
+      <mat-icon>inventory_2</mat-icon>
+      <h3>No models available</h3>
+      <p>Models will appear here once they are loaded from the API.</p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="browser-footer">
+    <span>{{ getTotalModelCount() }} models available</span>
+    <button mat-button (click)="refreshModels()">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </div>
+</div>

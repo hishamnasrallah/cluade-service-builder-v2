@@ -1,0 +1,169 @@
+.target-details {
+  height: 100%;
+  overflow: auto;
+  padding: 16px;
+}
+
+.details-card {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+mat-card-header {
+  margin-bottom: 24px;
+}
+
+mat-card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+}
+
+.target-icon {
+  color: #1976d2;
+  font-size: 28px;
+}
+
+.target-id {
+  margin-left: 16px;
+  font-size: 12px;
+  color: #666;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.target-form {
+  width: 100%;
+}
+
+.tab-content {
+  padding: 24px 0;
+}
+
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section h3 {
+  margin: 0 0 16px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+mat-form-field {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.model-hint {
+  font-size: 11px;
+  color: #666;
+  margin-left: 8px;
+  font-family: 'Roboto Mono', monospace;
+}
+
+mat-checkbox {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+.help-icon {
+  font-size: 16px;
+  margin-left: 8px;
+  color: #666;
+  cursor: help;
+}
+
+.info-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #e3f2fd;
+  border-radius: 4px;
+  color: #1976d2;
+  font-size: 14px;
+}
+
+.info-text mat-icon {
+  font-size: 20px;
+}
+
+mat-expansion-panel {
+  margin-bottom: 8px;
+}
+
+.field-rules-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.field-rules-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.no-rules {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #666;
+}
+
+.no-rules mat-icon {
+  font-size: 64px;
+  width: 64px;
+  height: 64px;
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+.no-rules p {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+}
+
+mat-card-actions {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Expansion panel customization */
+::ng-deep .mat-expansion-panel-header {
+  background: #f5f5f5;
+}
+
+::ng-deep .mat-expansion-panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+::ng-deep .mat-expansion-panel-body {
+  padding: 16px;
+}
+
+@media (max-width: 768px) {
+  .target-details {
+    padding: 8px;
+  }
+
+  .tab-content {
+    padding: 16px 0;
+  }
+
+  .field-rules-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
