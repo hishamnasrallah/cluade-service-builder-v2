@@ -30,6 +30,7 @@ import {
 } from '../../../../models/mapper.models';
 import { FieldRuleEditorComponent } from '../field-rule-editor/field-rule-editor.component';
 import {MatAutocomplete, MatAutocompleteTrigger} from '@angular/material/autocomplete';
+import {FieldRuleEditorDialogComponent} from '../dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component';
 
 @Component({
   selector: 'app-mapper-canvas',
@@ -160,14 +161,16 @@ export class MapperCanvasComponent implements OnChanges {
   }
 
   addFieldRule(): void {
-    const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
+    console.log('Opening Field Rule Dialog with lookups:', this.availableLookups?.length || 0);
+
+    const dialogRef = this.dialog.open(FieldRuleEditorDialogComponent, {
       width: '800px',
       maxHeight: '90vh',
       data: {
         rule: null,
         targetModel: this.selectedTarget?.model,
-        availableLookups: this.availableLookups,
-        availableTransforms: this.availableTransforms
+        availableLookups: this.availableLookups || [],
+        availableTransforms: this.availableTransforms || []
       }
     });
 
@@ -177,7 +180,6 @@ export class MapperCanvasComponent implements OnChanges {
       }
     });
   }
-
   editFieldRule(rule: MapperFieldRule): void {
     const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
       width: '800px',

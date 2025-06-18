@@ -161,6 +161,18 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       this.mapperApi.getTransformFunctions().toPromise(),
       this.mapperApi.getFilterFunctions().toPromise()
     ]).then(([models, lookups, transforms, filters]) => {
+      console.log('Loaded reference data:', {
+        models: models?.length || 0,
+        lookups: lookups?.length || 0,
+        transforms: transforms?.length || 0,
+        filters: filters?.length || 0
+      });
+
+      // Log lookups for debugging
+      if (lookups && lookups.length > 0) {
+        console.log('Sample lookup:', lookups[0]);
+      }
+
       this.mapperState.setReferenceData({
         models: models || [],
         lookups: lookups || [],
@@ -169,11 +181,14 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       });
       this.isLoading = false;
     }).catch(error => {
-      this.snackBar.open('Failed to load reference data', 'Retry', {duration: 5000});
+      console.error('Failed to load reference data:', error);
+      this.snackBar.open('Failed to load reference data', 'Retry', {duration: 5000})
+        .onAction().subscribe(() => {
+        this.loadReferenceData(); // Retry on action
+      });
       this.isLoading = false;
     });
   }
-
   private registerKeyboardShortcuts(): void {
     this.shortcuts.registerShortcut({
       key: 'n',

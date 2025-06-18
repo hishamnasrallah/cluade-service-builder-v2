@@ -87,6 +87,18 @@ export class FieldRuleEditorDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    console.log('Field Rule Editor Dialog Data:', {
+      targetModel: this.data.targetModel,
+      availableTransforms: this.data.availableTransforms?.length || 0,
+      availableLookups: this.data.availableLookups?.length || 0,
+      rule: this.data.rule
+    });
+
+    // Log sample lookup for debugging
+    if (this.data.availableLookups && this.data.availableLookups.length > 0) {
+      console.log('Sample lookup in dialog:', this.data.availableLookups[0]);
+    }
+
     this.loadTargetFields();
     this.groupTransforms();
     this.setupAutocomplete();

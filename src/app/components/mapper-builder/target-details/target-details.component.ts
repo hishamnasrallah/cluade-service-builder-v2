@@ -57,6 +57,7 @@ export class TargetDetailsComponent implements OnInit, OnChanges {
   targetForm!: FormGroup;
   modelSearchControl = this.fb.control('');
   private originalFormValue: any;
+  private selectedTarget: any;
 
   constructor(
     private fb: FormBuilder,
@@ -168,12 +169,16 @@ export class TargetDetailsComponent implements OnInit, OnChanges {
 
   // Field rule management
   addFieldRule(): void {
+    console.log('Opening Field Rule Dialog with lookups:', this.availableLookups?.length || 0);
+
     const dialogRef = this.dialog.open(FieldRuleEditorDialogComponent, {
       width: '800px',
+      maxHeight: '90vh',
       data: {
-        targetModel: this.targetForm.get('model')?.value,
-        availableTransforms: this.availableTransforms,
-        availableLookups: this.availableLookups
+        rule: null,
+        targetModel: this.selectedTarget?.model,
+        availableLookups: this.availableLookups || [],
+        availableTransforms: this.availableTransforms || []
       }
     });
 
@@ -183,7 +188,6 @@ export class TargetDetailsComponent implements OnInit, OnChanges {
       }
     });
   }
-
   onFieldRuleUpdated(event: { ruleId: number; changes: Partial<MapperFieldRule> }): void {
     this.fieldRuleUpdated.emit(event);
   }
