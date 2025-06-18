@@ -1,0 +1,78 @@
+.mapper-toolbar {
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  height: 56px;
+  padding: 0 16px;
+  z-index: 100;
+}
+
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 8px;
+}
+
+.logo-icon {
+  color: #1976d2;
+  margin-right: 8px;
+}
+
+.toolbar-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: #424242;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+mat-divider[vertical] {
+  height: 32px;
+  margin: 0 8px;
+}
+
+.search-section {
+  min-width: 300px;
+}
+
+.search-field {
+  font-size: 14px;
+
+  ::ng-deep {
+    .mat-form-field-wrapper {
+      padding: 0;
+      margin: 0;
+    }
+
+    .mat-form-field-infix {
+      padding: 8px 0;
+      border-top: 0;
+    }
+
+    .mat-form-field-appearance-outline .mat-form-field-outline {
+      top: 0;
+    }
+  }
+}
+
+button[mat-icon-button] {
+  &:not(:disabled):hover {
+    background-color: rgba(0, 0, 0, 0.04);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 768px) {
+  .toolbar-title {
+    display: none;
+  }
+
+  .toolbar-section {
+    margin: 0 4px;
+  }
+}

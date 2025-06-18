@@ -1,0 +1,235 @@
+<div class="logs-viewer">
+  <!-- No mapper/target selected -->
+  <div class="empty-state" *ngIf="!mapperId && !targetId">
+    <mat-icon>history</mat-icon>
+    <p>Select a mapper or target to view execution logs</p>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="isLoading && (mapperId || targetId)">
+    <mat-spinner diameter="40"></mat-spinner>
+    <p>Loading execution logs...</p>
+  </div>
+
+  <!-- Logs Content -->
+  <div class="logs-content" *ngIf="!isLoading && (mapperId || targetId)">
+    <!-- Summary Stats -->
+    <mat-card class="stats-card">
+      <mat-card-content>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <mat-icon class="stat-icon success">check_circle</mat-icon>
+            <div class="stat-value">{{ successCount }}</div>
+            <div class="stat-label">Successful</div>
+          </div>
+          <div class="stat-item">
+            <mat-icon class="stat-icon error">error</mat-icon>
+            <div class="stat-value">{{ errorCount }}</div>
+            <div class="stat-label">Failed</div>
+          </div>
+          <div class="stat-item">
+            <mat-icon class="stat-icon">schedule</mat-icon>
+            <div class="stat-value">{{ avgExecutionTime }}ms</div>
+            <div class="stat-label">Avg Time</div>
+          </div>
+          <div class="stat-item">
+            <mat-icon class="stat-icon">storage</mat-icon>
+            <div class="stat-value">{{ totalRecords }}</div>
+            <div class="stat-label">Records</div>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Logs Tabs -->
+    <mat-tab-group dynamicHeight class="logs-tabs">
+      <!-- Recent Executions Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon>access_time</mat-icon>
+          Recent
+          <span class="tab-badge" *ngIf="recentLogs.length > 0">{{ recentLogs.length }}</span>
+        </ng-template>
+
+        <div class="tab-content">
+          <mat-accordion *ngIf="recentLogs.length > 0">
+            <mat-expansion-panel *ngFor="let log of recentLogs"
+                                 [expanded]="expandedLogId === log.id"
+                                 (opened)="expandedLogId = log.id"
+                                 (closed)="expandedLogId = null">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <div class="log-header">
+                    <mat-icon [class.success]="log.success" [class.error]="!log.success">
+                      {{ log.success ? 'check_circle' : 'error' }}
+                    </mat-icon>
+                    <span class="log-time">{{ log.executed_at | date:'short' }}</span>
+                    <mat-chip-listbox class="log-status">
+                      <mat-chip [class.success]="log.success" [class.error]="!log.success">
+                        {{ log.success ? 'Success' : 'Failed' }}
+                      </mat-chip>
+                    </mat-chip-listbox>
+                  </div>
+                </mat-panel-title>
+                <mat-panel-description>
+                  <div class="log-summary">
+                    <span *ngIf="log.executed_by">{{ log.executed_by }} • </span>
+                    <span *ngIf="log.records_created">Created: {{ log.records_created }} • </span>
+                    <span *ngIf="log.records_updated">Updated: {{ log.records_updated }} • </span>
+                    <span>{{ log.execution_time_ms }}ms</span>
+                  </div>
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <div class="log-details">
+                <!-- Execution Info -->
+                <div class="detail-section">
+                  <h4>Execution Details</h4>
+                  <div class="detail-grid">
+                    <div class="detail-item">
+                      <strong>Case ID:</strong>
+                      <span>{{ log.case }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>Target:</strong>
+                      <span>{{ getTargetName(log.mapper_target) }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>Duration:</strong>
+                      <span>{{ log.execution_time_ms }}ms</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>Records:</strong>
+                      <span>
+                            {{ (log.records_created || 0) + (log.records_updated || 0) }} total
+                          </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Result Data -->
+                <div class="detail-section" *ngIf="log.result_data">
+                  <h4>Result Data</h4>
+                  <pre class="result-data">{{ formatJson(log.result_data) }}</pre>
+                </div>
+
+                <!-- Error Details -->
+                <div class="detail-section error-section" *ngIf="!log.success && log.error_trace">
+                  <h4>Error Details</h4>
+                  <pre class="error-trace">{{ log.error_trace }}</pre>
+                </div>
+
+                <!-- Actions -->
+                <div class="log-actions">
+                  <button mat-stroked-button (click)="viewFullLog(log)">
+                    <mat-icon>open_in_new</mat-icon>
+                    View Full Details
+                  </button>
+                  <button mat-stroked-button (click)="rerunExecution(log)">
+                    <mat-icon>replay</mat-icon>
+                    Re-run
+                  </button>
+                </div>
+              </div>
+            </mat-expansion-panel>
+          </mat-accordion>
+
+          <div class="empty-logs" *ngIf="recentLogs.length === 0">
+            <mat-icon>inbox</mat-icon>
+            <p>No execution logs found</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Errors Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon>error_outline</mat-icon>
+          Errors
+          <span class="tab-badge error" *ngIf="errorLogs.length > 0">{{ errorLogs.length }}</span>
+        </ng-template>
+
+        <div class="tab-content">
+          <div class="error-list" *ngIf="errorLogs.length > 0">
+            <mat-card *ngFor="let log of errorLogs" class="error-card">
+              <mat-card-header>
+                <mat-card-title>
+                  <mat-icon class="error">error</mat-icon>
+                  Error on {{ log.executed_at | date:'short' }}
+                </mat-card-title>
+              </mat-card-header>
+              <mat-card-content>
+                <p class="error-message">{{ getErrorMessage(log) }}</p>
+                <button mat-button (click)="showErrorDetails(log)">
+                  View Details
+                </button>
+              </mat-card-content>
+            </mat-card>
+          </div>
+
+          <div class="empty-logs" *ngIf="errorLogs.length === 0">
+            <mat-icon>check_circle</mat-icon>
+            <p>No errors found</p>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Analytics Tab -->
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <mat-icon>analytics</mat-icon>
+          Analytics
+        </ng-template>
+
+        <div class="tab-content analytics-content">
+          <div class="analytics-cards">
+            <mat-card>
+              <mat-card-content>
+                <h4>Success Rate</h4>
+                <div class="metric-value">{{ successRate }}%</div>
+                <mat-progress-bar
+                  mode="determinate"
+                  [value]="successRate"
+                  [color]="successRate > 80 ? 'primary' : 'warn'">
+                </mat-progress-bar>
+              </mat-card-content>
+            </mat-card>
+
+            <mat-card>
+              <mat-card-content>
+                <h4>Performance Trend</h4>
+                <div class="trend-chart">
+                  <!-- Simple trend visualization -->
+                  <div class="trend-bars">
+                    <div *ngFor="let time of executionTimes"
+                         class="trend-bar"
+                         [style.height.%]="(time / maxExecutionTime) * 100"
+                         [matTooltip]="time + 'ms'">
+                    </div>
+                  </div>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+
+          <mat-card class="frequency-card">
+            <mat-card-header>
+              <mat-card-title>Execution Frequency</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="frequency-list">
+                <div *ngFor="let day of executionFrequency" class="frequency-item">
+                  <span class="day-label">{{ day.date | date:'EEE, MMM d' }}</span>
+                  <div class="frequency-bar">
+                    <div class="bar-fill" [style.width.%]="(day.count / maxFrequency) * 100"></div>
+                  </div>
+                  <span class="count-label">{{ day.count }}</span>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </div>
+</div>

@@ -13,7 +13,7 @@ interface PersistedState {
 @Injectable({
   providedIn: 'root'
 })
-export class StatePersistenceService {
+export class StatePresistanceService {
   private readonly STORAGE_PREFIX = 'mapper_builder_';
   private readonly CURRENT_VERSION = '1.0.0';
   private autosaveEnabled$ = new BehaviorSubject<boolean>(true);
@@ -237,7 +237,7 @@ export class MapperStatePersistenceService {
   private readonly MAPPER_STATE_KEY = 'current_mapper_state';
   private readonly DRAFT_KEY = 'mapper_draft';
 
-  constructor(private persistence: StatePersistenceService) {}
+  constructor(private persistence: StatePresistanceService) {}
 
   saveMapperState(state: any): boolean {
     return this.persistence.saveState(this.MAPPER_STATE_KEY, state);

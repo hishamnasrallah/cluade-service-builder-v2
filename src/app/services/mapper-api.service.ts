@@ -384,4 +384,28 @@ export class MapperApiService {
         catchError(this.handleError('validateMapper'))
       );
   }
+  // CaseMapper CRUD - Add these methods after getCaseMapper
+  createCaseMapper(mapper: CaseMapper): Observable<CaseMapper> {
+    return this.http.post<CaseMapper>(this.getFullUrl('/api/mapping/case-mappers/'), mapper)
+      .pipe(
+        tap(newMapper => console.log('Created case mapper:', newMapper)),
+        catchError(this.handleError('createCaseMapper'))
+      );
+  }
+
+  updateCaseMapper(id: number, mapper: Partial<CaseMapper>): Observable<CaseMapper> {
+    return this.http.put<CaseMapper>(this.getFullUrl(`/api/mapping/case-mappers/${id}/`), mapper)
+      .pipe(
+        tap(updatedMapper => console.log('Updated case mapper:', updatedMapper)),
+        catchError(this.handleError('updateCaseMapper'))
+      );
+  }
+
+  deleteCaseMapper(id: number): Observable<void> {
+    return this.http.delete<void>(this.getFullUrl(`/api/mapping/case-mappers/${id}/`))
+      .pipe(
+        tap(() => console.log('Deleted case mapper:', id)),
+        catchError(this.handleError('deleteCaseMapper'))
+      );
+  }
 }

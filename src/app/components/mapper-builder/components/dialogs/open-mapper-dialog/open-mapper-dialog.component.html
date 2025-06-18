@@ -1,0 +1,164 @@
+<h2 mat-dialog-title>
+  <mat-icon>folder_open</mat-icon>
+  Open Mapper
+</h2>
+
+<mat-dialog-content>
+  <!-- Filters -->
+  <div class="filters-row">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search mappers...</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [formControl]="searchControl" placeholder="Name or case type">
+      <button mat-icon-button matSuffix *ngIf="searchControl.value" (click)="searchControl.setValue('')">
+        <mat-icon>clear</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Case Type</mat-label>
+      <mat-select [formControl]="caseTypeControl">
+        <mat-option value="">All Types</mat-option>
+        <mat-option *ngFor="let type of caseTypes" [value]="type">
+          {{ type }}
+        </mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Status</mat-label>
+      <mat-select [formControl]="statusControl">
+        <mat-option value="">All</mat-option>
+        <mat-option [value]="true">Active</mat-option>
+        <mat-option [value]="false">Inactive</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container" *ngIf="!isLoading">
+    <table mat-table [dataSource]="dataSource" matSort class="mapper-table">
+      <!-- Name Column -->
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+        <td mat-cell *matCellDef="let mapper">
+          <div class="name-cell">
+            <strong>{{ mapper.name }}</strong>
+            <small *ngIf="mapper.parent">Based on v{{ getParentVersion(mapper.parent) }}</small>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- Case Type Column -->
+      <ng-container matColumnDef="case_type">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Case Type</th>
+        <td mat-cell *matCellDef="let mapper">
+          <mat-chip-listbox class="type-chip">
+            <mat-chip>{{ mapper.case_type }}</mat-chip>
+          </mat-chip-listbox>
+        </td>
+      </ng-container>
+
+      <!-- Version Column -->
+      <ng-container matColumnDef="version">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Version</th>
+        <td mat-cell *matCellDef="let mapper">
+          v{{ mapper.version }}
+        </td>
+      </ng-container>
+
+      <!-- Status Column -->
+      <ng-container matColumnDef="active_ind">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let mapper">
+          <mat-icon [class.active]="mapper.active_ind" [class.inactive]="!mapper.active_ind">
+            {{ mapper.active_ind ? 'check_circle' : 'cancel' }}
+          </mat-icon>
+        </td>
+      </ng-container>
+
+      <!-- Modified Column -->
+      <ng-container matColumnDef="updated_at">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header>Modified</th>
+        <td mat-cell *matCellDef="let mapper">
+          <div class="date-cell">
+            <span>{{ mapper.updated_at | date:'short' }}</span>
+            <small *ngIf="mapper.updated_by">by {{ mapper.updated_by }}</small>
+          </div>
+        </td>
+      </ng-container>
+
+      <!-- Actions Column -->
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let mapper">
+          <button mat-icon-button [matMenuTriggerFor]="actionMenu">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+
+          <mat-menu #actionMenu="matMenu">
+            <button mat-menu-item (click)="openMapper(mapper)">
+              <mat-icon>open_in_new</mat-icon>
+              <span>Open</span>
+            </button>
+            <button mat-menu-item (click)="cloneMapper(mapper)">
+              <mat-icon>content_copy</mat-icon>
+              <span>Clone</span>
+            </button>
+            <button mat-menu-item (click)="exportMapper(mapper)">
+              <mat-icon>download</mat-icon>
+              <span>Export</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item (click)="deleteMapper(mapper)"
+                    [disabled]="mapper.active_ind"
+                    class="delete-action">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </mat-menu>
+        </td>
+      </ng-container>
+
+      <!-- Header and Row Definitions -->
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+          class="mapper-row"
+          (dblclick)="openMapper(row)"
+          [class.active-mapper]="row.active_ind">
+      </tr>
+
+      <!-- No Data Row -->
+      <tr class="mat-row no-data-row" *matNoDataRow>
+        <td class="mat-cell" [attr.colspan]="displayedColumns.length">
+          <div class="no-data">
+            <mat-icon>search_off</mat-icon>
+            <p>No mappers found</p>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <mat-paginator [pageSize]="10"
+                   [pageSizeOptions]="[5, 10, 20, 50]"
+                   showFirstLastButtons>
+    </mat-paginator>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="isLoading">
+    <mat-spinner></mat-spinner>
+    <p>Loading mappers...</p>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">Cancel</button>
+  <button mat-raised-button
+          color="primary"
+          (click)="confirmOpen()"
+          [disabled]="!selectedMapper">
+    <mat-icon>folder_open</mat-icon>
+    Open Selected
+  </button>
+</mat-dialog-actions>

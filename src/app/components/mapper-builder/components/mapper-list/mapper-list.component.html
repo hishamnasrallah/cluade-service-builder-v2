@@ -1,0 +1,402 @@
+<!-- src/app/components/mapper-list/mapper-list.component.html -->
+<div class="mapper-list-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-content">
+      <h1>
+        <mat-icon>map</mat-icon>
+        Case Mappers
+      </h1>
+      <p class="subtitle">Manage and configure your data mapping workflows</p>
+    </div>
+
+    <div class="header-actions">
+      <button mat-raised-button color="primary" (click)="createNewMapper()">
+        <mat-icon>add</mat-icon>
+        New Mapper
+      </button>
+      <button mat-stroked-button (click)="importMapper()">
+        <mat-icon>upload</mat-icon>
+        Import
+      </button>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-container">
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon total">
+          <mat-icon>inventory_2</mat-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ stats.total }}</div>
+          <div class="stat-label">Total Mappers</div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon active">
+          <mat-icon>check_circle</mat-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ stats.active }}</div>
+          <div class="stat-label">Active</div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon inactive">
+          <mat-icon>pause_circle</mat-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ stats.inactive }}</div>
+          <div class="stat-label">Inactive</div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon types">
+          <mat-icon>category</mat-icon>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value">{{ stats.byCaseType.size }}</div>
+          <div class="stat-label">Case Types</div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Filters and View Toggle -->
+  <mat-card class="filters-card">
+    <mat-card-content>
+      <div class="filters-row">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Search mappers...</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput [formControl]="searchControl" placeholder="Name, case type, or user">
+          <button mat-icon-button matSuffix *ngIf="searchControl.value" (click)="searchControl.setValue('')">
+            <mat-icon>clear</mat-icon>
+          </button>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Case Type</mat-label>
+          <mat-select [formControl]="caseTypeFilter">
+            <mat-option value="">All Types</mat-option>
+            <mat-option *ngFor="let type of caseTypes" [value]="type">
+              {{ type }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select [formControl]="statusFilter">
+            <mat-option value="">All</mat-option>
+            <mat-option value="active">Active</mat-option>
+            <mat-option value="inactive">Inactive</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button mat-stroked-button (click)="clearFilters()" class="clear-filters-btn">
+          <mat-icon>filter_alt_off</mat-icon>
+          Clear Filters
+        </button>
+
+        <div class="view-toggle">
+          <mat-button-toggle-group [(value)]="viewMode">
+            <mat-button-toggle value="table" matTooltip="Table view">
+              <mat-icon>view_list</mat-icon>
+            </mat-button-toggle>
+            <mat-button-toggle value="grid" matTooltip="Grid view">
+              <mat-icon>grid_view</mat-icon>
+            </mat-button-toggle>
+          </mat-button-toggle-group>
+        </div>
+      </div>
+
+      <!-- Bulk Actions -->
+      <div class="bulk-actions" *ngIf="selectedMappers.size > 0">
+        <mat-chip>
+          {{ selectedMappers.size }} selected
+        </mat-chip>
+        <button mat-button (click)="exportSelected()">
+          <mat-icon>download</mat-icon>
+          Export Selected
+        </button>
+        <button mat-button (click)="selectedMappers.clear()">
+          Clear Selection
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="isLoading">
+    <mat-spinner diameter="60"></mat-spinner>
+    <p>Loading mappers...</p>
+  </div>
+
+  <!-- Table View -->
+  <mat-card class="mappers-table-card" *ngIf="!isLoading && viewMode === 'table'">
+    <mat-card-content>
+      <table mat-table [dataSource]="dataSource" matSort class="mappers-table">
+
+        <!-- Selection Column -->
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox (change)="selectAll()"
+                          [checked]="selectedMappers.size > 0 && selectedMappers.size === filteredMappers.length"
+                          [indeterminate]="selectedMappers.size > 0 && selectedMappers.size < filteredMappers.length">
+            </mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let mapper">
+            <mat-checkbox [checked]="isSelected(mapper.id)"
+                          (change)="toggleSelection(mapper.id)">
+            </mat-checkbox>
+          </td>
+        </ng-container>
+
+        <!-- Name Column -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Name</th>
+          <td mat-cell *matCellDef="let mapper">
+            <div class="name-cell">
+              <a class="mapper-name" (click)="openMapper(mapper)">{{ mapper.name }}</a>
+              <small class="version-info">{{ getVersionHistory(mapper) }}</small>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Case Type Column -->
+        <ng-container matColumnDef="case_type">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Case Type</th>
+          <td mat-cell *matCellDef="let mapper">
+            <mat-chip-listbox>
+              <mat-chip>{{ mapper.case_type }}</mat-chip>
+            </mat-chip-listbox>
+          </td>
+        </ng-container>
+
+        <!-- Version Column -->
+        <ng-container matColumnDef="version">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Version</th>
+          <td mat-cell *matCellDef="let mapper">
+            <span class="version-badge">v{{ mapper.version }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Targets Column -->
+        <ng-container matColumnDef="targets">
+          <th mat-header-cell *matHeaderCellDef>Targets</th>
+          <td mat-cell *matCellDef="let mapper">
+            <span class="target-count" [matBadge]="getTargetCount(mapper.id)" matBadgeColor="accent">
+              <mat-icon>flag</mat-icon>
+            </span>
+          </td>
+        </ng-container>
+
+        <!-- Updated Column -->
+        <ng-container matColumnDef="updated_at">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Last Modified</th>
+          <td mat-cell *matCellDef="let mapper">
+            <div class="date-cell">
+              <span class="date">{{ formatDate(mapper.updated_at) }}</span>
+              <small *ngIf="mapper.updated_by">by {{ mapper.updated_by }}</small>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Status Column -->
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>Status</th>
+          <td mat-cell *matCellDef="let mapper">
+            <button mat-icon-button
+                    (click)="toggleMapperStatus(mapper)"
+                    [matTooltip]="mapper.active_ind ? 'Click to deactivate' : 'Click to activate'">
+              <mat-icon [class.active]="mapper.active_ind" [class.inactive]="!mapper.active_ind">
+                {{ mapper.active_ind ? 'check_circle' : 'cancel' }}
+              </mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <!-- Actions Column -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let mapper">
+            <button mat-icon-button [matMenuTriggerFor]="menu">
+              <mat-icon>more_vert</mat-icon>
+            </button>
+
+            <mat-menu #menu="matMenu">
+              <button mat-menu-item (click)="editMapper(mapper)">
+                <mat-icon>edit</mat-icon>
+                <span>Edit</span>
+              </button>
+              <button mat-menu-item (click)="runMapper(mapper)">
+                <mat-icon>play_arrow</mat-icon>
+                <span>Run</span>
+              </button>
+              <button mat-menu-item (click)="cloneMapper(mapper)">
+                <mat-icon>content_copy</mat-icon>
+                <span>Clone</span>
+              </button>
+              <button mat-menu-item (click)="exportMapper(mapper)">
+                <mat-icon>download</mat-icon>
+                <span>Export</span>
+              </button>
+              <button mat-menu-item (click)="viewHistory(mapper)">
+                <mat-icon>history</mat-icon>
+                <span>View History</span>
+              </button>
+              <mat-divider></mat-divider>
+              <button mat-menu-item
+                      (click)="deleteMapper(mapper)"
+                      [disabled]="mapper.active_ind"
+                      class="delete-action">
+                <mat-icon>delete</mat-icon>
+                <span>Delete</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <!-- Header and Row Definitions -->
+        <tr mat-header-row *matHeaderRowDef="['select', ...displayedColumns]"></tr>
+        <tr mat-row
+            *matRowDef="let row; columns: ['select', ...displayedColumns];"
+            class="mapper-row"
+            [class.active-mapper]="row.active_ind">
+        </tr>
+
+        <!-- No Data Row -->
+        <tr class="mat-row no-data-row" *matNoDataRow>
+          <td class="mat-cell" [attr.colspan]="displayedColumns.length + 1">
+            <div class="no-data">
+              <mat-icon>search_off</mat-icon>
+              <p>No mappers found matching your filters</p>
+              <button mat-stroked-button (click)="clearFilters()">Clear Filters</button>
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <mat-paginator [pageSize]="10"
+                     [pageSizeOptions]="[5, 10, 20, 50]"
+                     showFirstLastButtons>
+      </mat-paginator>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Grid View -->
+  <div class="mappers-grid" *ngIf="!isLoading && viewMode === 'grid'">
+    <mat-card *ngFor="let mapper of filteredMappers"
+              class="mapper-card"
+              [class.active]="mapper.active_ind"
+              [class.inactive]="!mapper.active_ind">
+      <mat-card-header>
+        <mat-card-title>
+          <a (click)="openMapper(mapper)">{{ mapper.name }}</a>
+        </mat-card-title>
+        <mat-card-subtitle>
+          <mat-chip-listbox>
+            <mat-chip>{{ mapper.case_type }}</mat-chip>
+          </mat-chip-listbox>
+        </mat-card-subtitle>
+        <div class="card-menu">
+          <button mat-icon-button [matMenuTriggerFor]="gridMenu">
+            <mat-icon>more_vert</mat-icon>
+          </button>
+
+          <mat-menu #gridMenu="matMenu">
+            <button mat-menu-item (click)="editMapper(mapper)">
+              <mat-icon>edit</mat-icon>
+              <span>Edit</span>
+            </button>
+            <button mat-menu-item (click)="runMapper(mapper)">
+              <mat-icon>play_arrow</mat-icon>
+              <span>Run</span>
+            </button>
+            <button mat-menu-item (click)="cloneMapper(mapper)">
+              <mat-icon>content_copy</mat-icon>
+              <span>Clone</span>
+            </button>
+            <button mat-menu-item (click)="exportMapper(mapper)">
+              <mat-icon>download</mat-icon>
+              <span>Export</span>
+            </button>
+            <mat-divider></mat-divider>
+            <button mat-menu-item
+                    (click)="deleteMapper(mapper)"
+                    [disabled]="mapper.active_ind"
+                    class="delete-action">
+              <mat-icon>delete</mat-icon>
+              <span>Delete</span>
+            </button>
+          </mat-menu>
+        </div>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="card-stats">
+          <div class="stat">
+            <mat-icon>flag</mat-icon>
+            <span>{{ getTargetCount(mapper.id) }} targets</span>
+          </div>
+          <div class="stat">
+            <mat-icon>update</mat-icon>
+            <span>{{ formatDate(mapper.updated_at) }}</span>
+          </div>
+        </div>
+
+        <div class="card-info">
+          <div class="info-row">
+            <span class="label">Version:</span>
+            <span class="value">v{{ mapper.version }}</span>
+          </div>
+          <div class="info-row" *ngIf="mapper.updated_by">
+            <span class="label">Updated by:</span>
+            <span class="value">{{ mapper.updated_by }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+
+      <mat-card-actions>
+        <button mat-button (click)="openMapper(mapper)">
+          <mat-icon>edit</mat-icon>
+          Edit
+        </button>
+        <button mat-button (click)="runMapper(mapper)">
+          <mat-icon>play_arrow</mat-icon>
+          Run
+        </button>
+        <mat-chip class="status-chip" [class.active]="mapper.active_ind" [class.inactive]="!mapper.active_ind">
+          {{ mapper.active_ind ? 'Active' : 'Inactive' }}
+        </mat-chip>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+
+  <!-- Empty State -->
+  <mat-card class="empty-state-card" *ngIf="!isLoading && filteredMappers.length === 0 && allMappers.length === 0">
+    <mat-card-content>
+      <div class="empty-state">
+        <mat-icon>inbox</mat-icon>
+        <h2>No Mappers Yet</h2>
+        <p>Create your first mapper to start transforming case data into database records.</p>
+        <button mat-raised-button color="primary" (click)="createNewMapper()">
+          <mat-icon>add</mat-icon>
+          Create Your First Mapper
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

@@ -20,18 +20,18 @@ import { PropertiesEditorComponent } from './properties-editor/properties-editor
 import { PreviewComponent } from './preview/preview.component';
 
 // Dialogs
-import { NewMapperDialogComponent } from './dialogs/new-mapper-dialog/new-mapper-dialog.component';
-import { OpenMapperDialogComponent } from './dialogs/open-mapper-dialog/open-mapper-dialog.component';
-import { SaveMapperDialogComponent } from './dialogs/save-mapper-dialog/save-mapper-dialog.component';
-import { ImportMapperDialogComponent } from './dialogs/import-mapper-dialog/import-mapper-dialog.component';
-import { ExportMapperDialogComponent } from './dialogs/export-mapper-dialog/export-mapper-dialog.component';
+import { NewMapperDialogComponent } from './components/dialogs/new-mapper-dialog/new-mapper-dialog.component';
+import { OpenMapperDialogComponent } from './components/dialogs/open-mapper-dialog/open-mapper-dialog.component';
+import { SaveMapperDialogComponent } from './components/dialogs/save-mapper-dialog/save-mapper-dialog.component';
+import { ImportMapperDialogComponent } from './components/dialogs/import-mapper-dialog/import-mapper-dialog.component';
+import { ExportMapperDialogComponent } from './components/dialogs/export-mapper-dialog/export-mapper-dialog.component';
 
 // Services
 import { MapperApiService } from '../../services/mapper-api.service';
 import { MapperStateService } from '../../services/mapper-state.service';
 import { MapperValidationService } from '../../services/mapper-validation.service';
 import { KeyboardShortcutsService } from '../../services/keyboard-shortcuts.service';
-import { MapperUndoRedoService } from '../../services/undo-redo.service';
+import { UndoRedoService } from '../../services/undo-redo.service';
 
 // Models
 import { CaseMapper, MapperTarget, ModelOption, LookupOption, TransformFunction, FilterFunction } from '../../models/mapper.models';
@@ -90,7 +90,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     private mapperState: MapperStateService,
     private validation: MapperValidationService,
     private shortcuts: KeyboardShortcutsService,
-    private undoRedo: MapperUndoRedoService,
+    private undoRedo: UndoRedoService,
     private snackBar: MatSnackBar,
     private dialog: MatDialog
   ) {}
@@ -284,17 +284,13 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
   }
 
   undo(): void {
-    const state = this.undoRedo.undo();
-    if (state) {
-      this.snackBar.open(`Undone: ${state.description}`, 'Close', { duration: 2000 });
-    }
+    this.undoRedo.undo();  // It doesn't return a state object
+    this.snackBar.open('Action undone', 'Close', { duration: 2000 });
   }
 
   redo(): void {
-    const state = this.undoRedo.redo();
-    if (state) {
-      this.snackBar.open(`Redone: ${state.description}`, 'Close', { duration: 2000 });
-    }
+    this.undoRedo.redo();  // It doesn't return a state object
+    this.snackBar.open('Action redone', 'Close', { duration: 2000 });
   }
 
   validateMapper(): void {
@@ -519,10 +515,16 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
   }
 
   private saveUndoState(action: string): void {
-    this.undoRedo.saveMapperState({
+    this.undoRedo.saveState({
       currentMapper: this.currentMapper,
       targets: this.targets,
-      selectedTargetId: this.selectedTargetId
+      selectedTargetId: this.selectedTargetId,
+      isDirty: true,
+      availableModels: this.availableModels,
+      availableLookups: this.availableLookups,
+      availableTransforms: this.availableTransforms,
+      availableFilters: this.availableFilters,
+      loading: false
     }, action);
   }
 }

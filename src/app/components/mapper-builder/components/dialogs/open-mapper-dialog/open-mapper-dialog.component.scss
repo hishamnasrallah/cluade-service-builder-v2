@@ -1,0 +1,135 @@
+mat-dialog-content {
+  min-height: 400px;
+  max-height: 70vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.filters-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.search-field {
+  flex: 2;
+}
+
+.filter-field {
+  flex: 1;
+}
+
+.table-container {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.mapper-table {
+  width: 100%;
+}
+
+.mapper-row {
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #f5f5f5;
+  }
+
+  &.active-mapper {
+    background-color: #e3f2fd;
+  }
+}
+
+.name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  small {
+    color: #666;
+    font-size: 11px;
+  }
+}
+
+.date-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  small {
+    color: #666;
+    font-size: 11px;
+  }
+}
+
+.type-chip {
+  min-height: auto;
+
+  mat-chip {
+    min-height: 24px;
+    font-size: 12px;
+  }
+}
+
+mat-icon {
+  &.active {
+    color: #4caf50;
+  }
+
+  &.inactive {
+    color: #9e9e9e;
+  }
+}
+
+.delete-action {
+  color: #f44336;
+}
+
+.no-data-row {
+  height: 200px;
+}
+
+.no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: #ccc;
+  }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+
+  p {
+    margin-top: 16px;
+    color: #666;
+  }
+}
+
+mat-dialog-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+}

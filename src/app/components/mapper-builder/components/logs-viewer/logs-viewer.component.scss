@@ -1,0 +1,312 @@
+.logs-viewer {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.empty-state,
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #666;
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: #ccc;
+    margin-bottom: 16px;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.logs-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+.stats-card {
+  margin-bottom: 8px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+
+  &.success {
+    color: #4caf50;
+  }
+
+  &.error {
+    color: #f44336;
+  }
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.logs-tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-content {
+  padding: 16px 0;
+  overflow-y: auto;
+}
+
+.tab-badge {
+  margin-left: 8px;
+  padding: 2px 6px;
+  background-color: #e0e0e0;
+  border-radius: 10px;
+  font-size: 11px;
+
+  &.error {
+    background-color: #ffebee;
+    color: #c62828;
+  }
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+mat-icon {
+  &.success {
+    color: #4caf50;
+  }
+
+  &.error {
+    color: #f44336;
+  }
+}
+
+.log-time {
+  font-weight: 500;
+}
+
+.log-status mat-chip {
+  min-height: 24px;
+  font-size: 11px;
+
+  &.success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &.error {
+    background-color: #ffebee;
+    color: #c62828;
+  }
+}
+
+.log-summary {
+  font-size: 12px;
+  color: #666;
+}
+
+.log-details {
+  padding: 16px;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  h4 {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 12px 0;
+    color: #666;
+  }
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.detail-item {
+  strong {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+
+  span {
+    font-size: 14px;
+  }
+}
+
+.result-data,
+.error-trace {
+  background-color: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 12px;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
+.error-section {
+  .error-trace {
+    background-color: #ffebee;
+    color: #c62828;
+  }
+}
+
+.log-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.empty-logs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: #ccc;
+    margin-bottom: 8px;
+  }
+}
+
+.error-card {
+  margin-bottom: 12px;
+}
+
+.error-message {
+  margin: 8px 0;
+  color: #c62828;
+}
+
+.analytics-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.metric-value {
+  font-size: 32px;
+  font-weight: 500;
+  margin: 8px 0;
+}
+
+.trend-chart {
+  height: 80px;
+  margin-top: 12px;
+}
+
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  gap: 2px;
+}
+
+.trend-bar {
+  flex: 1;
+  background-color: #1976d2;
+  min-height: 4px;
+  border-radius: 2px 2px 0 0;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background-color: #1565c0;
+  }
+}
+
+.frequency-card {
+  margin-top: 8px;
+}
+
+.frequency-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.frequency-item {
+  display: grid;
+  grid-template-columns: 120px 1fr 40px;
+  align-items: center;
+  gap: 12px;
+}
+
+.day-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.frequency-bar {
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background-color: #1976d2;
+  transition: width 0.3s ease;
+}
+
+.count-label {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 500;
+}

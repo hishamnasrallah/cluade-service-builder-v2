@@ -18,7 +18,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { MapperTarget, ModelOption, LookupOption, TransformFunction, MapperFieldRule } from '../../../models/mapper.models';
 import { FieldRuleListComponent } from '../field-rule-list/field-rule-list.component';
-import { FieldRuleEditorDialogComponent } from '../dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component';
+import { FieldRuleEditorDialogComponent } from '../components/dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component';
 
 @Component({
   selector: 'app-target-details',

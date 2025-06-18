@@ -1,4 +1,4 @@
-// src/app/app.routes.ts
+// src/app/app.routes.ts - FINAL VERSION
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 
@@ -30,9 +30,24 @@ export const routes: Routes = [
   },
   {
     path: 'mapper-builder',
-    loadComponent: () => import('./components/mapper-builder/mapper-builder.component')
-      .then(m => m.MapperBuilderComponent),
-    canActivate: [AuthGuard]
+    canActivate: [AuthGuard],
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./components/mapper-builder/components/mapper-list/mapper-list.component')
+          .then(m => m.MapperListComponent)
+      },
+      {
+        path: 'new',
+        loadComponent: () => import('./components/mapper-builder/mapper-builder.component')
+          .then(m => m.MapperBuilderComponent)
+      },
+      {
+        path: ':id',
+        loadComponent: () => import('./components/mapper-builder/mapper-builder.component')
+          .then(m => m.MapperBuilderComponent)
+      }
+    ]
   },
   {
     path: '**',

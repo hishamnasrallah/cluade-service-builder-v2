@@ -1,13 +1,13 @@
-// src/app/components/app.component.ts
+// src/app/components/app.component.ts - FINAL VERSION
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import {RouterOutlet, Router, RouterLink} from '@angular/router';
+import { RouterOutlet, Router, RouterLink } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../services/auth.service';
-import {MatDivider} from '@angular/material/divider';
+import { MatDivider } from '@angular/material/divider';
 
 @Component({
   selector: 'app-root',
@@ -40,7 +40,7 @@ import {MatDivider} from '@angular/material/divider';
         </button>
 
         <button mat-button routerLink="/mapper-builder">
-          <mat-icon>settings_input_component</mat-icon>
+          <mat-icon>map</mat-icon>
           Mapper Builder
         </button>
 

@@ -18,7 +18,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 
 import { MapperFieldRule, TransformFunction, LookupOption } from '../../../models/mapper.models';
-import { FieldRuleEditorDialogComponent } from '../dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component';
+import { FieldRuleEditorDialogComponent } from '../components/dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component';
 
 @Component({
   selector: 'app-field-rule-list',

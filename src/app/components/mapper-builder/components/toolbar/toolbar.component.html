@@ -1,0 +1,158 @@
+<mat-toolbar class="mapper-toolbar">
+  <!-- Logo/Title -->
+  <div class="toolbar-section">
+    <mat-icon class="logo-icon">map</mat-icon>
+    <span class="toolbar-title">Case Mapper Builder</span>
+  </div>
+
+  <mat-divider [vertical]="true"></mat-divider>
+
+  <!-- File Operations -->
+  <div class="toolbar-section">
+    <button mat-icon-button
+            (click)="handleNewMapper()"
+            matTooltip="New Mapper (Ctrl+N)"
+            [disabled]="isDirty">
+      <mat-icon>add_circle</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="handleOpenMapper()"
+            matTooltip="Open Mapper (Ctrl+O)">
+      <mat-icon>folder_open</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="saveMapper.emit()"
+            matTooltip="Save (Ctrl+S)"
+            [disabled]="!currentMapper || !isDirty">
+      <mat-icon>save</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="handleSaveAs()"
+            matTooltip="Save As New Version (Ctrl+Shift+S)"
+            [disabled]="!currentMapper">
+      <mat-icon>save_as</mat-icon>
+    </button>
+  </div>
+
+  <mat-divider [vertical]="true"></mat-divider>
+
+  <!-- Edit Operations -->
+  <div class="toolbar-section">
+    <button mat-icon-button
+            (click)="undo.emit()"
+            matTooltip="Undo (Ctrl+Z)"
+            [disabled]="!canUndo">
+      <mat-icon>undo</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="redo.emit()"
+            matTooltip="Redo (Ctrl+Y)"
+            [disabled]="!canRedo">
+      <mat-icon>redo</mat-icon>
+    </button>
+  </div>
+
+  <mat-divider [vertical]="true"></mat-divider>
+
+  <!-- Mapper Operations -->
+  <div class="toolbar-section">
+    <button mat-icon-button
+            (click)="validate.emit()"
+            matTooltip="Validate Mapper (F5)"
+            [disabled]="!currentMapper">
+      <mat-icon>check_circle</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="showPreview()"
+            matTooltip="Preview Mapping"
+            [disabled]="!currentMapper">
+      <mat-icon>visibility</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="runMapper()"
+            matTooltip="Run Mapper"
+            [disabled]="!currentMapper"
+            [matMenuTriggerFor]="runMenu">
+      <mat-icon>play_arrow</mat-icon>
+    </button>
+
+    <mat-menu #runMenu="matMenu">
+      <button mat-menu-item (click)="runDryRun()">
+        <mat-icon>preview</mat-icon>
+        <span>Dry Run (Preview Only)</span>
+      </button>
+      <button mat-menu-item (click)="runActual()">
+        <mat-icon>play_circle</mat-icon>
+        <span>Run Actual Mapping</span>
+      </button>
+    </mat-menu>
+  </div>
+
+  <mat-divider [vertical]="true"></mat-divider>
+
+  <!-- Import/Export -->
+  <div class="toolbar-section">
+    <button mat-icon-button
+            (click)="handleImport()"
+            matTooltip="Import Mapper">
+      <mat-icon>upload</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="handleExport()"
+            matTooltip="Export Mapper"
+            [disabled]="!currentMapper">
+      <mat-icon>download</mat-icon>
+    </button>
+  </div>
+
+  <!-- Spacer -->
+  <span class="toolbar-spacer"></span>
+
+  <!-- Search -->
+  <div class="toolbar-section search-section">
+    <mat-form-field appearance="outline"
+                    class="search-field"
+                    *ngIf="showSearch">
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput
+             placeholder="Search..."
+             [(ngModel)]="searchQuery"
+             (ngModelChange)="onSearchChange($event)"
+             (keyup.escape)="closeSearch()">
+      <button mat-icon-button
+              matSuffix
+              (click)="closeSearch()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <button mat-icon-button
+            (click)="toggleSearch()"
+            matTooltip="Search (Ctrl+F)"
+            *ngIf="!showSearch">
+      <mat-icon>search</mat-icon>
+    </button>
+  </div>
+
+  <!-- Help/Settings -->
+  <div class="toolbar-section">
+    <button mat-icon-button
+            (click)="showHelp()"
+            matTooltip="Help">
+      <mat-icon>help</mat-icon>
+    </button>
+
+    <button mat-icon-button
+            (click)="showSettings()"
+            matTooltip="Settings">
+      <mat-icon>settings</mat-icon>
+    </button>
+  </div>
+</mat-toolbar>
