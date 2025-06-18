@@ -98,7 +98,7 @@ export class MapperApiService {
 
   // Model & Function APIs
   getAvailableModels(): Observable<ModelOption[]> {
-    return this.http.get<ModelOption[]>(this.getFullUrl('/api/mapping/models/'))
+    return this.http.get<ModelOption[]>(this.getFullUrl('/auth/content-types/models/'))
       .pipe(
         tap(models => console.log('Available models:', models)),
         catchError(this.handleError('getAvailableModels'))
@@ -139,7 +139,7 @@ export class MapperApiService {
 
   // CaseMapper CRUD
   getCaseMappers(): Observable<CaseMapper[]> {
-    return this.http.get<CaseMapper[]>(this.getFullUrl('/api/mapping/case-mappers/'))
+    return this.http.get<CaseMapper[]>(this.getFullUrl('/cases/case-mappers/'))
       .pipe(
         tap(mappers => console.log('Case mappers:', mappers)),
         catchError(this.handleError('getCaseMappers'))
@@ -147,7 +147,7 @@ export class MapperApiService {
   }
 
   getCaseMapper(id: number): Observable<CaseMapper> {
-    return this.http.get<CaseMapper>(this.getFullUrl(`/api/mapping/case-mappers/${id}/`))
+    return this.http.get<CaseMapper>(this.getFullUrl(`/cases/case-mappers/${id}/`))
       .pipe(
         tap(mapper => console.log('Case mapper:', mapper)),
         catchError(this.handleError('getCaseMapper'))
@@ -160,7 +160,7 @@ export class MapperApiService {
     if (caseMapperIt) {
       params = params.set('case_mapper', caseMapperIt.toString());
     }
-    return this.http.get<MapperTarget[]>(this.getFullUrl('/api/mapping/targets/'), { params })
+    return this.http.get<MapperTarget[]>(this.getFullUrl('/cases/targets/'), { params })
       .pipe(
         tap(targets => console.log('Mapper targets:', targets)),
         catchError(this.handleError('getMapperTargets'))
@@ -168,7 +168,7 @@ export class MapperApiService {
   }
 
   createMapperTarget(target: MapperTarget): Observable<MapperTarget> {
-    return this.http.post<MapperTarget>(this.getFullUrl('/api/mapping/targets/'), target)
+    return this.http.post<MapperTarget>(this.getFullUrl('/cases/targets/'), target)
       .pipe(
         tap(newTarget => console.log('Created mapper target:', newTarget)),
         catchError(this.handleError('createMapperTarget'))
@@ -176,7 +176,7 @@ export class MapperApiService {
   }
 
   updateMapperTarget(id: string, target: MapperTarget): Observable<MapperTarget> {
-    return this.http.put<MapperTarget>(this.getFullUrl(`/api/mapping/targets/${id}/`), target)
+    return this.http.put<MapperTarget>(this.getFullUrl(`/cases/targets/${id}/`), target)
       .pipe(
         tap(updatedTarget => console.log('Updated mapper target:', updatedTarget)),
         catchError(this.handleError('updateMapperTarget'))
@@ -184,7 +184,7 @@ export class MapperApiService {
   }
 
   deleteMapperTarget(id: string): Observable<void> {
-    return this.http.delete<void>(this.getFullUrl(`/api/mapping/targets/${id}/`))
+    return this.http.delete<void>(this.getFullUrl(`/cases/targets/${id}/`))
       .pipe(
         tap(() => console.log('Deleted mapper target:', id)),
         catchError(this.handleError('deleteMapperTarget'))
@@ -265,7 +265,7 @@ export class MapperApiService {
   }
   // Save entire configuration
   saveMapperConfiguration(config: SaveMapperRequest): Observable<any> {
-    return this.http.post(this.getFullUrl('/api/mapping/save/'), config)
+    return this.http.post(this.getFullUrl('/cases/save/'), config)
       .pipe(
         tap(result => console.log('Save result:', result)),
         catchError(this.handleError('saveMapperConfiguration'))
@@ -403,7 +403,7 @@ export class MapperApiService {
   }
   // CaseMapper CRUD - Add these methods after getCaseMapper
   createCaseMapper(mapper: CaseMapper): Observable<CaseMapper> {
-    return this.http.post<CaseMapper>(this.getFullUrl('/api/mapping/case-mappers/'), mapper)
+    return this.http.post<CaseMapper>(this.getFullUrl('/cases/case-mappers/'), mapper)
       .pipe(
         tap(newMapper => console.log('Created case mapper:', newMapper)),
         catchError(this.handleError('createCaseMapper'))
@@ -411,7 +411,7 @@ export class MapperApiService {
   }
 
   updateCaseMapper(id: number, mapper: Partial<CaseMapper>): Observable<CaseMapper> {
-    return this.http.put<CaseMapper>(this.getFullUrl(`/api/mapping/case-mappers/${id}/`), mapper)
+    return this.http.put<CaseMapper>(this.getFullUrl(`/cases/case-mappers/${id}/`), mapper)
       .pipe(
         tap(updatedMapper => console.log('Updated case mapper:', updatedMapper)),
         catchError(this.handleError('updateCaseMapper'))
@@ -419,7 +419,7 @@ export class MapperApiService {
   }
 
   deleteCaseMapper(id: number): Observable<void> {
-    return this.http.delete<void>(this.getFullUrl(`/api/mapping/case-mappers/${id}/`))
+    return this.http.delete<void>(this.getFullUrl(`/cases/case-mappers/${id}/`))
       .pipe(
         tap(() => console.log('Deleted case mapper:', id)),
         catchError(this.handleError('deleteCaseMapper'))
