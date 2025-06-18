@@ -1,5 +1,5 @@
 // src/app/components/mapper-builder/field-rule-list/field-rule-list.component.ts
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { MatListModule } from '@angular/material/list';
@@ -18,7 +18,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 
 import { MapperFieldRule, TransformFunction, LookupOption } from '../../../models/mapper.models';
-import { FieldRuleEditorDialogComponent } from '../components/dialogs/field-rule-editor-dialog/field-rule-editor-dialog.component';
+// Import the actual component, not a dialog wrapper
+import { FieldRuleEditorComponent } from '../components/field-rule-editor/field-rule-editor.component';
 
 @Component({
   selector: 'app-field-rule-list',
@@ -43,7 +44,7 @@ import { FieldRuleEditorDialogComponent } from '../components/dialogs/field-rule
   templateUrl:'field-rule-list.component.html',
   styleUrl:'field-rule-list.component.scss'
 })
-export class FieldRuleListComponent implements OnInit {
+export class FieldRuleListComponent implements OnInit, OnChanges {
   @Input() fieldRules: MapperFieldRule[] = [];
   @Input() targetModel?: string;
   @Input() availableTransforms: TransformFunction[] = [];
@@ -52,6 +53,7 @@ export class FieldRuleListComponent implements OnInit {
   @Output() ruleUpdated = new EventEmitter<{ ruleId: number; changes: Partial<MapperFieldRule> }>();
   @Output() ruleDeleted = new EventEmitter<number>();
   @Output() ruleReordered = new EventEmitter<MapperFieldRule[]>();
+  @Output() ruleAdded = new EventEmitter<Partial<MapperFieldRule>>();
 
   searchTerm = '';
   filteredRules: MapperFieldRule[] = [];
@@ -62,6 +64,13 @@ export class FieldRuleListComponent implements OnInit {
 
   ngOnInit(): void {
     this.filteredRules = [...this.fieldRules];
+    console.log('FieldRuleList initialized with lookups:', this.availableLookups?.length || 0);
+  }
+
+  ngOnChanges(): void {
+    // Update filtered rules when input changes
+    this.filterRules();
+    console.log('FieldRuleList inputs changed, lookups:', this.availableLookups?.length || 0);
   }
 
   filterRules(): void {
@@ -115,31 +124,36 @@ export class FieldRuleListComponent implements OnInit {
   }
 
   addRule(): void {
-    const dialogRef = this.dialog.open(FieldRuleEditorDialogComponent, {
+    console.log('Opening dialog with lookups:', this.availableLookups);
+
+    const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
       width: '800px',
       data: {
-        targetModel: this.targetModel,
-        availableTransforms: this.availableTransforms,
-        availableLookups: this.availableLookups
+        rule: null,
+        targetModel: this.targetModel || '',
+        availableTransforms: this.availableTransforms || [],
+        availableLookups: this.availableLookups || []
       }
     });
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        // Parent component will handle adding the rule
         console.log('New rule to add:', result);
+        this.ruleAdded.emit(result);
       }
     });
   }
 
   editRule(rule: MapperFieldRule): void {
-    const dialogRef = this.dialog.open(FieldRuleEditorDialogComponent, {
+    console.log('Editing rule with lookups:', this.availableLookups);
+
+    const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
       width: '800px',
       data: {
         rule: rule,
-        targetModel: this.targetModel,
-        availableTransforms: this.availableTransforms,
-        availableLookups: this.availableLookups
+        targetModel: this.targetModel || '',
+        availableTransforms: this.availableTransforms || [],
+        availableLookups: this.availableLookups || []
       }
     });
 
@@ -157,13 +171,20 @@ export class FieldRuleListComponent implements OnInit {
       target_field: `${rule.target_field}_copy`
     };
 
-    const dialogRef = this.dialog.open(FieldRuleEditorDialogComponent, {
+    const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
       width: '800px',
       data: {
         rule: duplicate,
-        targetModel: this.targetModel,
-        availableTransforms: this.availableTransforms,
-        availableLookups: this.availableLookups
+        targetModel: this.targetModel || '',
+        availableTransforms: this.availableTransforms || [],
+        availableLookups: this.availableLookups || []
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        console.log('Duplicate rule to add:', result);
+        this.ruleAdded.emit(result);
       }
     });
   }
@@ -196,6 +217,9 @@ export class FieldRuleListComponent implements OnInit {
   }
 
   getLookupLabel(lookupId: number): string {
+    if (!this.availableLookups || this.availableLookups.length === 0) {
+      return `Lookup ${lookupId}`;
+    }
     const lookup = this.availableLookups.find(l => l.id === lookupId);
     return lookup?.label || `Lookup ${lookupId}`;
   }

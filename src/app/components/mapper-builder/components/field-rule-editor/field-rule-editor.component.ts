@@ -16,7 +16,7 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
@@ -70,7 +70,6 @@ export class FieldRuleEditorComponent implements OnInit {
   ruleForm: FormGroup;
   conditionMode: 'simple' | 'expression' = 'simple';
 
-
   // Dynamic data from API
   targetFields: string[] = [];
   suggestedPaths: string[] = [];
@@ -90,6 +89,10 @@ export class FieldRuleEditorComponent implements OnInit {
     array_index_notation: false
   };
 
+  // Store lookups locally and ensure they're loaded
+  lookups: LookupOption[] = [];
+  isLoadingLookups = false;
+
   constructor(
     private fb: FormBuilder,
     private apiService: MapperApiService,
@@ -102,22 +105,79 @@ export class FieldRuleEditorComponent implements OnInit {
       startWith(''),
       map(value => this.filterPaths(value || ''))
     );
+
+    // Initialize lookups from dialog data or load them
+    this.lookups = this.data.availableLookups || [];
+    console.log('Initial lookups from dialog data:', this.lookups);
   }
 
   ngOnInit(): void {
     if (this.data.rule) {
       this.populateForm(this.data.rule);
     }
-    if (!this.data.modelFields && this.data.targetModel) {
+
+    // Load model fields based on target model
+    if (this.data.targetModel && !this.data.modelFields) {
       this.loadModelFields();
     }
 
-    // Load model fields based on target model
-    this.loadModelFields();
-
     // Load JSONPath suggestions
     this.loadJSONPathSuggestions();
+
+    // If lookups are not provided or empty, load them
+    if (!this.lookups || this.lookups.length === 0) {
+      console.log('No lookups provided, loading from API...');
+      this.loadLookups();
+    } else {
+      console.log('Using provided lookups:', this.lookups.length, 'items');
+    }
   }
+
+  // Add this method to load lookups if not provided
+  loadLookups(): void {
+    this.isLoadingLookups = true;
+    this.apiService.getAvailableLookups().subscribe({
+      next: (lookups) => {
+        console.log('Loaded lookups from API:', lookups);
+        this.lookups = lookups;
+        this.data.availableLookups = lookups; // Update the data object
+        this.isLoadingLookups = false;
+      },
+      error: (error) => {
+        console.error('Failed to load lookups:', error);
+        this.isLoadingLookups = false;
+        // Use mock data as fallback
+        this.lookups = this.getMockLookups();
+        this.data.availableLookups = this.lookups;
+      }
+    });
+  }
+
+  // Add mock lookups for fallback
+  getMockLookups(): LookupOption[] {
+    return [
+      {
+        id: 31,
+        code: '08',
+        label: 'Gender',
+        values: [
+          { id: 32, code: '01', label: 'Male' },
+          { id: 33, code: '02', label: 'Female' }
+        ]
+      },
+      {
+        id: 10,
+        code: '04',
+        label: 'Case Status',
+        values: [
+          { id: 11, code: '01', label: 'Submitted' },
+          { id: 20, code: '', label: 'Draft' },
+          { id: 57, code: '55', label: 'Completed' }
+        ]
+      }
+    ];
+  }
+
   loadModelFields(): void {
     if (this.data.targetModel) {
       this.isLoadingFields = true;
@@ -157,6 +217,7 @@ export class FieldRuleEditorComponent implements OnInit {
       }
     });
   }
+
   addArrayIndex(): void {
     const indices = this.ruleForm.get('array_indices') as FormArray;
     indices.push(this.fb.control(0));
@@ -166,6 +227,7 @@ export class FieldRuleEditorComponent implements OnInit {
     const indices = this.ruleForm.get('array_indices') as FormArray;
     indices.removeAt(index);
   }
+
   buildJsonPath(): string {
     const basePath = this.ruleForm.get('json_path')?.value;
     const useArrayIndex = this.ruleForm.get('use_array_index')?.value;
@@ -181,6 +243,7 @@ export class FieldRuleEditorComponent implements OnInit {
 
     return path;
   }
+
   buildConditionFromVisual(): void {
     const condition = `${this.conditionBuilder.field} ${this.conditionBuilder.operator} '${this.conditionBuilder.value}'`;
     this.ruleForm.patchValue({ condition_expression: condition });
@@ -217,6 +280,7 @@ export class FieldRuleEditorComponent implements OnInit {
     }
     return true;
   }
+
   createRuleForm(): FormGroup {
     return this.fb.group({
       json_path: ['', Validators.required],
@@ -353,14 +417,6 @@ export class FieldRuleEditorComponent implements OnInit {
     );
   }
 
-  // loadModelFields(): void {
-  //   // TODO: Load actual model fields from API
-  //   // For now using mock data
-  //   if (this.data.targetModel === 'citizen.Citizen') {
-  //     this.targetFields = ['id', 'full_name', 'birth_date', 'national_id', 'gender', 'marital_status'];
-  //   }
-  // }
-
   cancel(): void {
     this.dialogRef.close();
   }
@@ -373,25 +429,26 @@ export class FieldRuleEditorComponent implements OnInit {
         this.showValidationErrors(validationErrors);
         return;
       }
-      const formValue = this.ruleForm.value;
-      const result: Partial<MapperFieldRule> = {
-        json_path: formValue.json_path,
-        target_field: formValue.target_field,
-        default_value: formValue.default_value || undefined,
-        transform_function_path: formValue.transform_function_path || undefined,
-        source_lookup: formValue.source_lookup || undefined,
-        target_lookup: formValue.target_lookup || undefined
-      };
-
-      // Handle conditions based on mode
-      if (this.conditionMode === 'expression' && formValue.condition_expression) {
-        result.condition_expression = formValue.condition_expression;
-      } else if (this.conditionMode === 'simple' && formValue.conditions.length > 0) {
-        result.conditions = this.buildConditions(formValue.conditions);
-      }
-
-      this.dialogRef.close(result);
     }
+
+    const formValue = this.ruleForm.value;
+    const result: Partial<MapperFieldRule> = {
+      json_path: formValue.json_path,
+      target_field: formValue.target_field,
+      default_value: formValue.default_value || undefined,
+      transform_function_path: formValue.transform_function_path || undefined,
+      source_lookup: formValue.source_lookup || undefined,
+      target_lookup: formValue.target_lookup || undefined
+    };
+
+    // Handle conditions based on mode
+    if (this.conditionMode === 'expression' && formValue.condition_expression) {
+      result.condition_expression = formValue.condition_expression;
+    } else if (this.conditionMode === 'simple' && formValue.conditions.length > 0) {
+      result.conditions = this.buildConditions(formValue.conditions);
+    }
+
+    this.dialogRef.close(result);
   }
 
   validateRule(): string[] {
@@ -420,6 +477,7 @@ export class FieldRuleEditorComponent implements OnInit {
     // Show errors in a dialog or snackbar
     console.error('Validation errors:', errors);
   }
+
   private buildConditions(conditionGroups: any[]): MapperFieldRuleCondition[] {
     const conditions: MapperFieldRuleCondition[] = [];
 

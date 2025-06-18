@@ -85,23 +85,35 @@
               <div class="lookup-row">
                 <mat-form-field appearance="outline" class="lookup-field">
                   <mat-label>Source Lookup</mat-label>
-                  <mat-select formControlName="source_lookup">
+                  <mat-select formControlName="source_lookup" [disabled]="isLoadingLookups">
                     <mat-option [value]="null">None</mat-option>
-                    <mat-option *ngFor="let lookup of data.availableLookups" [value]="lookup.id">
-                      {{ lookup.label }}
+                    <mat-option *ngFor="let lookup of lookups" [value]="lookup.id">
+                      <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <span>{{ lookup.label }}</span>
+                        <small style="color: #666; margin-left: 8px;" *ngIf="lookup.values && lookup.values.length > 0">
+                          ({{ lookup.values.length }})
+                        </small>
+                      </span>
                     </mat-option>
                   </mat-select>
                   <mat-icon matSuffix>search</mat-icon>
+                  <mat-hint *ngIf="isLoadingLookups">Loading lookups...</mat-hint>
+                  <mat-hint *ngIf="!isLoadingLookups && lookups.length === 0">No lookups available</mat-hint>
                 </mat-form-field>
 
                 <mat-icon class="arrow-icon">arrow_forward</mat-icon>
 
                 <mat-form-field appearance="outline" class="lookup-field">
                   <mat-label>Target Lookup</mat-label>
-                  <mat-select formControlName="target_lookup">
+                  <mat-select formControlName="target_lookup" [disabled]="isLoadingLookups">
                     <mat-option [value]="null">None</mat-option>
-                    <mat-option *ngFor="let lookup of data.availableLookups" [value]="lookup.id">
-                      {{ lookup.label }}
+                    <mat-option *ngFor="let lookup of lookups" [value]="lookup.id">
+                      <span style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <span>{{ lookup.label }}</span>
+                        <small style="color: #666; margin-left: 8px;" *ngIf="lookup.values && lookup.values.length > 0">
+                          ({{ lookup.values.length }})
+                        </small>
+                      </span>
                     </mat-option>
                   </mat-select>
                   <mat-icon matSuffix>flag</mat-icon>
@@ -150,7 +162,7 @@
 
           <!-- Simple Mode -->
           <div *ngIf="conditionMode === 'simple'" class="conditions-section">
-            <div formArrayName="conditions" class="condition-groups">
+            <div [formGroup]="ruleForm" formArrayName="conditions" class="condition-groups">
               <mat-expansion-panel
                 *ngFor="let group of conditionGroups; let i = index"
                 [expanded]="true"
@@ -252,6 +264,14 @@
               <div class="info-row" *ngIf="data.rule">
                 <strong>Rule ID:</strong>
                 <code>{{ data.rule.id }}</code>
+              </div>
+              <div class="info-row">
+                <strong>Available Lookups:</strong>
+                <code>{{ lookups.length }} loaded</code>
+              </div>
+              <div class="info-row">
+                <strong>Available Transforms:</strong>
+                <code>{{ data.availableTransforms?.length || 0 }}</code>
               </div>
             </div>
           </div>
