@@ -125,6 +125,8 @@ export class MapperApiService {
   }
 
   // Transform the API response to match the expected LookupOption format
+// Transform the API response to match the expected LookupOption format
+// Transform the API response to match the expected LookupOption format
   private transformLookupResponse(apiItems: LookupApiItem[]): LookupOption[] {
     if (!apiItems || apiItems.length === 0) {
       console.warn('No lookup items to transform');
@@ -133,105 +135,56 @@ export class MapperApiService {
 
     // Log the raw data for debugging
     console.log('Raw lookup items:', apiItems);
-    console.log('Sample item structure:', apiItems[0]);
 
-    // First, let's check what types we actually have
-    const typeGroups = apiItems.reduce((acc, item) => {
-      acc[item.type] = (acc[item.type] || 0) + 1;
-      return acc;
-    }, {} as Record<number, number>);
-    console.log('Item types distribution:', typeGroups);
+    // Based on the data structure, parent items have type: 1 and no parent_lookup
+    // Child items have type: 2 and a parent_lookup reference
+    const parentItems = apiItems.filter(item => item.type === 1 && (!item.parent_lookup || item.parent_lookup === null));
+    const childItems = apiItems.filter(item => item.type === 2 && item.parent_lookup !== null && item.parent_lookup !== undefined);
 
-    // Try different strategies based on the data structure
+    console.log(`Found ${parentItems.length} parent items and ${childItems.length} child items`);
 
-    // Strategy 1: If all items have the same type, group by whether they have parent_lookup
-    const hasParentField = apiItems.some(item => 'parent_lookup' in item);
+    // Create lookup options from parent items
+    const lookupOptions = parentItems.map(parent => {
+      // Find child items for this parent
+      const children = childItems.filter(child => child.parent_lookup === parent.id);
 
-    if (hasParentField) {
-      // Original logic - separate parents and children
-      const parentItems = apiItems.filter(item => !item.parent_lookup || item.parent_lookup === null);
-      const childItems = apiItems.filter(item => item.parent_lookup !== null && item.parent_lookup !== undefined);
+      console.log(`Parent "${parent.name}" (ID: ${parent.id}) has ${children.length} children`);
 
-      console.log(`Found ${parentItems.length} parent items and ${childItems.length} child items`);
-
-      // Create lookup options from parent items
-      const lookupOptions = parentItems.map(parent => {
-        // Find child items for this parent
-        const children = childItems.filter(child => child.parent_lookup === parent.id);
-
-        console.log(`Parent "${parent.name}" (ID: ${parent.id}) has ${children.length} children`);
-
-        return {
-          id: parent.id,
-          code: parent.code || '',
-          label: parent.name,
-          values: children.map(child => ({
-            id: child.id,
-            code: child.code || '',
-            label: child.name
-          }))
-        };
-      });
-
-      // Only return lookups that have values
-      const validLookups = lookupOptions.filter(lookup => lookup.values.length > 0);
-
-      if (validLookups.length > 0) {
-        return validLookups;
-      }
-    }
-
-    // Strategy 2: If no valid parent-child relationships found, return all items as individual lookups
-    console.warn('No parent-child relationships found, returning flat structure');
-
-    // Group by a common attribute (like name prefix or type)
-    const grouped = new Map<string, LookupApiItem[]>();
-
-    apiItems.forEach(item => {
-      // Try to group by type or create individual lookups
-      const groupKey = item.type.toString();
-
-      if (!grouped.has(groupKey)) {
-        grouped.set(groupKey, []);
-      }
-      grouped.get(groupKey)!.push(item);
+      return {
+        id: parent.id,
+        code: parent.code || '',
+        label: parent.name,
+        values: children.map(child => ({
+          id: child.id,
+          code: child.code || '',
+          label: child.name
+        }))
+      };
     });
 
-    // Convert to LookupOption format
-    const lookupOptions: LookupOption[] = [];
+    // Filter to only return lookups that have values (children)
+    const validLookups = lookupOptions.filter(lookup => lookup.values.length > 0);
 
-    grouped.forEach((items, typeKey) => {
-      if (items.length === 1) {
-        // Single item - make it both parent and value
-        const item = items[0];
-        lookupOptions.push({
+    console.log('Transformed lookups with values:', validLookups);
+
+    // If no lookups with children found, return all items as a flat structure
+    if (validLookups.length === 0) {
+      console.warn('No parent-child relationships found, returning all items as single lookup');
+
+      // Return all items under a single "All Lookups" parent
+      return [{
+        id: 0,
+        code: 'all',
+        label: 'All Lookups',
+        values: apiItems.map(item => ({
           id: item.id,
           code: item.code || '',
-          label: item.name,
-          values: [{
-            id: item.id,
-            code: item.code || '',
-            label: item.name
-          }]
-        });
-      } else {
-        // Multiple items of same type - group them
-        const lookupOption: LookupOption = {
-          id: parseInt(typeKey),
-          code: typeKey,
-          label: `Type ${typeKey} Lookups`,
-          values: items.map(item => ({
-            id: item.id,
-            code: item.code || '',
-            label: item.name
-          }))
-        };
-        lookupOptions.push(lookupOption);
-      }
-    });
+          label: item.name
+        }))
+      }];
+    }
 
-    console.log('Transformed lookups:', lookupOptions);
-    return lookupOptions;
+    return validLookups;
   }
   // Alternative: Get lookups by specific type name
   getLookupsByName(name: string): Observable<LookupOption[]> {

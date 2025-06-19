@@ -16,6 +16,8 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatRadioModule } from '@angular/material/radio';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Observable, of } from 'rxjs';
 import { map, startWith } from 'rxjs/operators';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -59,13 +61,14 @@ interface DialogData {
     MatRadioModule,
     MatDividerModule,
     MatSlideToggleModule,
+    MatProgressSpinnerModule,
+    MatCheckboxModule,
     FormsModule,
     DragDropModule
   ],
-  templateUrl:'field-rule-editor.component.html',
-  styleUrl:'field-rule-editor.component.scss'
+  templateUrl: 'field-rule-editor.component.html',
+  styleUrl: 'field-rule-editor.component.scss'
 })
-
 export class FieldRuleEditorComponent implements OnInit {
   ruleForm: FormGroup;
   conditionMode: 'simple' | 'expression' = 'simple';
@@ -99,6 +102,13 @@ export class FieldRuleEditorComponent implements OnInit {
     public dialogRef: MatDialogRef<FieldRuleEditorComponent>,
     @Inject(MAT_DIALOG_DATA) public data: DialogData
   ) {
+    console.log('FieldRuleEditor constructor - Dialog data:', {
+      hasRule: !!data.rule,
+      targetModel: data.targetModel,
+      availableLookupsCount: data.availableLookups?.length || 0,
+      availableTransformsCount: data.availableTransforms?.length || 0
+    });
+
     this.ruleForm = this.createRuleForm();
 
     this.filteredPaths$ = this.ruleForm.get('json_path')!.valueChanges.pipe(
@@ -106,12 +116,19 @@ export class FieldRuleEditorComponent implements OnInit {
       map(value => this.filterPaths(value || ''))
     );
 
-    // Initialize lookups from dialog data or load them
+    // Initialize lookups from dialog data
     this.lookups = this.data.availableLookups || [];
-    console.log('Initial lookups from dialog data:', this.lookups);
+    if (this.lookups.length > 0) {
+      console.log('Initial lookups loaded from dialog data:', this.lookups);
+    } else {
+      console.log('No lookups in dialog data, will load from API');
+    }
   }
 
   ngOnInit(): void {
+    // Setup lookup watcher first
+    this.setupLookupWatcher();
+
     if (this.data.rule) {
       this.populateForm(this.data.rule);
     }
@@ -124,13 +141,31 @@ export class FieldRuleEditorComponent implements OnInit {
     // Load JSONPath suggestions
     this.loadJSONPathSuggestions();
 
-    // If lookups are not provided or empty, load them
-    if (!this.lookups || this.lookups.length === 0) {
-      console.log('No lookups provided, loading from API...');
-      this.loadLookups();
-    } else {
-      console.log('Using provided lookups:', this.lookups.length, 'items');
-    }
+    // Always load lookups to ensure we have the latest data
+    console.log('Loading lookups...');
+    this.loadLookups();
+  }
+
+  createRuleForm(): FormGroup {
+    return this.fb.group({
+      json_path: ['', Validators.required],
+      target_field: ['', Validators.required],
+      default_value: [''],
+      transform_function_path: [null],
+      use_lookup: [false],
+      source_lookup: [null],
+      target_lookup: [null],
+      condition_expression: [''],
+      conditions: this.fb.array([]),
+      // Advanced options
+      skip_empty: [false],
+      trim_whitespace: [true],
+      convert_types: [true],
+      use_array_index: [false],
+      array_indices: this.fb.array([]),
+      array_index_notation: [false],
+      validate_on_save: [true]
+    });
   }
 
   // Add this method to load lookups if not provided
@@ -139,8 +174,8 @@ export class FieldRuleEditorComponent implements OnInit {
     this.apiService.getAvailableLookups().subscribe({
       next: (lookups) => {
         console.log('Loaded lookups from API:', lookups);
-        this.lookups = lookups;
-        this.data.availableLookups = lookups; // Update the data object
+        this.lookups = lookups || [];
+        this.data.availableLookups = this.lookups; // Update the data object
         this.isLoadingLookups = false;
       },
       error: (error) => {
@@ -157,12 +192,22 @@ export class FieldRuleEditorComponent implements OnInit {
   getMockLookups(): LookupOption[] {
     return [
       {
-        id: 31,
-        code: '08',
-        label: 'Gender',
+        id: 1,
+        code: '03',
+        label: 'Phone Types',
         values: [
-          { id: 32, code: '01', label: 'Male' },
-          { id: 33, code: '02', label: 'Female' }
+          { id: 2, code: '01', label: 'Fax' },
+          { id: 3, code: '02', label: 'Mobile' },
+          { id: 4, code: '03', label: 'Line' }
+        ]
+      },
+      {
+        id: 5,
+        code: '01',
+        label: 'User Types',
+        values: [
+          { id: 6, code: '01', label: 'Admin' },
+          { id: 7, code: '02', label: 'Public User' }
         ]
       },
       {
@@ -172,10 +217,49 @@ export class FieldRuleEditorComponent implements OnInit {
         values: [
           { id: 11, code: '01', label: 'Submitted' },
           { id: 20, code: '', label: 'Draft' },
+          { id: 21, code: '04', label: 'Return To Applicant' },
           { id: 57, code: '55', label: 'Completed' }
+        ]
+      },
+      {
+        id: 12,
+        code: '05',
+        label: 'Applicant Type',
+        values: [
+          { id: 13, code: '', label: 'Self' },
+          { id: 52, code: '', label: 'Father' }
+        ]
+      },
+      {
+        id: 31,
+        code: '08',
+        label: 'Gender',
+        values: [
+          { id: 32, code: '01', label: 'Male' },
+          { id: 33, code: '02', label: 'Female' }
         ]
       }
     ];
+  }
+
+  private setupLookupWatcher(): void {
+    this.ruleForm.get('use_lookup')?.valueChanges.subscribe(useLookup => {
+      const sourceLookupControl = this.ruleForm.get('source_lookup');
+      const targetLookupControl = this.ruleForm.get('target_lookup');
+
+      if (useLookup) {
+        sourceLookupControl?.setValidators([Validators.required]);
+        targetLookupControl?.setValidators([Validators.required]);
+      } else {
+        sourceLookupControl?.clearValidators();
+        targetLookupControl?.clearValidators();
+        sourceLookupControl?.setValue('');
+        targetLookupControl?.setValue('');
+      }
+
+      sourceLookupControl?.updateValueAndValidity();
+      targetLookupControl?.updateValueAndValidity();
+    });
   }
 
   loadModelFields(): void {
@@ -218,96 +302,13 @@ export class FieldRuleEditorComponent implements OnInit {
     });
   }
 
-  addArrayIndex(): void {
-    const indices = this.ruleForm.get('array_indices') as FormArray;
-    indices.push(this.fb.control(0));
-  }
-
-  removeArrayIndex(index: number): void {
-    const indices = this.ruleForm.get('array_indices') as FormArray;
-    indices.removeAt(index);
-  }
-
-  buildJsonPath(): string {
-    const basePath = this.ruleForm.get('json_path')?.value;
-    const useArrayIndex = this.ruleForm.get('use_array_index')?.value;
-
-    if (!useArrayIndex) return basePath;
-
-    const indices = this.ruleForm.get('array_indices')?.value || [];
-    let path = basePath;
-
-    indices.forEach((index: number) => {
-      path += `.${index}`;
-    });
-
-    return path;
-  }
-
-  buildConditionFromVisual(): void {
-    const condition = `${this.conditionBuilder.field} ${this.conditionBuilder.operator} '${this.conditionBuilder.value}'`;
-    this.ruleForm.patchValue({ condition_expression: condition });
-  }
-
-  // Drag and drop for condition ordering
-  dropCondition(event: CdkDragDrop<any[]>): void {
-    const conditionsArray = this.ruleForm.get('conditions') as FormArray;
-    const conditions = conditionsArray.value;
-    moveItemInArray(conditions, event.previousIndex, event.currentIndex);
-    conditionsArray.setValue(conditions);
-  }
-
-  // Real-time validation
-  validateJsonPath(): void {
-    const path = this.ruleForm.get('json_path')?.value;
-    if (!path) return;
-
-    // Check against suggestions
-    const isValid = this.validatePathFormat(path);
-    if (!isValid) {
-      this.ruleForm.get('json_path')?.setErrors({ invalidPath: true });
-    }
-  }
-
-  validatePathFormat(path: string): boolean {
-    // Implementation from validation service
-    const segments = path.split('.');
-    for (const segment of segments) {
-      if (segment === '') return false;
-      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(segment) && !/^\d+$/.test(segment)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  createRuleForm(): FormGroup {
-    return this.fb.group({
-      json_path: ['', Validators.required],
-      target_field: ['', Validators.required],
-      default_value: [''],
-      transform_function_path: [null],
-      source_lookup: [null],
-      target_lookup: [null],
-      condition_expression: [''],
-      conditions: this.fb.array([]),
-      // Advanced options
-      skip_empty: [false],
-      trim_whitespace: [true],
-      convert_types: [true],
-      use_array_index: [false],
-      array_indices: this.fb.array([]),
-      array_index_notation: [false],
-      validate_on_save: [true]
-    });
-  }
-
   populateForm(rule: MapperFieldRule): void {
     this.ruleForm.patchValue({
       json_path: rule.json_path,
       target_field: rule.target_field,
       default_value: rule.default_value || '',
       transform_function_path: rule.transform_function_path || null,
+      use_lookup: !!(rule.source_lookup && rule.target_lookup),
       source_lookup: rule.source_lookup || null,
       target_lookup: rule.target_lookup || null,
       condition_expression: rule.condition_expression || ''
@@ -417,6 +418,97 @@ export class FieldRuleEditorComponent implements OnInit {
     );
   }
 
+  // Additional methods
+  addArrayIndex(): void {
+    const indices = this.ruleForm.get('array_indices') as FormArray;
+    indices.push(this.fb.control(0));
+  }
+
+  removeArrayIndex(index: number): void {
+    const indices = this.ruleForm.get('array_indices') as FormArray;
+    indices.removeAt(index);
+  }
+
+  buildJsonPath(): string {
+    const basePath = this.ruleForm.get('json_path')?.value;
+    const useArrayIndex = this.ruleForm.get('use_array_index')?.value;
+
+    if (!useArrayIndex) return basePath;
+
+    const indices = this.ruleForm.get('array_indices')?.value || [];
+    let path = basePath;
+
+    indices.forEach((index: number) => {
+      path += `.${index}`;
+    });
+
+    return path;
+  }
+
+  buildConditionFromVisual(): void {
+    const condition = `${this.conditionBuilder.field} ${this.conditionBuilder.operator} '${this.conditionBuilder.value}'`;
+    this.ruleForm.patchValue({ condition_expression: condition });
+  }
+
+  // Drag and drop for condition ordering
+  dropCondition(event: CdkDragDrop<any[]>): void {
+    const conditionsArray = this.ruleForm.get('conditions') as FormArray;
+    const conditions = conditionsArray.value;
+    moveItemInArray(conditions, event.previousIndex, event.currentIndex);
+    conditionsArray.setValue(conditions);
+  }
+
+  // Real-time validation
+  validateJsonPath(): void {
+    const path = this.ruleForm.get('json_path')?.value;
+    if (!path) return;
+
+    // Check against suggestions
+    const isValid = this.validatePathFormat(path);
+    if (!isValid) {
+      this.ruleForm.get('json_path')?.setErrors({ invalidPath: true });
+    }
+  }
+
+  validatePathFormat(path: string): boolean {
+    // Implementation from validation service
+    const segments = path.split('.');
+    for (const segment of segments) {
+      if (segment === '') return false;
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(segment) && !/^\d+$/.test(segment)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  validateRule(): string[] {
+    const errors: string[] = [];
+    const formValue = this.ruleForm.value;
+
+    // Validate JSONPath
+    if (!this.validatePathFormat(formValue.json_path)) {
+      errors.push('Invalid JSON path format');
+    }
+
+    // Validate target field
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(formValue.target_field)) {
+      errors.push('Target field must be a valid Python identifier');
+    }
+
+    // Validate lookups
+    if (formValue.use_lookup && formValue.source_lookup && !formValue.target_lookup) {
+      errors.push('Target lookup required when source lookup is specified');
+    }
+
+    return errors;
+  }
+
+  showValidationErrors(errors: string[]): void {
+    // Show errors in a dialog or snackbar
+    console.error('Validation errors:', errors);
+  }
+
   cancel(): void {
     this.dialogRef.close();
   }
@@ -436,10 +528,17 @@ export class FieldRuleEditorComponent implements OnInit {
       json_path: formValue.json_path,
       target_field: formValue.target_field,
       default_value: formValue.default_value || undefined,
-      transform_function_path: formValue.transform_function_path || undefined,
-      source_lookup: formValue.source_lookup || undefined,
-      target_lookup: formValue.target_lookup || undefined
+      transform_function_path: formValue.transform_function_path || undefined
     };
+
+    // Handle lookups based on use_lookup checkbox
+    if (formValue.use_lookup && formValue.source_lookup && formValue.target_lookup) {
+      result.source_lookup = formValue.source_lookup;
+      result.target_lookup = formValue.target_lookup;
+    } else {
+      result.source_lookup = undefined;
+      result.target_lookup = undefined;
+    }
 
     // Handle conditions based on mode
     if (this.conditionMode === 'expression' && formValue.condition_expression) {
@@ -449,33 +548,6 @@ export class FieldRuleEditorComponent implements OnInit {
     }
 
     this.dialogRef.close(result);
-  }
-
-  validateRule(): string[] {
-    const errors: string[] = [];
-    const formValue = this.ruleForm.value;
-
-    // Validate JSONPath
-    if (!this.validatePathFormat(formValue.json_path)) {
-      errors.push('Invalid JSON path format');
-    }
-
-    // Validate target field
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(formValue.target_field)) {
-      errors.push('Target field must be a valid Python identifier');
-    }
-
-    // Validate lookups
-    if (formValue.source_lookup && !formValue.target_lookup) {
-      errors.push('Target lookup required when source lookup is specified');
-    }
-
-    return errors;
-  }
-
-  showValidationErrors(errors: string[]): void {
-    // Show errors in a dialog or snackbar
-    console.error('Validation errors:', errors);
   }
 
   private buildConditions(conditionGroups: any[]): MapperFieldRuleCondition[] {

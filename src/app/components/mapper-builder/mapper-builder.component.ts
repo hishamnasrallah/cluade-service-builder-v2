@@ -49,6 +49,7 @@ import { LogsViewerComponent } from './components/logs-viewer/logs-viewer.compon
 import {
   ValidationResultsDialogComponent
 } from './components/dialogs/validation-results-dialog/validation-results-dialog';
+import {FieldRuleEditorComponent} from './components/field-rule-editor/field-rule-editor.component';
 
 @Component({
   selector: 'app-mapper-builder',
@@ -171,6 +172,9 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
       // Log lookups for debugging
       if (lookups && lookups.length > 0) {
         console.log('Sample lookup:', lookups[0]);
+        console.log('All lookups:', lookups);
+      } else {
+        console.warn('No lookups loaded from API');
       }
 
       this.mapperState.setReferenceData({
@@ -476,13 +480,30 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
   }
 
   // Field rule management
-  addFieldRule(rule: any): void {
-    if (this.selectedTargetId) {
-      this.mapperState.addFieldRule(this.selectedTargetId, rule);
-      this.saveUndoState('ADD_FIELD_RULE');
-    }
-  }
+  addFieldRule(): void {
+    console.log('Opening Field Rule Dialog with lookups:', this.availableLookups?.length || 0);
 
+    if (this.availableLookups && this.availableLookups.length > 0) {
+      console.log('Sample lookup:', this.availableLookups[0]);
+    }
+
+    const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
+      width: '800px',
+      maxHeight: '90vh',
+      data: {
+        rule: null,
+        targetModel: this.target?.model || this.targetForm.get('model')?.value,
+        availableLookups: this.availableLookups || [],
+        availableTransforms: this.availableTransforms || []
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.fieldRuleAdded.emit(result);
+      }
+    });
+  }
   updateFieldRule(event: { ruleId: number; changes: any }): void {
     if (this.selectedTargetId) {
       this.mapperState.updateFieldRule(this.selectedTargetId, event.ruleId, event.changes);

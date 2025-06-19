@@ -64,7 +64,14 @@ export class FieldRuleListComponent implements OnInit, OnChanges {
 
   ngOnInit(): void {
     this.filteredRules = [...this.fieldRules];
-    console.log('FieldRuleList initialized with lookups:', this.availableLookups?.length || 0);
+    console.log('FieldRuleList initialized with:', {
+      lookups: this.availableLookups?.length || 0,
+      transforms: this.availableTransforms?.length || 0,
+      rules: this.fieldRules?.length || 0
+    });
+    if (this.availableLookups && this.availableLookups.length > 0) {
+      console.log('Sample lookup in FieldRuleList:', this.availableLookups[0]);
+    }
   }
 
   ngOnChanges(): void {
