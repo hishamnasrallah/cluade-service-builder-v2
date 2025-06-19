@@ -1,4 +1,4 @@
-// app.module.ts - Fixed import name
+// app.module.ts - Updated to remove bootstrap array since we're using standalone bootstrapping
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
@@ -148,7 +148,7 @@ const routes: Routes = [
       useClass: AuthInterceptorClass,
       multi: true
     }
-  ],
-  bootstrap: [AppComponent]
+  ]
+  // Removed bootstrap array since we're using standalone bootstrapping
 })
 export class AppModule { }
