@@ -663,12 +663,15 @@ export class MapperApiService {
       );
   }
 
-  // Case types
+  // Case types - Fixed to use existing method
   getCaseTypes(): Observable<string[]> {
-    return this.getLookups('Service').pipe(
-      map(response => {
+    return this.getLookupsByName('Service').pipe(
+      map((response: LookupOption[]) => {
         // Extract case types from the service lookup
-        return response.results.map(item => item.code);
+        if (response.length > 0) {
+          return response[0].values.map((item: LookupValue) => item.code);
+        }
+        return [];
       }),
       tap(types => console.log('Case types:', types)),
       catchError(error => {
