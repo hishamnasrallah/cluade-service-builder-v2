@@ -42,7 +42,7 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
     // MonacoEditorModule
   ],
   templateUrl:'./transform-function-manager.component.html',
-  styleUrls:['./transform-function-manager.component.scss']
+  styleUrls:['../transform-function-manager/transform-function-manager.scss']
 })
 export class TransformFunctionManagerComponent implements OnInit {
   transformFunctions: TransformFunction[] = [];

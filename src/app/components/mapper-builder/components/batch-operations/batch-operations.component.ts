@@ -39,8 +39,7 @@ export interface BatchOperationDialogData {
     MatProgressBarModule,
     MatListModule
   ],
-  templateUrl: './batch-operations.component.html',
-  styleUrls: ['./batch-operations.component.scss']
+  templateUrl: './batch-operations.component.html'
 })
 export class BatchOperationsComponent {
   operationForm: FormGroup;
