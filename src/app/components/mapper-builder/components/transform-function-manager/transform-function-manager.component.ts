@@ -1,20 +1,19 @@
-// src/app/components/mapper-builder/components/transform-function-manager/transform-function-manager.component.ts
-
-import { Component, OnInit, Inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, Inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatDialogModule, MatDialog, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 // Note: MonacoEditorModule would need to be installed separately
 // import { MonacoEditorModule } from 'ngx-monaco-editor';
 
@@ -27,22 +26,93 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    FormsModule,
     MatCardModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatDialogModule,
-    MatTabsModule,
-    MatChipsModule,
     MatTooltipModule,
-    MatExpansionModule,
+    MatChipsModule,
+    MatDividerModule,
+    MatDialogModule,
     MatSnackBarModule,
     // MonacoEditorModule
   ],
-  templateUrl:'./transform-function-manager.component.html',
-  styleUrls:['../transform-function-manager/transform-function-manager.scss']
+  templateUrl: './transform-function-manager.component.html',
+  styles: [`
+    .transform-function-manager {
+      height: 100%;
+    }
+
+    mat-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .header-actions {
+      flex-shrink: 0;
+    }
+
+    .functions-table-container {
+      margin-top: 16px;
+    }
+
+    .functions-table {
+      width: 100%;
+    }
+
+    code {
+      background-color: #f5f5f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+
+    .test-container {
+      padding: 24px;
+    }
+
+    .test-form {
+      margin: 24px 0;
+    }
+
+    .full-width {
+      width: 100%;
+    }
+
+    .test-result {
+      margin-top: 24px;
+    }
+
+    .test-result mat-card {
+      margin-top: 16px;
+    }
+
+    .test-result mat-card.success {
+      border-left: 4px solid #4caf50;
+    }
+
+    .test-result mat-card.error {
+      border-left: 4px solid #f44336;
+    }
+
+    ::ng-deep .mat-mdc-tab-body-wrapper {
+      flex: 1;
+      height: 100%;
+    }
+  `]
 })
 export class TransformFunctionManagerComponent implements OnInit {
   transformFunctions: TransformFunction[] = [];
