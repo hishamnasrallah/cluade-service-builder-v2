@@ -126,7 +126,6 @@ export class MapperApiService {
 
   // Transform the API response to match the expected LookupOption format
   // Transform the API response to match the expected LookupOption format
-  // Transform the API response to match the expected LookupOption format
   private transformLookupResponse(apiItems: LookupApiItem[]): LookupOption[] {
     if (!apiItems || apiItems.length === 0) {
       console.warn('No lookup items to transform');
