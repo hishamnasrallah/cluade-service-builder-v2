@@ -1,0 +1,108 @@
+.batch-operations-dialog {
+  min-width: 500px;
+  max-width: 800px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+}
+
+.operation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.targets-section {
+  margin-bottom: 24px;
+}
+
+.targets-section h3 {
+  margin: 0 0 16px 0;
+  color: #424242;
+  font-size: 16px;
+}
+
+.selection-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.targets-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.target-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.target-info strong {
+  font-size: 14px;
+}
+
+.target-info small {
+  color: #666;
+  font-size: 12px;
+}
+
+.operation-section {
+  margin-bottom: 24px;
+}
+
+.operation-section h3 {
+  margin: 0 0 16px 0;
+  color: #424242;
+  font-size: 16px;
+}
+
+.operation-fields {
+  margin-top: 16px;
+}
+
+.delete-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background-color: #ffebee;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.delete-confirmation mat-icon {
+  color: #f44336;
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+}
+
+.delete-confirmation p {
+  margin: 0;
+  color: #d32f2f;
+}
+
+.progress-section {
+  margin-top: 24px;
+}
+
+.progress-section p {
+  margin: 0 0 8px 0;
+  color: #666;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.danger {
+  color: #f44336;
+}
