@@ -30,6 +30,7 @@
     "@angular/cli": "^18.0.0",
     "@angular/compiler-cli": "^18.0.0",
     "@types/uuid": "^9.0.8",
+    "sass": "^1.69.5",
     "typescript": "~5.4.0"
   }
 }

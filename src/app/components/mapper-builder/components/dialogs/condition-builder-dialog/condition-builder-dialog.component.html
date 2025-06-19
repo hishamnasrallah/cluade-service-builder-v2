@@ -5,7 +5,7 @@
 
 <mat-dialog-content>
   <div class="builder-modes">
-    <mat-chip-listbox [(ngModel)]="builderMode" aria-label="Builder mode">
+    <mat-chip-listbox [(ngModel)]="builderMode" name="builderMode" aria-label="Builder mode">
       <mat-chip-option value="visual">
         <mat-icon>visibility</mat-icon>
         Visual Builder
@@ -45,7 +45,7 @@
           <!-- Group Logic Selector -->
           <div class="group-logic-selector">
             <span class="logic-label">Conditions in this group are combined with:</span>
-            <mat-button-toggle-group [(ngModel)]="group.logic" aria-label="Group logic">
+            <mat-button-toggle-group [(ngModel)]="group.logic" name="groupLogic{{i}}" aria-label="Group logic">
               <mat-button-toggle value="AND">AND</mat-button-toggle>
               <mat-button-toggle value="OR">OR</mat-button-toggle>
             </mat-button-toggle-group>
@@ -68,6 +68,7 @@
                 <mat-label>Field</mat-label>
                 <input matInput
                        [(ngModel)]="condition.field"
+                       name="conditionField{{i}}_{{j}}"
                        [matAutocomplete]="fieldAuto"
                        placeholder="e.g., user.age">
                 <mat-autocomplete #fieldAuto="matAutocomplete"
@@ -85,7 +86,7 @@
               <!-- Operator Select -->
               <mat-form-field appearance="outline" class="operator-select">
                 <mat-label>Operator</mat-label>
-                <mat-select [(ngModel)]="condition.operator">
+                <mat-select [(ngModel)]="condition.operator" name="conditionOperator{{i}}_{{j}}">
                   <mat-option value="==">equals</mat-option>
                   <mat-option value="!=">not equals</mat-option>
                   <mat-option value=">">greater than</mat-option>
@@ -108,6 +109,7 @@
                 <mat-label>Value</mat-label>
                 <input matInput
                        [(ngModel)]="condition.value"
+                       name="conditionValue{{i}}_{{j}}"
                        [type]="getInputType(condition)"
                        placeholder="Enter value">
                 <mat-hint *ngIf="condition.type">Expected: {{ condition.type }}</mat-hint>
@@ -165,6 +167,7 @@
       <mat-label>Condition Expression</mat-label>
       <textarea matInput
                 [(ngModel)]="expressionText"
+                name="expressionText"
                 rows="8"
                 placeholder="e.g., (age > 18 and status == 'active') or user_type in ['admin', 'manager']">
       </textarea>

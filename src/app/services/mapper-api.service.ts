@@ -318,7 +318,7 @@ export class MapperApiService {
   }
 
   getTransformFunctions(): Observable<TransformFunction[]> {
-    return this.http.get<TransformFunction[]>(this.getFullUrl('/api/functions/transforms/'))
+    return this.http.get<TransformFunction[]>(this.getFullUrl('/cases/functions/transforms/'))
       .pipe(
         tap(transforms => console.log('Transform functions:', transforms)),
         catchError(error => {
@@ -343,15 +343,32 @@ export class MapperApiService {
   }
 
   getFilterFunctions(): Observable<FilterFunction[]> {
-    return this.http.get<FilterFunction[]>(this.getFullUrl('/api/functions/filters/'))
+    return this.http.get<FilterFunction[]>(this.getFullUrl('/cases/functions/filters/'))
       .pipe(
         tap(filters => console.log('Filter functions:', filters)),
-        catchError(this.handleError('getFilterFunctions'))
+        catchError(error => {
+          console.error('Failed to load filters:', error);
+          // Return mock filters as fallback
+          return of([
+            {
+              path: 'common.filters.not_empty',
+              label: 'Not Empty',
+              description: 'Filter out empty values',
+              is_builtin: true
+            },
+            {
+              path: 'common.filters.is_valid_email',
+              label: 'Valid Email',
+              description: 'Filter valid email addresses',
+              is_builtin: true
+            }
+          ]);
+        })
       );
   }
 
   getProcessorFunctions(): Observable<ProcessorFunction[]> {
-    return this.http.get<ProcessorFunction[]>(this.getFullUrl('/api/functions/processors/'))
+    return this.http.get<ProcessorFunction[]>(this.getFullUrl('/cases/functions/processors/'))
       .pipe(
         tap(processors => console.log('Processor functions:', processors)),
         catchError(this.handleError('getProcessorFunctions'))

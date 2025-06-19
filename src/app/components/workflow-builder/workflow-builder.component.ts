@@ -54,8 +54,8 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   canvasState: CanvasState = {
     zoom: 1,
-    panX: 0,
-    panY: 0
+    panX: 100,
+    panY: 100
   };
 
   canvasSize = { width: 5000, height: 5000 };
@@ -97,9 +97,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   ngAfterViewInit(): void {
-    // Initialize canvas pan to center
-    this.canvasState.panX = 100;
-    this.canvasState.panY = 100;
+    // Canvas is already initialized in constructor, no need to change panX/panY here
   }
 
   ngOnDestroy(): void {
