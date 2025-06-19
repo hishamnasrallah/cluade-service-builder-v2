@@ -125,8 +125,8 @@ export class MapperApiService {
   }
 
   // Transform the API response to match the expected LookupOption format
-// Transform the API response to match the expected LookupOption format
-// Transform the API response to match the expected LookupOption format
+  // Transform the API response to match the expected LookupOption format
+  // Transform the API response to match the expected LookupOption format
   private transformLookupResponse(apiItems: LookupApiItem[]): LookupOption[] {
     if (!apiItems || apiItems.length === 0) {
       console.warn('No lookup items to transform');
@@ -665,11 +665,17 @@ export class MapperApiService {
 
   // Case types
   getCaseTypes(): Observable<string[]> {
-    return this.http.get<string[]>(this.getFullUrl('/api/case-types/'))
-      .pipe(
-        tap(types => console.log('Case types:', types)),
-        catchError(this.handleError('getCaseTypes'))
-      );
+    return this.getLookups('Service').pipe(
+      map(response => {
+        // Extract case types from the service lookup
+        return response.results.map(item => item.code);
+      }),
+      tap(types => console.log('Case types:', types)),
+      catchError(error => {
+        console.error('Failed to load case types:', error);
+        return of(['USER_REG', 'EMPLOYEE_BENEFITS', 'APPLICATION_FORM']);
+      })
+    );
   }
 
   // Validate mapper configuration

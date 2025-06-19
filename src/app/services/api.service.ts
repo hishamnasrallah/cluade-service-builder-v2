@@ -145,7 +145,7 @@ export class ApiService {
 
   // Service Flow APIs
   getServiceFlows(): Observable<ServiceFlowResponse> {
-    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/service_flow/'))
+    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamicflow/service_flow/'))
       .pipe(
         tap(response => console.log('Loaded service flows:', response)),
         catchError(this.handleError)
