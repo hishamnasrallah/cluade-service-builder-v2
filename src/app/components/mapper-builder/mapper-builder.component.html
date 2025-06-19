@@ -110,7 +110,7 @@
           [availableLookups]="availableLookups"
           [availableTransforms]="availableTransforms"
           (targetUpdated)="updateTarget($event)"
-          (fieldRuleAdded)="addFieldRule($event)"
+          (fieldRuleAdded)="onFieldRuleAdded($event)"
           (fieldRuleUpdated)="updateFieldRule($event)"
           (fieldRuleDeleted)="deleteFieldRule($event)">
         </app-target-details>

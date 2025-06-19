@@ -479,7 +479,7 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Field rule management - renamed and fixed method signature
+  // Field rule management - fixed method names and signatures
   onFieldRuleAdded(rule: any): void {
     if (this.selectedTargetId) {
       this.mapperState.addFieldRule(this.selectedTargetId, rule);

@@ -38,8 +38,8 @@ interface AppGroup {
     MatBadgeModule,
     MatDividerModule
   ],
-  templateUrl:'model-browser.component.html',
-  styleUrl:'model-browser.component.scss'
+  templateUrl: 'model-browser.component.html',
+  styleUrl: 'model-browser.component.scss'
 })
 export class ModelBrowserComponent implements OnInit {
   @Input() models: ModelOption[] = [];
