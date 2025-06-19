@@ -39,7 +39,7 @@ interface AppGroup {
     MatDividerModule
   ],
   templateUrl:'model-browser.component.html',
-  styleUrl:'model-browser.component.css'
+  styleUrl:'model-browser.component.scss'
 })
 export class ModelBrowserComponent implements OnInit {
   @Input() models: ModelOption[] = [];

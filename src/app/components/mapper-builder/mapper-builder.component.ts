@@ -479,31 +479,14 @@ export class MapperBuilderComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Field rule management
-  addFieldRule(): void {
-    console.log('Opening Field Rule Dialog with lookups:', this.availableLookups?.length || 0);
-
-    if (this.availableLookups && this.availableLookups.length > 0) {
-      console.log('Sample lookup:', this.availableLookups[0]);
+  // Field rule management - renamed and fixed method signature
+  onFieldRuleAdded(rule: any): void {
+    if (this.selectedTargetId) {
+      this.mapperState.addFieldRule(this.selectedTargetId, rule);
+      this.saveUndoState('ADD_FIELD_RULE');
     }
-
-    const dialogRef = this.dialog.open(FieldRuleEditorComponent, {
-      width: '800px',
-      maxHeight: '90vh',
-      data: {
-        rule: null,
-        targetModel: this.target?.model || this.targetForm.get('model')?.value,
-        availableLookups: this.availableLookups || [],
-        availableTransforms: this.availableTransforms || []
-      }
-    });
-
-    dialogRef.afterClosed().subscribe(result => {
-      if (result) {
-        this.fieldRuleAdded.emit(result);
-      }
-    });
   }
+
   updateFieldRule(event: { ruleId: number; changes: any }): void {
     if (this.selectedTargetId) {
       this.mapperState.updateFieldRule(this.selectedTargetId, event.ruleId, event.changes);

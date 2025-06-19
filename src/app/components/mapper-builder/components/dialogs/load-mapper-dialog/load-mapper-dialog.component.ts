@@ -40,7 +40,7 @@ import { MapperApiService } from '../../../../../services/mapper-api.service';
     MatTooltip
   ],
   templateUrl:'load-mapper-dialog.component.html',
-  styleUrl:'load-mapper-dialog.component.css'
+  styleUrl:'load-mapper-dialog.component.scss'
 })
 export class LoadMapperDialogComponent implements OnInit {
   searchControl = new FormControl('');
