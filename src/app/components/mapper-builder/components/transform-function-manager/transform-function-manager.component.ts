@@ -11,6 +11,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatDialog, MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -37,6 +38,7 @@ import { MapperApiService } from '../../../../services/mapper-api.service';
     MatTooltipModule,
     MatChipsModule,
     MatDividerModule,
+    MatTabsModule,
     MatDialogModule,
     MatSnackBarModule,
     // MonacoEditorModule
