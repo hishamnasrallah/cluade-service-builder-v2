@@ -95,6 +95,7 @@ export interface ServiceFlowPage {
 
 
 export interface VisibilityCondition {
+  id?: number;
   condition_logic: ConditionLogicItem[];
 }
 

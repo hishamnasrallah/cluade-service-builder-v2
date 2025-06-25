@@ -211,6 +211,7 @@ export interface WorkflowData {
     updated_at?: string;
     version?: string;
     service_code?: string;
+    service_id?: number;
   };
 }
 

@@ -398,13 +398,13 @@ export class WorkflowService {
         const pageElementId = `page-${page.page_id || pageIndex}`;
 
         // Extract IDs from objects if necessary
-        const sequenceNumberId = typeof page.sequence_number === 'object'
-          ? page.sequence_number.id
-          : page.sequence_number;
+        const sequenceNumberId = page.sequence_number
+          ? (typeof page.sequence_number === 'object' ? page.sequence_number.id : page.sequence_number)
+          : null;
 
-        const applicantTypeId = typeof page.applicant_type === 'object'
-          ? page.applicant_type.id
-          : page.applicant_type;
+        const applicantTypeId = page.applicant_type
+          ? (typeof page.applicant_type === 'object' ? page.applicant_type.id : page.applicant_type)
+          : null;
 
         // Create page element with properly extracted IDs
         const pageElement: WorkflowElement = {
@@ -442,7 +442,7 @@ export class WorkflowService {
         // Convert categories as children of page
         if (page.categories && Array.isArray(page.categories)) {
           page.categories.forEach((category: any, categoryIndex: number) => {
-            const categoryElementId = `category-${category.id || categoryIndex}`;
+            const categoryElementId = `category-${category?.id || categoryIndex}`;
 
             const categoryElement: WorkflowElement = {
               id: categoryElementId,
@@ -469,16 +469,29 @@ export class WorkflowService {
             // Convert fields as children of category
             if (category.fields && Array.isArray(category.fields)) {
               category.fields.forEach((field: any, fieldIndex: number) => {
-                const fieldElementId = `field-${field.field_id || fieldIndex}`;
+                // Skip null or undefined fields
+                if (!field) {
+                  console.warn(`Skipping null field at index ${fieldIndex} in category ${category.name}`);
+                  return;
+                }
+
+                // Debug log to see field structure
+                console.log(`Processing field ${fieldIndex} in category ${category.name}:`, {
+                  name: field.name,
+                  field_id: field.field_id,
+                  has_visibility_conditions: !!field.visibility_conditions,
+                  visibility_conditions_count: field.visibility_conditions ? field.visibility_conditions.length : 0
+                });
+                const fieldElementId = `field-${field?.field_id || fieldIndex}`;
 
                 // Extract field type ID if it's an object
-                const fieldTypeId = typeof field.field_type === 'object'
-                  ? field.field_type.id
-                  : field.field_type;
+                const fieldTypeId = field.field_type
+                  ? (typeof field.field_type === 'object' && field.field_type ? field.field_type.id : field.field_type)
+                  : null;
 
-                const lookupId = typeof field.lookup === 'object'
-                  ? field.lookup.id
-                  : field.lookup;
+                const lookupId = field.lookup
+                  ? (typeof field.lookup === 'object' && field.lookup ? field.lookup.id : field.lookup)
+                  : null;
 
                 const fieldElement: WorkflowElement = {
                   id: fieldElementId,
@@ -534,30 +547,48 @@ export class WorkflowService {
                 categoryElement.children!.push(fieldElementId);
 
                 // Handle visibility conditions
-                if (field.visibility_conditions && field.visibility_conditions.length > 0) {
+                if (field.visibility_conditions && Array.isArray(field.visibility_conditions) && field.visibility_conditions.length > 0) {
+                  console.log(`Processing ${field.visibility_conditions.length} visibility conditions for field ${field.name}`);
+
                   field.visibility_conditions.forEach((condition: any, conditionIndex: number) => {
-                    const conditionElementId = `condition-${field.field_id || fieldIndex}-${conditionIndex}`;
+                    try {
+                      // Skip null or undefined conditions
+                      if (!condition) {
+                        console.warn(`Skipping null visibility condition at index ${conditionIndex} for field ${field.name}`);
+                        return;
+                      }
 
-                    workflowData.elements.push({
-                      id: conditionElementId,
-                      type: ElementType.CONDITION,
-                      position: { x: 400 + (conditionIndex * 150), y: 100 },
-                      properties: {
-                        name: `Condition for ${field.display_name || field.name}`,
-                        target_field: field.name,
-                        target_field_id: field.field_id,
-                        condition_logic: condition.condition_logic || [],
-                        condition_id: condition.id
-                      },
-                      connections: []
-                    });
+                      console.log(`Processing condition ${conditionIndex}:`, condition);
 
-                    // Only connect if both elements are top-level (no parents)
-                    workflowData.connections.push({
-                      id: `conn-${pageElementId}-${conditionElementId}`,
-                      sourceId: pageElementId,
-                      targetId: conditionElementId
-                    });
+                      const conditionElementId = `condition-${field.field_id || fieldIndex}-${conditionIndex}`;
+
+                      const conditionElement = {
+                        id: conditionElementId,
+                        type: ElementType.CONDITION,
+                        position: { x: 400 + (conditionIndex * 150), y: 100 },
+                        properties: {
+                          name: `Condition for ${field.display_name || field.name || 'Unknown Field'}`,
+                          target_field: field.name || '',
+                          target_field_id: field.field_id || null,
+                          condition_logic: (condition && condition.condition_logic) ? condition.condition_logic : [],
+                          condition_id: (condition && typeof condition.id !== 'undefined') ? condition.id : null
+                        },
+                        connections: []
+                      };
+
+                      workflowData.elements.push(conditionElement);
+
+                      // Only connect if both elements are top-level (no parents)
+                      workflowData.connections.push({
+                        id: `conn-${pageElementId}-${conditionElementId}`,
+                        sourceId: pageElementId,
+                        targetId: conditionElementId
+                      });
+                    } catch (error) {
+                      console.error(`Error processing visibility condition ${conditionIndex} for field ${field.name}:`, error);
+                      console.error('Condition data:', condition);
+                      console.error('Field data:', field);
+                    }
                   });
                 }
               });
