@@ -5,9 +5,9 @@ export interface WorkflowElement {
   position: Position;
   properties: ElementProperties;
   connections: Connection[];
-  isExpanded?: boolean; // New: Track expansion state
-  parentId?: string; // New: Track parent element
-  children?: string[]; // New: Track child element IDs
+  isExpanded?: boolean;
+  parentId?: string;
+  children?: string[];
 }
 
 export enum ElementType {
@@ -33,12 +33,14 @@ export interface Connection {
 }
 
 export interface ElementProperties {
-  [key: string]: any; // Add index signature to allow string indexing
+  [key: string]: any;
   name?: string;
   description?: string;
-  // Summary counts for display
-  categoryCount?: number; // For pages
-  fieldCount?: number; // For pages and categories
+
+  // NEW: Summary counts for display
+  categoryCount?: number;     // For pages
+  fieldCount?: number;        // For pages and categories
+
   // Page properties
   useExisting?: boolean;
   existingPageId?: number;
@@ -70,34 +72,6 @@ export interface ElementProperties {
   _is_disabled?: boolean;
   _lookup?: number;
 
-  // Field validation properties (matching API structure)
-  _max_length?: number;
-  _min_length?: number;
-  _regex_pattern?: string;
-  _allowed_characters?: string;
-  _forbidden_words?: string;
-  _value_greater_than?: number;
-  _value_less_than?: number;
-  _integer_only?: boolean;
-  _positive_only?: boolean;
-  _date_greater_than?: string;
-  _date_less_than?: string;
-  _future_only?: boolean;
-  _past_only?: boolean;
-  _default_boolean?: boolean;
-  _file_types?: string;
-  _max_file_size?: number;
-  _image_max_width?: number;
-  _image_max_height?: number;
-  _max_selections?: number;
-  _min_selections?: number;
-  _precision?: number;
-  _unique?: boolean;
-  _default_value?: string;
-  _coordinates_format?: boolean;
-  _uuid_format?: boolean;
-  _parent_field?: number;
-
   // Condition properties
   target_field?: string;
   condition_logic?: ConditionLogic[];
@@ -106,10 +80,15 @@ export interface ElementProperties {
   action?: string;
 }
 
+// NEW: Add interface for element dimensions
 export interface ElementDimensions {
   collapsed: { width: number; height: number };
   expanded: { width: number; height: number };
 }
+
+
+
+
 export interface StartElementProperties extends ElementProperties {
   name: string;
 }
@@ -208,8 +187,8 @@ export interface WorkflowData {
   description?: string;
   elements: WorkflowElement[];
   connections: Connection[];
-  expandedElementId?: string; // New: Track which element is currently expanded
-  viewMode?: 'collapsed' | 'expanded'; // New: Track view mode
+  expandedElementId?: string;
+  viewMode?: 'collapsed' | 'expanded';
   metadata?: {
     created_at?: string;
     updated_at?: string;
@@ -234,6 +213,8 @@ export interface ElementTypeConfig {
   canSendConnections: boolean;
   maxInstances?: number;
 }
+
+// UPDATED: Element dimensions with expanded sizes
 export const ELEMENT_DIMENSIONS: { [key: string]: ElementDimensions } = {
   [ElementType.START]: {
     collapsed: { width: 60, height: 60 },
@@ -260,6 +241,7 @@ export const ELEMENT_DIMENSIONS: { [key: string]: ElementDimensions } = {
     expanded: { width: 60, height: 60 }
   }
 };
+
 
 // Field types mapping based on the API response
 export const FIELD_TYPE_MAPPING: { [key: string]: string } = {
@@ -356,6 +338,7 @@ export function isValidFieldType(fieldType: string | number): boolean {
 export function canContainChildren(elementType: ElementType): boolean {
   return elementType === ElementType.PAGE || elementType === ElementType.CATEGORY;
 }
+
 export function getValidChildTypes(parentType: ElementType): ElementType[] {
   switch (parentType) {
     case ElementType.PAGE:

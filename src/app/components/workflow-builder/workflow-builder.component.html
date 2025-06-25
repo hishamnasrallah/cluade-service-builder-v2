@@ -1,3 +1,4 @@
+<!-- Updated workflow-builder.component.html with hierarchy support -->
 <div class="workflow-builder">
   <!-- Top Toolbar -->
   <mat-toolbar class="workflow-toolbar">
@@ -8,13 +9,13 @@
     <span class="workflow-title">{{ workflow.name }}</span>
 
     <span class="workflow-status" [class.saved]="currentServiceCode" *ngIf="currentServiceCode || !currentServiceCode">
-          <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
-          <span>{{ currentServiceCode ? 'Online' : 'Local Only' }}</span>
-        </span>
+      <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
+      <span>{{ currentServiceCode ? 'Online' : 'Local Only' }}</span>
+    </span>
 
     <span class="spacer"></span>
 
-    <!-- View Mode Toggle -->
+    <!-- NEW: View Mode Toggle -->
     <mat-button-toggle-group [value]="workflow.viewMode" (change)="onViewModeChange($event)">
       <mat-button-toggle value="collapsed">
         <mat-icon>compress</mat-icon>
@@ -106,7 +107,7 @@
                 </marker>
               </defs>
 
-              <!-- Only show connections between top-level elements -->
+              <!-- UPDATED: Only show connections between top-level elements -->
               <ng-container *ngFor="let connection of getTopLevelConnections(); trackBy: trackConnection">
                 <!-- Invisible wider stroke for easier clicking -->
                 <path [attr.d]="getConnectionPath(connection)"
@@ -140,7 +141,7 @@
               </path>
             </svg>
 
-            <!-- Workflow Elements (only top-level) -->
+            <!-- UPDATED: Workflow Elements (only top-level) -->
             <div *ngFor="let element of getTopLevelElements(); trackBy: trackElement"
                  class="element-container"
                  [style.left.px]="element.position.x"
@@ -165,7 +166,7 @@
               </app-workflow-element>
             </div>
 
-            <!-- Drop zones for child elements when parent is expanded -->
+            <!-- NEW: Drop zone hint for child elements -->
             <div *ngIf="workflow.expandedElementId" class="drop-zone-hint">
               <mat-icon>info</mat-icon>
               <span>Drag elements into the expanded container to add them</span>

@@ -36,8 +36,8 @@ export class WorkflowElementComponent implements OnInit {
   @Input() isSelected = false;
   @Input() isConnecting = false;
   @Input() canvasZoom = 1;
-  @Input() allElements: WorkflowElement[] = []; // New: Pass all elements
-  @Input() selectedElementId?: string; // New: Pass selected element ID
+  @Input() allElements: WorkflowElement[] = []; // NEW: Pass all elements
+  @Input() selectedElementId?: string; // NEW: Pass selected element ID
 
   @Output() elementClick = new EventEmitter<MouseEvent>();
   @Output() elementDoubleClick = new EventEmitter<MouseEvent>();
@@ -47,7 +47,7 @@ export class WorkflowElementComponent implements OnInit {
   @Output() deleteElement = new EventEmitter<void>();
   @Output() dragStart = new EventEmitter<void>();
   @Output() dragEnd = new EventEmitter<void>();
-  @Output() expandToggled = new EventEmitter<string>(); // New: Emit when expanded
+  @Output() expandToggled = new EventEmitter<string>(); // NEW: Emit when expanded
 
   elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element?.type);
   dimensions = ELEMENT_DIMENSIONS[this.element?.type] || ELEMENT_DIMENSIONS[ElementType.PAGE];

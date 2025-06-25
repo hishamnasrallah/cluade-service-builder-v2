@@ -22,7 +22,9 @@ import {
   ELEMENT_DIMENSIONS,
   Position,
   CanvasState,
-  canBeContained
+  canBeContained,
+  canContainChildren,
+  getValidChildTypes
 } from '../../models/workflow.models';
 import { WorkflowElementComponent } from './workflow-element/workflow-element.component';
 import { PropertiesPanelComponent } from './properties-panel/properties-panel.component';
@@ -32,7 +34,6 @@ import {
   ServiceFlowSelectionResult,
   ServiceFlowSelectorDialogComponent
 } from './workflow-selector-dialog/workflow-selector-dialog.component';
-
 @Component({
   selector: 'app-workflow-builder',
   standalone: true,
@@ -176,7 +177,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
   }
 
-  // Helper to get valid child types
+// Helper to get valid child types
   private getValidChildTypes(parentType: ElementType): ElementType[] {
     switch (parentType) {
       case ElementType.PAGE:
@@ -522,6 +523,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.tempConnection = undefined;
   }
 
+
   selectConnection(connectionId: string, event?: MouseEvent): void {
     this.selectedConnectionId = connectionId;
     this.selectedElementId = undefined;
@@ -552,6 +554,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     return element.isExpanded ? dims.expanded : dims.collapsed;
   }
+
 
   private createCurvedPath(x1: number, y1: number, x2: number, y2: number): string {
     const dx = x2 - x1;

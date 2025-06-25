@@ -59,7 +59,6 @@ export class WorkflowService {
     return this.currentServiceCode;
   }
 
-  // Updated to support hierarchy
   addElement(type: ElementType, position: Position, properties: any = {}, parentId?: string): WorkflowElement {
     // Validate parent-child relationship
     if (parentId) {
@@ -170,7 +169,6 @@ export class WorkflowService {
     this.updateWorkflow();
   }
 
-  // Toggle element expansion
   toggleElementExpansion(elementId: string): void {
     const element = this.currentWorkflow.elements.find(el => el.id === elementId);
     if (!element || !canContainChildren(element.type)) return;
@@ -212,7 +210,6 @@ export class WorkflowService {
       parent.properties.fieldCount = fields.length;
     }
   }
-
   // Get child elements
   private getChildElements(parentId: string): WorkflowElement[] {
     const parent = this.currentWorkflow.elements.find(el => el.id === parentId);
@@ -327,7 +324,7 @@ export class WorkflowService {
       serviceFlow.pages.forEach((page: any, pageIndex: number) => {
         const pageElementId = `page-${page.page_id || pageIndex}`;
 
-        // Create page element
+        // Create page element with children array
         const pageElement: WorkflowElement = {
           id: pageElementId,
           type: ElementType.PAGE,
@@ -399,25 +396,7 @@ export class WorkflowService {
                     _mandatory: field.mandatory || false,
                     _is_hidden: field.is_hidden || false,
                     _is_disabled: field.is_disabled || false,
-                    _lookup: field.lookup,
-                    // Add all validation properties
-                    _max_length: field.max_length,
-                    _min_length: field.min_length,
-                    _regex_pattern: field.regex_pattern,
-                    _allowed_characters: field.allowed_characters,
-                    _forbidden_words: field.forbidden_words,
-                    _value_greater_than: field.value_greater_than,
-                    _value_less_than: field.value_less_than,
-                    _integer_only: field.integer_only,
-                    _positive_only: field.positive_only,
-                    _precision: field.precision,
-                    _default_boolean: field.default_boolean,
-                    _file_types: field.file_types,
-                    _max_file_size: field.max_file_size,
-                    _image_max_width: field.image_max_width,
-                    _image_max_height: field.image_max_height,
-                    _max_selections: field.max_selections,
-                    _min_selections: field.min_selections
+                    _lookup: field.lookup
                   },
                   connections: [],
                   parentId: categoryElementId
@@ -652,9 +631,11 @@ export class WorkflowService {
 
     this.updateWorkflow();
   }
-
   // Auto-organize with hierarchy in mind
 // Auto-organize with hierarchy in mind
+// Fix for autoOrganizeElements method in workflow.service.ts
+
+// Option 1: Include all ElementType values in typeOrder
   autoOrganizeElements(): void {
     const elements = this.currentWorkflow.elements;
 
@@ -665,10 +646,10 @@ export class WorkflowService {
     const typeOrder: Record<ElementType, number> = {
       [ElementType.START]: 0,
       [ElementType.PAGE]: 1,
-      [ElementType.CONDITION]: 2,
-      [ElementType.END]: 3,
-      [ElementType.CATEGORY]: 4,
-      [ElementType.FIELD]: 5
+      [ElementType.CATEGORY]: 2,
+      [ElementType.FIELD]: 3,
+      [ElementType.CONDITION]: 4,
+      [ElementType.END]: 5
     };
 
     topLevelElements.sort((a, b) => (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0));
@@ -684,6 +665,7 @@ export class WorkflowService {
 
     this.updateWorkflow();
   }
+
   private addStartElementToWorkflow(workflow: WorkflowData): void {
     const startElement: WorkflowElement = {
       id: uuidv4(),
