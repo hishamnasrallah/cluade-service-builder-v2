@@ -1,35 +1,35 @@
 <div class="workflow-builder">
   <!-- Top Toolbar -->
+  <!-- Updated toolbar section for workflow-builder.component.html -->
+  <!-- Replace the existing toolbar with this cleaner version -->
+
   <mat-toolbar class="workflow-toolbar">
-    <button mat-icon-button (click)="showServiceFlowSelector()" title="Select Service Flow">
-      <mat-icon>account_tree</mat-icon>
+    <button mat-icon-button title="Menu">
+      <mat-icon>menu</mat-icon>
     </button>
 
     <span class="workflow-title">{{ workflow.name }}</span>
-    <span class="workflow-status" *ngIf="currentServiceCode">
-          <mat-icon>cloud</mat-icon>
-          Service: {{ currentServiceCode }}
-        </span>
-    <span class="workflow-status unsaved" *ngIf="!currentServiceCode">
-          <mat-icon>cloud_off</mat-icon>
-          Local Only
-        </span>
+
+    <span class="workflow-status" [class.saved]="currentServiceCode" *ngIf="currentServiceCode || !currentServiceCode">
+    <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
+    <span>{{ currentServiceCode ? 'Online' : 'Local Only' }}</span>
+  </span>
 
     <span class="spacer"></span>
 
-    <button mat-icon-button (click)="autoOrganize()" title="Auto-organize Layout">
+    <button mat-icon-button (click)="autoOrganize()" title="Auto-organize">
       <mat-icon>auto_fix_high</mat-icon>
-    </button>
-
-    <button mat-icon-button (click)="zoomIn()" title="Zoom In">
-      <mat-icon>zoom_in</mat-icon>
     </button>
 
     <button mat-icon-button (click)="zoomOut()" title="Zoom Out">
       <mat-icon>zoom_out</mat-icon>
     </button>
 
-    <button mat-icon-button (click)="resetZoom()" title="Reset Zoom">
+    <button mat-icon-button (click)="zoomIn()" title="Zoom In">
+      <mat-icon>zoom_in</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="resetZoom()" title="Reset View">
       <mat-icon>center_focus_strong</mat-icon>
     </button>
 
@@ -39,23 +39,26 @@
       <mat-icon>check_circle</mat-icon>
     </button>
 
+    <button mat-icon-button (click)="showServiceFlowSelector()" title="Open">
+      <mat-icon>folder_open</mat-icon>
+    </button>
+
     <button mat-icon-button (click)="saveWorkflow()" title="Save">
       <mat-icon>save</mat-icon>
     </button>
 
-    <button mat-icon-button (click)="showServiceFlowSelector()" title="Load Service Flow">
-      <mat-icon>folder_open</mat-icon>
+    <button mat-icon-button (click)="exportServiceFlow()" title="Export" [disabled]="!currentServiceCode">
+      <mat-icon>download</mat-icon>
     </button>
 
-    <button mat-icon-button (click)="createNewWorkflow()" title="New Workflow">
+    <button mat-icon-button (click)="createNewWorkflow()" title="New">
       <mat-icon>add</mat-icon>
     </button>
 
-    <button mat-icon-button (click)="exportServiceFlow()" title="Export Service Flow" [disabled]="!currentServiceCode">
-      <mat-icon>download</mat-icon>
+    <button mat-icon-button title="More">
+      <mat-icon>more_vert</mat-icon>
     </button>
   </mat-toolbar>
-
   <div class="workflow-content">
     <!-- Left Sidebar - Element Palette -->
     <mat-sidenav-container class="sidenav-container">

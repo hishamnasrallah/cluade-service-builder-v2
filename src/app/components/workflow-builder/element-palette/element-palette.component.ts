@@ -18,61 +18,22 @@ import { ElementType, ElementTypeConfig } from '../../../models/workflow.models'
     MatDividerModule,
     DragDropModule
   ],
+// element-palette.component.ts - Updated template and styles to match mockup
   template: `
     <div class="element-palette">
-      <div class="palette-header">
-        <h3>Elements</h3>
-        <p>Drag elements to the canvas</p>
-      </div>
-
-      <mat-divider></mat-divider>
+      <h3>Elements</h3>
 
       <div class="palette-content">
         <div *ngFor="let elementType of availableElements; trackBy: trackElement"
              class="palette-item"
-             [style.border-left-color]="elementType.color"
+             [class]="elementType.type"
              (click)="selectElement(elementType.type)"
              draggable="true"
              (dragstart)="onDragStart($event, elementType.type)"
-             [title]="getElementTooltip(elementType)">
+             [title]="getElementDescription(elementType)">
 
-          <div class="palette-item-content">
-            <div class="palette-item-icon" [style.background-color]="elementType.color">
-              <mat-icon>{{ elementType.icon }}</mat-icon>
-            </div>
-
-            <div class="palette-item-info">
-              <div class="palette-item-name">{{ elementType.name }}</div>
-              <div class="palette-item-description">{{ getElementDescription(elementType) }}</div>
-            </div>
-          </div>
-
-          <div class="palette-item-constraints" *ngIf="hasConstraints(elementType)">
-            <mat-icon *ngIf="!elementType.canReceiveConnections"
-                      class="constraint-icon"
-                      title="Cannot receive connections">
-              input
-            </mat-icon>
-            <mat-icon *ngIf="!elementType.canSendConnections"
-                      class="constraint-icon"
-                      title="Cannot send connections">
-              output
-            </mat-icon>
-            <span *ngIf="elementType.maxInstances"
-                  class="max-instances"
-                  title="Maximum instances: {{ elementType.maxInstances }}">
-              {{ elementType.maxInstances }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <mat-divider></mat-divider>
-
-      <div class="palette-footer">
-        <div class="palette-help">
-          <mat-icon>info</mat-icon>
-          <span>Click or drag to add elements</span>
+          <mat-icon [style.color]="elementType.color">{{ elementType.icon }}</mat-icon>
+          <span>{{ elementType.name }}</span>
         </div>
       </div>
     </div>
@@ -82,153 +43,74 @@ import { ElementType, ElementTypeConfig } from '../../../models/workflow.models'
       height: 100%;
       display: flex;
       flex-direction: column;
-      background: #f8f9fa;
+      background: #f5f5f5;
+      padding: 20px 15px;
     }
 
-    .palette-header {
-      padding: 16px;
-      text-align: center;
-      background: white;
-      border-bottom: 1px solid #e0e0e0;
-    }
-
-    .palette-header h3 {
-      margin: 0 0 4px 0;
+    h3 {
+      margin: 0 0 20px 0;
       color: #333;
-      font-size: 18px;
-    }
-
-    .palette-header p {
-      margin: 0;
-      color: #666;
-      font-size: 12px;
+      font-size: 16px;
+      font-weight: 500;
     }
 
     .palette-content {
       flex: 1;
       overflow-y: auto;
-      padding: 8px;
     }
 
     .palette-item {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 12px;
+      gap: 12px;
+      padding: 12px 15px;
       margin-bottom: 8px;
       background: white;
-      border-radius: 8px;
-      border-left: 4px solid;
+      border-radius: 6px;
       cursor: pointer;
       transition: all 0.2s ease;
       user-select: none;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      font-size: 14px;
+      color: #333;
     }
 
     .palette-item:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-      background: #f8f9fa;
+      background: #f0f0f0;
+      transform: translateX(3px);
     }
 
-    .palette-item:active {
-      transform: translateY(0);
-    }
-
-    .palette-item-content {
-      display: flex;
-      align-items: center;
-      flex: 1;
-    }
-
-    .palette-item-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 12px;
-      color: white;
-    }
-
-    .palette-item-icon mat-icon {
+    .palette-item mat-icon {
       font-size: 20px;
+      width: 20px;
+      height: 20px;
     }
 
-    .palette-item-info {
-      flex: 1;
+    .palette-item span {
+      font-weight: 400;
     }
 
-    .palette-item-name {
-      font-weight: 500;
-      color: #333;
-      margin-bottom: 2px;
-      font-size: 14px;
-    }
-
+    /* Hide constraints and descriptions for cleaner look */
+    .palette-item-constraints,
     .palette-item-description {
-      color: #666;
-      font-size: 11px;
-      line-height: 1.3;
-    }
-
-    .palette-item-constraints {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-left: 8px;
-    }
-
-    .constraint-icon {
-      font-size: 16px;
-      color: #999;
-    }
-
-    .max-instances {
-      background: #e0e0e0;
-      color: #666;
-      border-radius: 10px;
-      padding: 2px 6px;
-      font-size: 10px;
-      font-weight: 500;
-    }
-
-    .palette-footer {
-      padding: 12px;
-      background: white;
-      border-top: 1px solid #e0e0e0;
-    }
-
-    .palette-help {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #666;
-      font-size: 12px;
-    }
-
-    .palette-help mat-icon {
-      font-size: 16px;
+      display: none;
     }
 
     @media (max-width: 768px) {
+      .element-palette {
+        padding: 15px 10px;
+      }
+
+      h3 {
+        font-size: 14px;
+      }
+
       .palette-item {
-        padding: 8px;
-      }
-
-      .palette-item-icon {
-        width: 30px;
-        height: 30px;
-        margin-right: 8px;
-      }
-
-      .palette-item-name {
+        padding: 10px;
         font-size: 12px;
       }
 
-      .palette-item-description {
-        font-size: 10px;
+      .palette-item mat-icon {
+        font-size: 18px;
       }
     }
   `]

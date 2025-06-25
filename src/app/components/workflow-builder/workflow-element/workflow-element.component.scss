@@ -1,0 +1,222 @@
+.workflow-element {
+  position: relative;
+  cursor: move;
+  transition: all 0.2s ease;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 500;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.workflow-element:hover {
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+  transform: translateY(-1px);
+}
+
+.workflow-element.selected {
+  filter: drop-shadow(0 0 10px #4CAF50);
+}
+
+.workflow-element.dragging {
+  cursor: grabbing;
+  opacity: 0.8;
+  transform: scale(1.05);
+  z-index: 1000;
+}
+
+/* Element type specific styles - matching mockup exactly */
+.workflow-element.start,
+.workflow-element.end {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  padding: 0;
+  border: 3px solid rgba(255,255,255,0.3);
+}
+
+.workflow-element.page {
+  width: 120px;
+  height: 80px;
+  border-radius: 8px;
+  padding: 0;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+
+.workflow-element.category {
+  width: 120px;
+  height: 60px;
+  border-radius: 8px;
+  padding: 0;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+
+.workflow-element.field {
+  width: 100px;
+  height: 50px;
+  border-radius: 8px;
+  padding: 0;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+
+.workflow-element.condition {
+  width: 50px;
+  height: 50px;
+  transform: rotate(45deg);
+  border-radius: 8px;
+  padding: 0;
+  border: 2px solid rgba(255,255,255,0.2);
+}
+
+.workflow-element.condition .element-content {
+  transform: rotate(-45deg);
+}
+
+.element-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 2;
+  position: relative;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  padding: 8px;
+}
+
+/* For non-circular elements, show title next to icon */
+.workflow-element.page .element-content,
+.workflow-element.category .element-content,
+.workflow-element.field .element-content {
+  flex-direction: row;
+}
+
+.element-icon {
+  font-size: 24px;
+  width: 24px;
+  height: 24px;
+  color: white;
+}
+
+/* Smaller icons for smaller elements */
+.workflow-element.field .element-icon,
+.workflow-element.condition .element-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.element-title {
+  font-size: 14px;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
+  text-align: center;
+}
+
+/* Hide title for start/end/condition elements */
+.workflow-element.start .element-title,
+.workflow-element.end .element-title,
+.workflow-element.condition .element-title {
+  display: none;
+}
+
+.connection-points {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.connection-point {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: white;
+  border: 2px solid #666;
+  border-radius: 50%;
+  pointer-events: all;
+  cursor: crosshair;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.workflow-element:hover .connection-point {
+  opacity: 1;
+}
+
+.connection-point.input {
+  top: 50%;
+  left: -6px;
+  transform: translateY(-50%);
+}
+
+.connection-point.output {
+  top: 50%;
+  right: -6px;
+  transform: translateY(-50%);
+}
+
+.connection-point:hover {
+  transform: translateY(-50%) scale(1.2);
+  background: #007bff;
+  border-color: #007bff;
+}
+
+/* Condition element connection points */
+.workflow-element.condition .connection-point {
+  opacity: 1;
+}
+
+.workflow-element.condition .connection-point.input {
+  left: -8px;
+}
+
+.workflow-element.condition .connection-point.output {
+  right: -8px;
+}
+
+@media (max-width: 768px) {
+  .workflow-element.start,
+  .workflow-element.end {
+    width: 50px;
+    height: 50px;
+  }
+
+  .workflow-element.page {
+    width: 100px;
+    height: 60px;
+  }
+
+  .workflow-element.category {
+    width: 100px;
+    height: 50px;
+  }
+
+  .workflow-element.field {
+    width: 80px;
+    height: 40px;
+  }
+
+  .workflow-element.condition {
+    width: 40px;
+    height: 40px;
+  }
+
+  .element-icon {
+    font-size: 20px;
+  }
+
+  .element-title {
+    font-size: 12px;
+  }
+}

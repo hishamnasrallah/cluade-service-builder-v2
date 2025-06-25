@@ -1,9 +1,8 @@
-// components/workflow-builder/workflow-element/workflow-element.component.ts
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, ElementRef, ViewChild } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, ElementRef, ViewChild, ViewContainerRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
-import { MatMenuModule } from '@angular/material/menu';
+import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 
 import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../../models/workflow.models';
@@ -18,332 +17,12 @@ import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../.
     MatMenuModule,
     MatDividerModule
   ],
-  template: `
-    <div class="workflow-element"
-         #elementRef
-         [class.selected]="isSelected"
-         [class.connecting]="isConnecting"
-         [class.dragging]="isDragging"
-         [style.background-color]="elementConfig?.color"
-         (mousedown)="onMouseDown($event)"
-         (click)="onElementClick($event)"
-         (dblclick)="onElementDoubleClick($event)">
-
-      <!-- Element Header -->
-      <div class="element-header">
-        <mat-icon class="element-icon">{{ elementConfig?.icon }}</mat-icon>
-        <span class="element-title">{{ element.properties.name || elementConfig?.name }}</span>
-
-        <!-- Element Menu -->
-        <button mat-icon-button
-                class="element-menu-btn"
-                [matMenuTriggerFor]="elementMenu"
-                (click)="$event.stopPropagation()"
-                (mousedown)="$event.stopPropagation()">
-          <mat-icon>more_vert</mat-icon>
-        </button>
-      </div>
-
-      <!-- Element Content -->
-      <div class="element-content">
-        <div class="element-description" *ngIf="element.properties.description">
-          {{ element.properties.description }}
-        </div>
-
-        <!-- Element Type Specific Content -->
-        <div [ngSwitch]="element.type" class="element-details">
-          <div *ngSwitchCase="'page'" class="page-details">
-            <div *ngIf="element.properties.service" class="detail-item">
-              <small>Service: {{ getServiceName(convertToNumber(element.properties.service)) }}</small>
-            </div>
-            <div *ngIf="element.properties.sequence_number" class="detail-item">
-              <small>Step: {{ getSequenceName(convertToNumber(element.properties.sequence_number)) }}</small>
-            </div>
-          </div>
-
-          <div *ngSwitchCase="'category'" class="category-details">
-            <div *ngIf="element.properties.is_repeatable" class="detail-item">
-              <small><mat-icon inline="true" style="font-size: 12px;">repeat</mat-icon> Repeatable</small>
-            </div>
-            <div *ngIf="element.properties.fields && element.properties.fields.length > 0" class="detail-item">
-              <small>{{ element.properties.fields.length }} fields</small>
-            </div>
-          </div>
-
-          <div *ngSwitchCase="'field'" class="field-details">
-            <div *ngIf="element.properties._field_type" class="detail-item">
-              <small>Type: {{ getFieldTypeName(convertToNumber(element.properties._field_type)) }}</small>
-            </div>
-            <div *ngIf="element.properties._mandatory" class="detail-item">
-              <small><mat-icon inline="true" style="font-size: 12px;">star</mat-icon> Required</small>
-            </div>
-          </div>
-
-          <div *ngSwitchCase="'condition'" class="condition-details">
-            <div *ngIf="element.properties.condition_logic && element.properties.condition_logic.length > 0" class="detail-item">
-              <small>{{ element.properties.condition_logic.length }} rule(s)</small>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Connection Points -->
-      <div class="connection-points">
-        <!-- Input connection point -->
-        <div *ngIf="elementConfig?.canReceiveConnections"
-             class="connection-point input"
-             (mouseup)="onConnectionEnd($event)"
-             (mousedown)="$event.stopPropagation()">
-          <div class="connection-dot"></div>
-        </div>
-
-        <!-- Output connection point -->
-        <div *ngIf="elementConfig?.canSendConnections"
-             class="connection-point output"
-             (mousedown)="onConnectionStart($event)">
-          <div class="connection-dot"></div>
-        </div>
-      </div>
-
-      <!-- Element Status Indicators -->
-      <div class="element-status">
-        <mat-icon *ngIf="!isValidElement()"
-                  class="status-icon error"
-                  title="Element has validation errors">
-          error
-        </mat-icon>
-        <mat-icon *ngIf="isValidElement() && hasWarnings()"
-                  class="status-icon warning"
-                  title="Element has warnings">
-          warning
-        </mat-icon>
-      </div>
-    </div>
-
-    <!-- Context Menu -->
-    <mat-menu #elementMenu="matMenu">
-      <button mat-menu-item (click)="onEdit()">
-        <mat-icon>edit</mat-icon>
-        <span>Edit Properties</span>
-      </button>
-      <button mat-menu-item (click)="onDuplicate()">
-        <mat-icon>content_copy</mat-icon>
-        <span>Duplicate</span>
-      </button>
-      <mat-divider></mat-divider>
-      <button mat-menu-item (click)="onDelete()" [disabled]="element.type === 'start'">
-        <mat-icon>delete</mat-icon>
-        <span>Delete</span>
-      </button>
-    </mat-menu>
-  `,
-  styles: [`
-    .workflow-element {
-      position: relative;
-      width: 200px;
-      min-height: 60px;
-      border: 2px solid #ddd;
-      border-radius: 8px;
-      background: white;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      user-select: none;
-    }
-
-    .workflow-element:hover {
-      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-      transform: translateY(-1px);
-    }
-
-    .workflow-element.selected {
-      border-color: #2196F3;
-      box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
-    }
-
-    .workflow-element.connecting {
-      border-color: #FF9800;
-      box-shadow: 0 0 0 2px rgba(255, 152, 0, 0.3);
-    }
-
-    .workflow-element.dragging {
-      cursor: grabbing;
-      transform: rotate(2deg);
-      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-      z-index: 1000;
-    }
-
-    .element-header {
-      display: flex;
-      align-items: center;
-      padding: 8px 12px;
-      background: rgba(255, 255, 255, 0.9);
-      border-radius: 6px 6px 0 0;
-      border-bottom: 1px solid rgba(0,0,0,0.1);
-      cursor: grab;
-    }
-
-    .element-header:active {
-      cursor: grabbing;
-    }
-
-    .element-icon {
-      color: white;
-      margin-right: 8px;
-      font-size: 18px;
-    }
-
-    .element-title {
-      flex: 1;
-      font-weight: 500;
-      color: white;
-      font-size: 14px;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    }
-
-    .element-menu-btn {
-      width: 24px;
-      height: 24px;
-      line-height: 24px;
-      color: white;
-    }
-
-    .element-content {
-      padding: 8px 12px;
-      background: white;
-    }
-
-    .element-description {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 4px;
-      max-height: 40px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .element-details {
-      font-size: 11px;
-    }
-
-    .detail-item {
-      margin: 2px 0;
-      color: #888;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .connection-points {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .connection-point {
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      pointer-events: all;
-      cursor: crosshair;
-      z-index: 10;
-    }
-
-    .connection-point.input {
-      top: 50%;
-      left: -8px;
-      transform: translateY(-50%);
-    }
-
-    .connection-point.output {
-      top: 50%;
-      right: -8px;
-      transform: translateY(-50%);
-    }
-
-    .connection-dot {
-      width: 12px;
-      height: 12px;
-      border: 2px solid #007bff;
-      background: white;
-      border-radius: 50%;
-      transition: all 0.2s ease;
-    }
-
-    .connection-point:hover .connection-dot {
-      background: #007bff;
-      transform: scale(1.2);
-    }
-
-    .element-status {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      display: flex;
-      gap: 2px;
-      pointer-events: none;
-    }
-
-    .status-icon {
-      font-size: 16px;
-      width: 16px;
-      height: 16px;
-    }
-
-    .status-icon.error {
-      color: #f44336;
-    }
-
-    .status-icon.warning {
-      color: #ff9800;
-    }
-
-    /* Element Type Specific Styles */
-    .workflow-element[style*="#4CAF50"] .element-header { /* Start */
-      background: linear-gradient(135deg, #4CAF50, #45a049);
-    }
-
-    .workflow-element[style*="#2196F3"] .element-header { /* Page */
-      background: linear-gradient(135deg, #2196F3, #1976D2);
-    }
-
-    .workflow-element[style*="#FF9800"] .element-header { /* Category */
-      background: linear-gradient(135deg, #FF9800, #F57C00);
-    }
-
-    .workflow-element[style*="#9C27B0"] .element-header { /* Field */
-      background: linear-gradient(135deg, #9C27B0, #7B1FA2);
-    }
-
-    .workflow-element[style*="#FF5722"] .element-header { /* Condition */
-      background: linear-gradient(135deg, #FF5722, #D84315);
-    }
-
-    .workflow-element[style*="#F44336"] .element-header { /* End */
-      background: linear-gradient(135deg, #F44336, #D32F2F);
-    }
-
-    @media (max-width: 768px) {
-      .workflow-element {
-        width: 160px;
-        min-height: 50px;
-      }
-
-      .element-title {
-        font-size: 12px;
-      }
-
-      .element-content {
-        padding: 6px 8px;
-      }
-    }
-  `]
+  templateUrl: 'workflow-element.component.html',
+  styleUrl:'workflow-element.component.scss'
 })
 export class WorkflowElementComponent implements OnInit, OnDestroy {
   @ViewChild('elementRef') elementRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('menuTrigger', { static: false }) menuTrigger!: MatMenuTrigger;
 
   @Input() element!: WorkflowElement;
   @Input() isSelected = false;
@@ -366,6 +45,9 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
   dragStartPos = { x: 0, y: 0 };
   elementStartPos = { x: 0, y: 0 };
 
+  // Menu position
+  menuPosition = { x: 0, y: 0 };
+
   // Mock data for display purposes (in real app, would come from services)
   private serviceNames: { [key: number]: string } = {
     9: 'Passport Issuance',
@@ -386,6 +68,8 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
     10: 'Decimal',
     11: 'Boolean'
   };
+
+  constructor(private viewContainerRef: ViewContainerRef) {}
 
   ngOnInit(): void {
     this.elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element.type);
@@ -425,16 +109,14 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // Only allow dragging from header or main element
-    if (target.closest('.element-header') || target.classList.contains('workflow-element')) {
-      this.isDragging = true;
-      this.dragStartPos = { x: event.clientX, y: event.clientY };
-      this.elementStartPos = { ...this.element.position };
+    // Allow dragging from anywhere on the element
+    this.isDragging = true;
+    this.dragStartPos = { x: event.clientX, y: event.clientY };
+    this.elementStartPos = { ...this.element.position };
 
-      this.dragStart.emit();
-      event.preventDefault();
-      event.stopPropagation();
-    }
+    this.dragStart.emit();
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   private onMouseMove(event: MouseEvent): void {
@@ -482,12 +164,30 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
     this.connectionEnd.emit(event);
   }
 
+  onRightClick(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Update menu position
+    this.menuPosition = {
+      x: event.clientX,
+      y: event.clientY
+    };
+
+    // Use setTimeout to ensure the menu trigger is ready
+    setTimeout(() => {
+      if (this.menuTrigger) {
+        this.menuTrigger.openMenu();
+      }
+    }, 0);
+  }
   onEdit(): void {
     this.elementDoubleClick.emit(new MouseEvent('dblclick'));
   }
 
   onDuplicate(): void {
-    this.elementClick.emit(new MouseEvent('click'));
+    // TODO: Implement duplicate functionality
+    console.log('Duplicate element');
   }
 
   onDelete(): void {

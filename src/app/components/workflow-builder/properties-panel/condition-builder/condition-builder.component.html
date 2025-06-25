@@ -1,0 +1,201 @@
+<div class="condition-builder">
+  <mat-tab-group animationDuration="200ms">
+    <!-- Visual Builder Tab -->
+    <mat-tab label="Visual Builder">
+      <div class="visual-builder">
+        <div class="builder-header">
+          <h4>Condition Rules</h4>
+          <button mat-icon-button (click)="addCondition()" color="primary" matTooltip="Add Rule">
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+
+        <div class="conditions-list"
+             cdkDropList
+             (cdkDropListDropped)="onConditionDrop($event)">
+
+          <mat-card *ngFor="let condition of conditionsArray.controls; let i = index; trackBy: trackCondition"
+                    class="condition-card"
+                    cdkDrag>
+
+            <mat-card-header>
+              <div class="condition-header">
+                <span class="condition-number">{{ i + 1 }}</span>
+                <span class="drag-handle" cdkDragHandle>
+                      <mat-icon>drag_indicator</mat-icon>
+                    </span>
+                <span class="spacer"></span>
+                <button mat-icon-button
+                        (click)="removeCondition(i)"
+                        color="warn"
+                        matTooltip="Remove Rule">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </mat-card-header>
+
+            <mat-card-content [formGroup]="getConditionGroup(i)">
+              <div class="condition-content">
+                <!-- Field Selection -->
+                <mat-form-field appearance="outline" class="condition-field">
+                  <mat-label>Field</mat-label>
+                  <mat-select formControlName="field" required>
+                    <mat-option *ngFor="let field of availableFields" [value]="field.value">
+                      {{ field.label }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-error>Field is required</mat-error>
+                </mat-form-field>
+
+                <!-- Operation Selection -->
+                <mat-form-field appearance="outline" class="condition-operation">
+                  <mat-label>Operation</mat-label>
+                  <mat-select formControlName="operation" required>
+                    <mat-optgroup *ngFor="let group of operationGroups" [label]="group.label">
+                      <mat-option *ngFor="let op of group.operations" [value]="op.value">
+                        {{ op.label }}
+                      </mat-option>
+                    </mat-optgroup>
+                  </mat-select>
+                  <mat-error>Operation is required</mat-error>
+                </mat-form-field>
+
+                <!-- Value Input -->
+                <mat-form-field appearance="outline" class="condition-value">
+                  <mat-label>Value</mat-label>
+                  <input matInput
+                         formControlName="value"
+                         [type]="getValueInputType(getConditionGroup(i).get('operation')?.value)"
+                         required>
+                  <mat-error>Value is required</mat-error>
+                </mat-form-field>
+
+                <!-- Logical Operator (for multiple conditions) -->
+                <mat-form-field appearance="outline"
+                                class="logical-operator"
+                                *ngIf="i < conditionsArray.length - 1">
+                  <mat-label>Then</mat-label>
+                  <mat-select formControlName="logical_operator">
+                    <mat-option value="and">AND</mat-option>
+                    <mat-option value="or">OR</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <!-- Condition Preview -->
+              <div class="condition-preview">
+                <mat-icon>visibility</mat-icon>
+                <span>{{ getConditionPreview(i) }}</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <!-- Add Condition Button -->
+        <div class="add-condition" *ngIf="conditionsArray.length === 0">
+          <button mat-raised-button color="primary" (click)="addCondition()">
+            <mat-icon>add</mat-icon>
+            Add First Condition
+          </button>
+          <p>No conditions defined. Add a condition to get started.</p>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- JSON Editor Tab -->
+    <mat-tab label="JSON Editor">
+      <div class="json-editor">
+        <div class="json-header">
+          <h4>JSON Configuration</h4>
+          <div class="json-actions">
+            <button mat-button (click)="formatJson()" matTooltip="Format JSON">
+              <mat-icon>code</mat-icon>
+              Format
+            </button>
+            <button mat-button (click)="validateJson()" matTooltip="Validate JSON">
+              <mat-icon>check_circle</mat-icon>
+              Validate
+            </button>
+            <button mat-button (click)="importFromJson()" matTooltip="Import from JSON">
+              <mat-icon>upload</mat-icon>
+              Import
+            </button>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline" class="json-textarea">
+          <mat-label>Condition Logic JSON</mat-label>
+          <textarea matInput
+                    [(ngModel)]="jsonText"
+                    (blur)="onJsonChange()"
+                    rows="15"
+                    placeholder='[{"field": "field_name", "operation": "=", "value": "some_value", "logical_operator": "and"}]'>
+              </textarea>
+          <mat-hint>Enter condition logic as JSON array</mat-hint>
+          <mat-error *ngIf="jsonError">{{ jsonError }}</mat-error>
+        </mat-form-field>
+
+        <!-- JSON Examples -->
+        <div class="json-examples">
+          <h5>Examples:</h5>
+          <mat-card class="example-card" *ngFor="let example of jsonExamples">
+            <mat-card-header>
+              <mat-card-title>{{ example.title }}</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <pre class="example-code">{{ example.code }}</pre>
+              <button mat-button (click)="loadExample(example)" color="primary">
+                Use This Example
+              </button>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Test Tab -->
+    <mat-tab label="Test">
+      <div class="condition-tester">
+        <h4>Test Conditions</h4>
+        <p>Enter test values to see if your conditions evaluate correctly.</p>
+
+        <div class="test-inputs">
+          <mat-form-field *ngFor="let field of getUniqueFields()"
+                          appearance="outline"
+                          class="test-field">
+            <mat-label>{{ field.label }}</mat-label>
+            <input matInput
+                   [(ngModel)]="testValues[field.value]"
+                   (input)="evaluateTestConditions()">
+          </mat-form-field>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <div class="test-results">
+          <h5>Results:</h5>
+          <div class="result-item" *ngFor="let result of testResults; let i = index">
+            <span class="result-condition">Condition {{ i + 1 }}:</span>
+            <mat-icon [class.success]="result.passed" [class.failed]="!result.passed">
+              {{ result.passed ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+            <span [class.success]="result.passed" [class.failed]="!result.passed">
+                  {{ result.passed ? 'PASS' : 'FAIL' }}
+                </span>
+            <span class="result-details">{{ result.details }}</span>
+          </div>
+
+          <div class="overall-result">
+            <strong>Overall Result: </strong>
+            <mat-icon [class.success]="overallResult" [class.failed]="!overallResult">
+              {{ overallResult ? 'check_circle' : 'cancel' }}
+            </mat-icon>
+            <span [class.success]="overallResult" [class.failed]="!overallResult">
+                  {{ overallResult ? 'CONDITIONS MET' : 'CONDITIONS NOT MET' }}
+                </span>
+          </div>
+        </div>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

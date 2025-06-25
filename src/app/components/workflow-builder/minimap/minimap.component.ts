@@ -8,21 +8,19 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
   selector: 'app-minimap',
   standalone: true,
   imports: [CommonModule],
+// minimap.component.ts - Updated template and styles for clean minimal look
   template: `
     <div class="minimap" (click)="onMinimapClick($event)">
-<!--      <div class="minimap-header">-->
-<!--&lt;!&ndash;        <span>Overview</span>&ndash;&gt;-->
-<!--&lt;!&ndash;        <span class="zoom-level">{{ Math.round(canvasState.zoom * 100) }}%</span>&ndash;&gt;-->
-<!--      </div>-->
+      <div class="minimap-label">Overview</div>
 
       <div class="minimap-canvas" #minimapCanvas>
         <!-- Elements -->
         <div *ngFor="let element of workflow.elements; trackBy: trackElement"
              class="minimap-element"
+             [class]="element.type"
              [style.left.px]="getMinimapX(element.position.x)"
              [style.top.px]="getMinimapY(element.position.y)"
-             [style.background-color]="getElementColor(element.type)"
-             [title]="element.properties.name">
+             [style.background-color]="getElementColor(element.type)">
         </div>
 
         <!-- Connections -->
@@ -35,7 +33,8 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
                 [attr.x2]="getConnectionX2(connection)"
                 [attr.y2]="getConnectionY2(connection)"
                 stroke="#999"
-                stroke-width="1">
+                stroke-width="1"
+                opacity="0.5">
           </line>
         </svg>
 
@@ -56,38 +55,47 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
       background: white;
       border-radius: 4px;
       overflow: hidden;
-      font-size: 12px;
+      position: relative;
+      cursor: pointer;
     }
 
-    .minimap-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px;
-      background: #f5f5f5;
-      border-bottom: 1px solid #ddd;
-      font-weight: 500;
-    }
-
-    .zoom-level {
+    .minimap-label {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      font-size: 11px;
       color: #666;
-      font-size: 10px;
+      font-weight: 500;
+      z-index: 10;
     }
 
     .minimap-canvas {
       position: relative;
       width: 100%;
-      height: calc(100% - 33px);
+      height: 100%;
       background: #fafafa;
-      cursor: pointer;
+      border: 1px solid #e0e0e0;
     }
 
     .minimap-element {
       position: absolute;
-      width: 8px;
-      height: 6px;
+      width: 6px;
+      height: 4px;
       border-radius: 1px;
-      border: 1px solid rgba(0,0,0,0.2);
+      opacity: 0.8;
+    }
+
+    .minimap-element.start,
+    .minimap-element.end {
+      border-radius: 50%;
+      width: 4px;
+      height: 4px;
+    }
+
+    .minimap-element.condition {
+      transform: rotate(45deg);
+      width: 3px;
+      height: 3px;
     }
 
     .minimap-connections {
@@ -99,21 +107,20 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
 
     .minimap-viewport {
       position: absolute;
-      border: 2px solid #2196F3;
-      background: rgba(33, 150, 243, 0.1);
+      border: 1.5px solid #007bff;
+      background: rgba(0, 123, 255, 0.1);
       border-radius: 2px;
       pointer-events: none;
     }
 
     @media (max-width: 768px) {
-      .minimap-header {
-        padding: 6px;
-        font-size: 11px;
+      .minimap-label {
+        font-size: 10px;
       }
 
       .minimap-element {
-        width: 6px;
-        height: 4px;
+        width: 4px;
+        height: 3px;
       }
     }
   `]

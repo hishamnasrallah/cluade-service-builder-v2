@@ -1,0 +1,59 @@
+<div class="workflow-element"
+     #elementRef
+     [class.selected]="isSelected"
+     [class.connecting]="isConnecting"
+     [class.dragging]="isDragging"
+     [class]="element.type"
+     [style.background-color]="elementConfig?.color"
+     (mousedown)="onMouseDown($event)"
+     (click)="onElementClick($event)"
+     (dblclick)="onElementDoubleClick($event)"
+     (contextmenu)="onRightClick($event)">
+
+  <!-- Element Content -->
+  <div class="element-content" (mousedown)="$event.stopPropagation()">
+    <mat-icon class="element-icon">{{ elementConfig?.icon }}</mat-icon>
+    <span class="element-title">{{ element.properties.name || elementConfig?.name }}</span>
+  </div>
+
+  <!-- Connection Points -->
+  <div class="connection-points">
+    <!-- Input connection point -->
+    <div *ngIf="elementConfig?.canReceiveConnections"
+         class="connection-point input"
+         (mouseup)="onConnectionEnd($event)"
+         (mousedown)="$event.stopPropagation()">
+    </div>
+
+    <!-- Output connection point -->
+    <div *ngIf="elementConfig?.canSendConnections"
+         class="connection-point output"
+         (mousedown)="onConnectionStart($event)">
+    </div>
+  </div>
+</div>
+
+<!-- Context Menu with manual trigger -->
+<div style="visibility: hidden; position: fixed"
+     [style.left.px]="menuPosition.x"
+     [style.top.px]="menuPosition.y"
+     [matMenuTriggerFor]="elementMenu"
+     #menuTrigger="matMenuTrigger">
+</div>
+
+<!-- Context Menu -->
+<mat-menu #elementMenu="matMenu">
+  <button mat-menu-item (click)="onEdit()">
+    <mat-icon>edit</mat-icon>
+    <span>Edit Properties</span>
+  </button>
+  <button mat-menu-item (click)="onDuplicate()">
+    <mat-icon>content_copy</mat-icon>
+    <span>Duplicate</span>
+  </button>
+  <mat-divider></mat-divider>
+  <button mat-menu-item (click)="onDelete()" [disabled]="element.type === 'start'">
+    <mat-icon>delete</mat-icon>
+    <span>Delete</span>
+  </button>
+</mat-menu>

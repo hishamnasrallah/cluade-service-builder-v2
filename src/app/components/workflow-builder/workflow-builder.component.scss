@@ -1,40 +1,60 @@
+// workflow-builder.component.scss - Clean minimal style matching mockup
 .workflow-builder {
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: #f5f5f5;
 }
 
 .workflow-toolbar {
   flex-shrink: 0;
-  background: #1976d2;
-  color: white;
+  height: 56px;
+  background: white;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  button {
+    color: #666;
+
+    &:hover {
+      background: rgba(0,0,0,0.04);
+    }
+  }
 }
 
 .workflow-title {
   font-weight: 500;
   margin-left: 8px;
+  color: #333;
+  font-size: 16px;
 }
 
 .workflow-status {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 12px;
-  font-size: 12px;
+  gap: 6px;
+  margin-left: 16px;
+  font-size: 13px;
   padding: 4px 8px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.2);
-}
+  border-radius: 4px;
+  background: #fff3e0;
+  color: #f57c00;
 
-.workflow-status.unsaved {
-  background: rgba(255, 152, 0, 0.3);
-}
+  &.saved {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
 
-.workflow-status mat-icon {
-  font-size: 16px;
-  width: 16px;
-  height: 16px;
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
 }
 
 .spacer {
@@ -48,23 +68,28 @@
 
 .sidenav-container {
   height: 100%;
+
+  .mat-drawer-container {
+    background: transparent;
+  }
 }
 
 .element-palette {
-  width: 250px;
+  width: 200px;
   background: #f5f5f5;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid #e0e0e0;
 }
 
 .properties-panel {
-  width: 350px;
-  background: #f5f5f5;
-  border-left: 1px solid #ddd;
+  width: 400px;
+  background: white;
+  border-left: 1px solid #e0e0e0;
 }
 
 .canvas-container {
   position: relative;
   overflow: hidden;
+  background: #fafafa;
 }
 
 .canvas-wrapper {
@@ -72,17 +97,15 @@
   height: 100%;
   position: relative;
   cursor: grab;
-  background:
-    radial-gradient(circle, #ccc 1px, transparent 1px),
-    linear-gradient(#f0f0f0 1px, transparent 1px),
-    linear-gradient(90deg, #f0f0f0 1px, transparent 1px);
-  background-size: 20px 20px, 20px 20px, 20px 20px;
-  background-position: 0 0, 0 0, 0 0;
+  background-image:
+    linear-gradient(rgba(200,200,200,0.2) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200,200,200,0.2) 1px, transparent 1px);
+  background-size: 20px 20px;
   user-select: none;
-}
 
-.canvas-wrapper.panning {
-  cursor: grabbing;
+  &.panning {
+    cursor: grabbing;
+  }
 }
 
 .canvas {
@@ -107,16 +130,22 @@
 
 .connection-line {
   pointer-events: none;
-  transition: stroke-width 0.2s, stroke 0.2s;
-}
+  transition: all 0.2s ease;
+  stroke: #999;
+  stroke-width: 2px;
 
-.connection-line.selected {
-  stroke: #007bff !important;
-  stroke-width: 3px;
+  &.selected {
+    stroke: #007bff !important;
+    stroke-width: 3px;
+  }
 }
 
 .temp-connection {
   pointer-events: none;
+  stroke: #007bff;
+  stroke-dasharray: 5,5;
+  stroke-width: 2px;
+  opacity: 0.7;
 }
 
 .element-container {
@@ -130,12 +159,12 @@
   bottom: 20px;
   right: 20px;
   width: 200px;
-  height: 150px;
-  background: rgba(255, 255, 255, 0.95);
+  height: 120px;
+  background: white;
   border: 1px solid #ddd;
   border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 1000;
 }
 
@@ -143,49 +172,74 @@
   position: absolute;
   top: 20px;
   right: 20px;
-  background: rgba(255, 255, 255, 0.95);
+  background: white;
   border: 1px solid #ddd;
   border-radius: 4px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  padding: 12px 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 1000;
-  min-width: 200px;
+  min-width: 180px;
+  font-size: 13px;
 }
 
 .info-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-weight: 500;
   color: #333;
   margin-bottom: 8px;
-}
 
-.info-header mat-icon {
-  font-size: 18px;
-  color: #1976d2;
+  mat-icon {
+    font-size: 18px;
+    color: #666;
+  }
 }
 
 .info-stats {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
   color: #666;
+  font-size: 12px;
+
+  span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
+// Clean minimal button styles
+.mat-mdc-icon-button {
+  width: 40px;
+  height: 40px;
+
+  .mat-icon {
+    font-size: 20px;
+  }
+}
+
+.mat-divider-vertical {
+  height: 24px;
+  margin: 0 8px;
+  background-color: #e0e0e0;
 }
 
 @media (max-width: 768px) {
   .element-palette {
-    width: 60px;
+    width: 180px;
   }
 
   .properties-panel {
-    width: 280px;
+    width: 320px;
   }
 
   .minimap-container {
     width: 150px;
     height: 100px;
+    bottom: 10px;
+    right: 10px;
   }
 
   .workflow-title {
@@ -193,14 +247,8 @@
   }
 
   .workflow-status {
-    margin-left: 4px;
-    padding: 2px 4px;
-  }
-
-  .info-panel {
-    top: 10px;
-    right: 10px;
-    padding: 8px;
-    min-width: 150px;
+    margin-left: 8px;
+    padding: 2px 6px;
+    font-size: 11px;
   }
 }
