@@ -36,9 +36,8 @@ import { ConditionLogic } from '../../../../models/workflow.models';
     MatTooltipModule,
     DragDropModule
   ],
-  templateUrl: 'condition-builder.component.html',
-// condition-builder.component.ts - Updated styles section only
-  styleUrl: 'condition-builder.component.scss'
+  templateUrl: './condition-builder.component.html',
+  styleUrls: ['./condition-builder.component.scss']
 })
 export class ConditionBuilderComponent implements OnInit {
   @Input() conditionLogic: ConditionLogic[] = [];
@@ -200,10 +199,7 @@ export class ConditionBuilderComponent implements OnInit {
 
   onConditionDrop(event: CdkDragDrop<any[]>): void {
     if (event.previousIndex !== event.currentIndex) {
-      const conditionsArray = this.conditionsArray;
-      const item = conditionsArray.at(event.previousIndex);
-      conditionsArray.removeAt(event.previousIndex);
-      conditionsArray.insert(event.currentIndex, item);
+      moveItemInArray(this.conditionsArray.controls, event.previousIndex, event.currentIndex);
       this.emitChanges();
     }
   }

@@ -13,10 +13,11 @@ import { MatExpansionModule } from '@angular/material/expansion';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subject, takeUntil, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { MatListModule } from '@angular/material/list';
+
 import {
   canContainChildren,
   getValidChildTypes,
@@ -32,7 +33,7 @@ import {
   Field,
   FieldType
 } from '../../../services/api.service';
-// import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
+import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
 
 @Component({
   selector: 'app-properties-panel',
@@ -51,10 +52,11 @@ import {
     MatChipsModule,
     MatDividerModule,
     MatProgressSpinnerModule,
+    MatListModule,
     // ConditionBuilderComponent
   ],
-  templateUrl:'properties-panel.component.html',
-  styleUrl:'properties-panel.component.scss'
+  templateUrl: './properties-panel.component.html',
+  styleUrls: ['./properties-panel.component.scss']
 })
 export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedElement?: WorkflowElement;
@@ -107,33 +109,33 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     this.setupAutoSave();
   }
 // Hierarchy navigation methods
+  // @ts-ignore
   getHierarchyPath(): any[] {
     if (!this.selectedElement) return [];
 
     const path = [];
-    let current = this.selectedElement;
+    let current = this.selectedElement as WorkflowElement; // non-nullable
 
-    // Build path from current element up to root
-    while (current) {
+    while (true) {
       const config = ELEMENT_CONFIGS.find(c => c.type === current.type);
+
       path.unshift({
-        id: current.id,
-        name: current.properties.name || current.type,
+        id:   current.id,
+        name: current.properties.name ?? current.type,
         type: current.type,
-        icon: config?.icon || 'help'
+        icon: config?.icon ?? 'help',
       });
 
-      if (current.parentId) {
-        current = this.workflow.elements.find(el => el.id === current.parentId);
-      } else {
-        break;
-      }
+      if (!current.parentId) break;
+
+      const parent = this.workflow.elements.find(el => el.id === current.parentId);
+      if (!parent) break;      // parent not found → stop climbing
+
+      current = parent;        // guaranteed WorkflowElement here
     }
+}
 
-    return path;
-  }
-
-  selectHierarchyItem(item: any): void {
+    selectHierarchyItem(item: any): void {
     this.selectedElementId = item.id;
     this.elementSelected.emit(item.id);
   }
@@ -154,6 +156,27 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   getElementTypeColor(elementType: ElementType): string {
     const config = ELEMENT_CONFIGS.find(c => c.type === elementType);
     return config?.color || '#999';
+  }
+
+  // Validation helper methods
+  shouldShowTextValidation(): boolean {
+    const fieldType = this.propertiesForm.get('_field_type')?.value;
+    return ['text', 'textarea', 'email', 'url', 'phone', 'password'].includes(fieldType?.toString());
+  }
+
+  shouldShowNumberValidation(): boolean {
+    const fieldType = this.propertiesForm.get('_field_type')?.value;
+    return ['number', 'decimal', 'percentage', 'range'].includes(fieldType?.toString());
+  }
+
+  shouldShowDateValidation(): boolean {
+    const fieldType = this.propertiesForm.get('_field_type')?.value;
+    return ['date', 'datetime'].includes(fieldType?.toString());
+  }
+
+  shouldShowFileValidation(): boolean {
+    const fieldType = this.propertiesForm.get('_field_type')?.value;
+    return fieldType?.toString() === 'file';
   }
 
   expandElement(): void {
