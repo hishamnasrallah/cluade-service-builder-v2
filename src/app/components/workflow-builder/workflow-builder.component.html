@@ -1,8 +1,5 @@
 <div class="workflow-builder">
   <!-- Top Toolbar -->
-  <!-- Updated toolbar section for workflow-builder.component.html -->
-  <!-- Replace the existing toolbar with this cleaner version -->
-
   <mat-toolbar class="workflow-toolbar">
     <button mat-icon-button title="Menu">
       <mat-icon>menu</mat-icon>
@@ -11,11 +8,25 @@
     <span class="workflow-title">{{ workflow.name }}</span>
 
     <span class="workflow-status" [class.saved]="currentServiceCode" *ngIf="currentServiceCode || !currentServiceCode">
-    <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
-    <span>{{ currentServiceCode ? 'Online' : 'Local Only' }}</span>
-  </span>
+          <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
+          <span>{{ currentServiceCode ? 'Online' : 'Local Only' }}</span>
+        </span>
 
     <span class="spacer"></span>
+
+    <!-- View Mode Toggle -->
+    <mat-button-toggle-group [value]="workflow.viewMode" (change)="onViewModeChange($event)">
+      <mat-button-toggle value="collapsed">
+        <mat-icon>compress</mat-icon>
+        Collapsed
+      </mat-button-toggle>
+      <mat-button-toggle value="expanded">
+        <mat-icon>expand</mat-icon>
+        Expanded
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-divider vertical></mat-divider>
 
     <button mat-icon-button (click)="autoOrganize()" title="Auto-organize">
       <mat-icon>auto_fix_high</mat-icon>
@@ -54,11 +65,8 @@
     <button mat-icon-button (click)="createNewWorkflow()" title="New">
       <mat-icon>add</mat-icon>
     </button>
-
-    <button mat-icon-button title="More">
-      <mat-icon>more_vert</mat-icon>
-    </button>
   </mat-toolbar>
+
   <div class="workflow-content">
     <!-- Left Sidebar - Element Palette -->
     <mat-sidenav-container class="sidenav-container">
@@ -73,6 +81,7 @@
       <mat-sidenav-content class="canvas-container">
         <div class="canvas-wrapper"
              #canvasWrapper
+             [class.hierarchy-mode]="workflow.viewMode === 'expanded'"
              (mousedown)="onCanvasMouseDown($event)"
              (mousemove)="onCanvasMouseMove($event)"
              (mouseup)="onCanvasMouseUp($event)"
@@ -97,26 +106,27 @@
                 </marker>
               </defs>
 
-              <!-- Invisible wider stroke for easier clicking -->
-              <path *ngFor="let connection of workflow.connections; trackBy: trackConnection"
-                    [attr.d]="getConnectionPath(connection)"
-                    stroke="transparent"
-                    stroke-width="12"
-                    fill="none"
-                    (click)="selectConnection(connection.id, $event)"
-                    class="connection-clickable">
-              </path>
+              <!-- Only show connections between top-level elements -->
+              <ng-container *ngFor="let connection of getTopLevelConnections(); trackBy: trackConnection">
+                <!-- Invisible wider stroke for easier clicking -->
+                <path [attr.d]="getConnectionPath(connection)"
+                      stroke="transparent"
+                      stroke-width="12"
+                      fill="none"
+                      (click)="selectConnection(connection.id, $event)"
+                      class="connection-clickable">
+                </path>
 
-              <!-- Visible connection lines -->
-              <path *ngFor="let connection of workflow.connections; trackBy: trackConnection"
-                    [attr.d]="getConnectionPath(connection)"
-                    stroke="#666"
-                    stroke-width="2"
-                    fill="none"
-                    marker-end="url(#arrowhead)"
-                    [class.selected]="selectedConnectionId === connection.id"
-                    class="connection-line">
-              </path>
+                <!-- Visible connection lines -->
+                <path [attr.d]="getConnectionPath(connection)"
+                      stroke="#666"
+                      stroke-width="2"
+                      fill="none"
+                      marker-end="url(#arrowhead)"
+                      [class.selected]="selectedConnectionId === connection.id"
+                      class="connection-line">
+                </path>
+              </ng-container>
 
               <!-- Temporary connection line while dragging -->
               <path *ngIf="tempConnection"
@@ -130,8 +140,8 @@
               </path>
             </svg>
 
-            <!-- Workflow Elements -->
-            <div *ngFor="let element of workflow.elements; trackBy: trackElement"
+            <!-- Workflow Elements (only top-level) -->
+            <div *ngFor="let element of getTopLevelElements(); trackBy: trackElement"
                  class="element-container"
                  [style.left.px]="element.position.x"
                  [style.top.px]="element.position.y">
@@ -141,6 +151,8 @@
                 [isSelected]="selectedElementId === element.id"
                 [isConnecting]="!!connectingFrom"
                 [canvasZoom]="canvasState.zoom"
+                [allElements]="workflow.elements"
+                [selectedElementId]="selectedElementId"
                 (elementClick)="selectElement(element.id)"
                 (elementDoubleClick)="editElement(element.id)"
                 (positionChanged)="updateElementPosition(element.id, $event)"
@@ -148,8 +160,15 @@
                 (connectionEnd)="endConnection(element.id)"
                 (deleteElement)="deleteElement(element.id)"
                 (dragStart)="onElementDragStart()"
-                (dragEnd)="onElementDragEnd()">
+                (dragEnd)="onElementDragEnd()"
+                (expandToggled)="onElementExpandToggled($event)">
               </app-workflow-element>
+            </div>
+
+            <!-- Drop zones for child elements when parent is expanded -->
+            <div *ngIf="workflow.expandedElementId" class="drop-zone-hint">
+              <mat-icon>info</mat-icon>
+              <span>Drag elements into the expanded container to add them</span>
             </div>
           </div>
         </div>
@@ -183,8 +202,13 @@
         <app-properties-panel
           [selectedElement]="getSelectedElement()"
           [selectedConnection]="getSelectedConnection()"
+          [workflow]="workflow"
           (elementUpdated)="onElementUpdated($event)"
-          (connectionUpdated)="onConnectionUpdated($event)">
+          (connectionUpdated)="onConnectionUpdated($event)"
+          (elementSelected)="selectElement($event)"
+          (elementExpanded)="onElementExpandToggled($event)"
+          (elementCollapsed)="onElementExpandToggled($event)"
+          (elementDeleted)="deleteElement($event)">
         </app-properties-panel>
       </mat-sidenav>
     </mat-sidenav-container>

@@ -1,4 +1,4 @@
-// workflow-builder.component.scss - Clean minimal style matching mockup
+// workflow-builder.component.scss - Updated with hierarchy styles
 .workflow-builder {
   height: 100vh;
   display: flex;
@@ -57,6 +57,24 @@
   }
 }
 
+// View mode toggle
+mat-button-toggle-group {
+  height: 32px;
+  font-size: 13px;
+
+  mat-button-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
 .spacer {
   flex: 1 1 auto;
 }
@@ -106,6 +124,13 @@
   &.panning {
     cursor: grabbing;
   }
+
+  &.hierarchy-mode {
+    background-image:
+      linear-gradient(rgba(200,200,200,0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,200,200,0.15) 1px, transparent 1px);
+    background-size: 25px 25px;
+  }
 }
 
 .canvas {
@@ -152,6 +177,39 @@
   position: absolute;
   z-index: 2;
   pointer-events: all;
+}
+
+// Drop zone hint
+.drop-zone-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(33, 150, 243, 0.9);
+  color: white;
+  padding: 12px 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  z-index: 1000;
+  animation: slideUp 0.3s ease-out;
+
+  mat-icon {
+    font-size: 20px;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .minimap-container {
@@ -226,6 +284,37 @@
   background-color: #e0e0e0;
 }
 
+// Animation classes for hierarchy
+.expanding-container {
+  animation: expandContainer 0.3s ease-out;
+}
+
+@keyframes expandContainer {
+  from {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.collapsing-container {
+  animation: collapseContainer 0.3s ease-out;
+}
+
+@keyframes collapseContainer {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+}
+
 @media (max-width: 768px) {
   .element-palette {
     width: 180px;
@@ -250,5 +339,10 @@
     margin-left: 8px;
     padding: 2px 6px;
     font-size: 11px;
+  }
+
+  mat-button-toggle-group {
+    font-size: 11px;
+    height: 28px;
   }
 }

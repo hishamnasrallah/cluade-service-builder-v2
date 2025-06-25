@@ -5,6 +5,9 @@ export interface WorkflowElement {
   position: Position;
   properties: ElementProperties;
   connections: Connection[];
+  isExpanded?: boolean; // New: Track expansion state
+  parentId?: string; // New: Track parent element
+  children?: string[]; // New: Track child element IDs
 }
 
 export enum ElementType {
@@ -33,7 +36,9 @@ export interface ElementProperties {
   [key: string]: any; // Add index signature to allow string indexing
   name?: string;
   description?: string;
-
+  // Summary counts for display
+  categoryCount?: number; // For pages
+  fieldCount?: number; // For pages and categories
   // Page properties
   useExisting?: boolean;
   existingPageId?: number;
@@ -101,6 +106,10 @@ export interface ElementProperties {
   action?: string;
 }
 
+export interface ElementDimensions {
+  collapsed: { width: number; height: number };
+  expanded: { width: number; height: number };
+}
 export interface StartElementProperties extends ElementProperties {
   name: string;
 }
@@ -199,6 +208,8 @@ export interface WorkflowData {
   description?: string;
   elements: WorkflowElement[];
   connections: Connection[];
+  expandedElementId?: string; // New: Track which element is currently expanded
+  viewMode?: 'collapsed' | 'expanded'; // New: Track view mode
   metadata?: {
     created_at?: string;
     updated_at?: string;
@@ -223,6 +234,32 @@ export interface ElementTypeConfig {
   canSendConnections: boolean;
   maxInstances?: number;
 }
+export const ELEMENT_DIMENSIONS: { [key: string]: ElementDimensions } = {
+  [ElementType.START]: {
+    collapsed: { width: 60, height: 60 },
+    expanded: { width: 60, height: 60 }
+  },
+  [ElementType.PAGE]: {
+    collapsed: { width: 150, height: 100 },
+    expanded: { width: 400, height: 300 }
+  },
+  [ElementType.CATEGORY]: {
+    collapsed: { width: 120, height: 80 },
+    expanded: { width: 160, height: 200 }
+  },
+  [ElementType.FIELD]: {
+    collapsed: { width: 120, height: 30 },
+    expanded: { width: 120, height: 30 }
+  },
+  [ElementType.CONDITION]: {
+    collapsed: { width: 50, height: 50 },
+    expanded: { width: 50, height: 50 }
+  },
+  [ElementType.END]: {
+    collapsed: { width: 60, height: 60 },
+    expanded: { width: 60, height: 60 }
+  }
+};
 
 // Field types mapping based on the API response
 export const FIELD_TYPE_MAPPING: { [key: string]: string } = {
@@ -315,6 +352,23 @@ export function getFieldTypeDisplayName(fieldType: string | number): string {
 export function isValidFieldType(fieldType: string | number): boolean {
   const typeStr = typeof fieldType === 'number' ? fieldType.toString() : fieldType;
   return typeStr in FIELD_TYPE_MAPPING;
+}
+export function canContainChildren(elementType: ElementType): boolean {
+  return elementType === ElementType.PAGE || elementType === ElementType.CATEGORY;
+}
+export function getValidChildTypes(parentType: ElementType): ElementType[] {
+  switch (parentType) {
+    case ElementType.PAGE:
+      return [ElementType.CATEGORY];
+    case ElementType.CATEGORY:
+      return [ElementType.FIELD];
+    default:
+      return [];
+  }
+}
+
+export function canBeContained(elementType: ElementType): boolean {
+  return elementType === ElementType.CATEGORY || elementType === ElementType.FIELD;
 }
 
 // Operation types for conditions (based on the API response)

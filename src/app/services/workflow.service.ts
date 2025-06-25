@@ -1,8 +1,18 @@
-// services/workflow.service.ts - Updated for service flow integration
+// services/workflow.service.ts - Complete version with hierarchy support
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { WorkflowData, WorkflowElement, Connection, ElementType, Position } from '../models/workflow.models';
+import {
+  WorkflowData,
+  WorkflowElement,
+  Connection,
+  ElementType,
+  Position,
+  canContainChildren,
+  canBeContained,
+  getValidChildTypes,
+  ELEMENT_VALIDATION_RULES
+} from '../models/workflow.models';
 import { ApiService, ServiceFlow } from './api.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,12 +23,13 @@ export class WorkflowService {
   private workflowSubject = new BehaviorSubject<WorkflowData>({
     name: 'New Workflow',
     elements: [],
-    connections: []
+    connections: [],
+    viewMode: 'collapsed'
   });
 
   public workflow$ = this.workflowSubject.asObservable();
   private currentWorkflow: WorkflowData;
-  private currentServiceCode?: string; // Track the current service code instead of workflow ID
+  private currentServiceCode?: string;
 
   constructor(private apiService: ApiService) {
     this.currentWorkflow = this.workflowSubject.value;
@@ -48,7 +59,28 @@ export class WorkflowService {
     return this.currentServiceCode;
   }
 
-  addElement(type: ElementType, position: Position, properties: any = {}): WorkflowElement {
+  // Updated to support hierarchy
+  addElement(type: ElementType, position: Position, properties: any = {}, parentId?: string): WorkflowElement {
+    // Validate parent-child relationship
+    if (parentId) {
+      const parent = this.currentWorkflow.elements.find(el => el.id === parentId);
+      if (!parent) {
+        throw new Error('Parent element not found');
+      }
+
+      if (!canContainChildren(parent.type)) {
+        throw new Error(`${parent.type} elements cannot contain children`);
+      }
+
+      const validChildTypes = getValidChildTypes(parent.type);
+      if (!validChildTypes.includes(type)) {
+        throw new Error(`${type} cannot be a child of ${parent.type}`);
+      }
+    } else if (canBeContained(type)) {
+      // Elements that should be contained need a parent
+      throw new Error(`${type} elements must be placed inside a container`);
+    }
+
     // Check for maximum instances
     if (type === ElementType.START) {
       const existingStarts = this.currentWorkflow.elements.filter(el => el.type === ElementType.START);
@@ -62,10 +94,23 @@ export class WorkflowService {
       type,
       position,
       properties: { name: type.charAt(0).toUpperCase() + type.slice(1), ...properties },
-      connections: []
+      connections: [],
+      parentId,
+      children: canContainChildren(type) ? [] : undefined,
+      isExpanded: false
     };
 
     this.currentWorkflow.elements.push(element);
+
+    // Update parent's children array
+    if (parentId) {
+      const parent = this.currentWorkflow.elements.find(el => el.id === parentId);
+      if (parent && parent.children) {
+        parent.children.push(element.id);
+      }
+      this.updateParentCounts(parentId);
+    }
+
     this.updateWorkflow();
     return element;
   }
@@ -73,19 +118,45 @@ export class WorkflowService {
   updateElement(id: string, updates: Partial<WorkflowElement>): void {
     const elementIndex = this.currentWorkflow.elements.findIndex(el => el.id === id);
     if (elementIndex !== -1) {
+      const element = this.currentWorkflow.elements[elementIndex];
+
+      // Preserve hierarchy properties
       this.currentWorkflow.elements[elementIndex] = {
-        ...this.currentWorkflow.elements[elementIndex],
-        ...updates
+        ...element,
+        ...updates,
+        parentId: element.parentId,
+        children: element.children
       };
+
+      // Update parent counts if this affects them
+      if (element.parentId) {
+        this.updateParentCounts(element.parentId);
+      }
+
       this.updateWorkflow();
     }
   }
 
   removeElement(id: string): void {
-    // Don't allow removing start element
     const element = this.currentWorkflow.elements.find(el => el.id === id);
-    if (element?.type === ElementType.START) {
+    if (!element) return;
+
+    if (element.type === ElementType.START) {
       throw new Error('Start element cannot be removed');
+    }
+
+    // Remove all children recursively
+    if (element.children && element.children.length > 0) {
+      [...element.children].forEach(childId => this.removeElement(childId));
+    }
+
+    // Remove from parent's children array
+    if (element.parentId) {
+      const parent = this.currentWorkflow.elements.find(el => el.id === element.parentId);
+      if (parent && parent.children) {
+        parent.children = parent.children.filter(childId => childId !== id);
+        this.updateParentCounts(element.parentId);
+      }
     }
 
     // Remove element
@@ -99,13 +170,71 @@ export class WorkflowService {
     this.updateWorkflow();
   }
 
+  // Toggle element expansion
+  toggleElementExpansion(elementId: string): void {
+    const element = this.currentWorkflow.elements.find(el => el.id === elementId);
+    if (!element || !canContainChildren(element.type)) return;
+
+    // Collapse all other elements first
+    this.currentWorkflow.elements.forEach(el => {
+      if (el.id !== elementId && el.isExpanded) {
+        el.isExpanded = false;
+      }
+    });
+
+    // Toggle the selected element
+    element.isExpanded = !element.isExpanded;
+    this.currentWorkflow.expandedElementId = element.isExpanded ? elementId : undefined;
+
+    this.updateWorkflow();
+  }
+
+  // Update parent element counts
+  private updateParentCounts(parentId: string): void {
+    const parent = this.currentWorkflow.elements.find(el => el.id === parentId);
+    if (!parent) return;
+
+    if (parent.type === ElementType.PAGE) {
+      // Count categories
+      const categories = this.getChildElements(parentId);
+      parent.properties.categoryCount = categories.length;
+
+      // Count all fields in all categories
+      let totalFields = 0;
+      categories.forEach(category => {
+        const fields = this.getChildElements(category.id);
+        totalFields += fields.length;
+      });
+      parent.properties.fieldCount = totalFields;
+    } else if (parent.type === ElementType.CATEGORY) {
+      // Count fields
+      const fields = this.getChildElements(parentId);
+      parent.properties.fieldCount = fields.length;
+    }
+  }
+
+  // Get child elements
+  private getChildElements(parentId: string): WorkflowElement[] {
+    const parent = this.currentWorkflow.elements.find(el => el.id === parentId);
+    if (!parent || !parent.children) return [];
+
+    return parent.children
+      .map(childId => this.currentWorkflow.elements.find(el => el.id === childId))
+      .filter(el => el !== undefined) as WorkflowElement[];
+  }
+
+  // Modified connection logic to handle hierarchy
   addConnection(sourceId: string, targetId: string): Connection {
-    // Validate connection rules
     const sourceElement = this.currentWorkflow.elements.find(el => el.id === sourceId);
     const targetElement = this.currentWorkflow.elements.find(el => el.id === targetId);
 
     if (!sourceElement || !targetElement) {
       throw new Error('Invalid connection: source or target element not found');
+    }
+
+    // Don't allow connections to/from child elements
+    if (sourceElement.parentId || targetElement.parentId) {
+      throw new Error('Cannot create connections to/from child elements');
     }
 
     if (sourceElement.type === ElementType.END) {
@@ -116,7 +245,6 @@ export class WorkflowService {
       throw new Error('Start elements cannot receive connections');
     }
 
-    // Check if connection already exists
     const existingConnection = this.currentWorkflow.connections.find(
       conn => conn.sourceId === sourceId && conn.targetId === targetId
     );
@@ -143,17 +271,33 @@ export class WorkflowService {
     this.updateWorkflow();
   }
 
-  // Load service flow from API by service code
+  // Load service flow from API with hierarchy
   loadServiceFlowFromApi(serviceCode: string): Observable<WorkflowData> {
     return this.apiService.getServiceFlow(serviceCode).pipe(
       map((serviceFlow: ServiceFlow) => {
-        const workflowData = this.apiService.convertServiceFlowToWorkflow(serviceFlow);
+        this.currentServiceCode = serviceCode;
+
+        const workflowData: WorkflowData = {
+          name: `Service Flow - ${serviceCode}`,
+          description: `Service flow for service ${serviceCode}`,
+          elements: [],
+          connections: [],
+          viewMode: 'collapsed',
+          metadata: {
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            version: '1.0',
+            service_code: serviceCode
+          }
+        };
+
+        // Convert service flow data to workflow elements with hierarchy
+        this.convertServiceFlowToElements(serviceFlow, workflowData);
 
         this.currentWorkflow = workflowData;
-        this.currentServiceCode = serviceCode;
         this.updateWorkflow();
 
-        console.log('Loaded service flow from API:', workflowData);
+        console.log('Loaded service flow from API with hierarchy:', workflowData);
         return workflowData;
       }),
       catchError(error => {
@@ -163,7 +307,166 @@ export class WorkflowService {
     );
   }
 
-  // Convert current workflow back to service flow format
+  // Convert service flow with hierarchy
+  private convertServiceFlowToElements(serviceFlow: ServiceFlow, workflowData: WorkflowData): void {
+    // Add start element
+    const startElement: WorkflowElement = {
+      id: 'start',
+      type: ElementType.START,
+      position: { x: 100, y: 100 },
+      properties: { name: 'Start' },
+      connections: []
+    };
+    workflowData.elements.push(startElement);
+
+    let previousElementId = 'start';
+    let xPosition = 350;
+
+    // Convert pages to workflow elements
+    if (serviceFlow.pages && Array.isArray(serviceFlow.pages)) {
+      serviceFlow.pages.forEach((page: any, pageIndex: number) => {
+        const pageElementId = `page-${page.page_id || pageIndex}`;
+
+        // Create page element
+        const pageElement: WorkflowElement = {
+          id: pageElementId,
+          type: ElementType.PAGE,
+          position: { x: xPosition, y: 100 },
+          properties: {
+            name: page.name || `Page ${pageIndex + 1}`,
+            name_ara: page.name_ara,
+            description: page.description,
+            description_ara: page.description_ara,
+            sequence_number: page.sequence_number,
+            page_id: page.page_id,
+            is_hidden_page: page.is_hidden_page || false,
+            categoryCount: 0,
+            fieldCount: 0
+          },
+          connections: [],
+          children: [],
+          isExpanded: false
+        };
+        workflowData.elements.push(pageElement);
+
+        // Connect to previous element
+        workflowData.connections.push({
+          id: `conn-${previousElementId}-${pageElementId}`,
+          sourceId: previousElementId,
+          targetId: pageElementId
+        });
+
+        // Convert categories as children of page
+        if (page.categories && Array.isArray(page.categories)) {
+          page.categories.forEach((category: any, categoryIndex: number) => {
+            const categoryElementId = `category-${category.id || categoryIndex}`;
+
+            const categoryElement: WorkflowElement = {
+              id: categoryElementId,
+              type: ElementType.CATEGORY,
+              position: { x: 0, y: 0 }, // Position relative to parent
+              properties: {
+                name: category.name || `Category ${categoryIndex + 1}`,
+                name_ara: category.name_ara,
+                category_id: category.id,
+                is_repeatable: category.repeatable || false,
+                fieldCount: 0
+              },
+              connections: [],
+              parentId: pageElementId,
+              children: [],
+              isExpanded: false
+            };
+            workflowData.elements.push(categoryElement);
+            pageElement.children!.push(categoryElementId);
+
+            // Convert fields as children of category
+            if (category.fields && Array.isArray(category.fields)) {
+              category.fields.forEach((field: any, fieldIndex: number) => {
+                const fieldElementId = `field-${field.field_id || fieldIndex}`;
+
+                const fieldElement: WorkflowElement = {
+                  id: fieldElementId,
+                  type: ElementType.FIELD,
+                  position: { x: 0, y: 0 }, // Position relative to parent
+                  properties: {
+                    name: field.display_name || field.name || `Field ${fieldIndex + 1}`,
+                    _field_name: field.name,
+                    _field_display_name: field.display_name,
+                    _field_display_name_ara: field.display_name_ara,
+                    _field_type: field.field_type,
+                    _field_id: field.field_id,
+                    _mandatory: field.mandatory || false,
+                    _is_hidden: field.is_hidden || false,
+                    _is_disabled: field.is_disabled || false,
+                    _lookup: field.lookup,
+                    // Add all validation properties
+                    _max_length: field.max_length,
+                    _min_length: field.min_length,
+                    _regex_pattern: field.regex_pattern,
+                    _allowed_characters: field.allowed_characters,
+                    _forbidden_words: field.forbidden_words,
+                    _value_greater_than: field.value_greater_than,
+                    _value_less_than: field.value_less_than,
+                    _integer_only: field.integer_only,
+                    _positive_only: field.positive_only,
+                    _precision: field.precision,
+                    _default_boolean: field.default_boolean,
+                    _file_types: field.file_types,
+                    _max_file_size: field.max_file_size,
+                    _image_max_width: field.image_max_width,
+                    _image_max_height: field.image_max_height,
+                    _max_selections: field.max_selections,
+                    _min_selections: field.min_selections
+                  },
+                  connections: [],
+                  parentId: categoryElementId
+                };
+                workflowData.elements.push(fieldElement);
+                categoryElement.children!.push(fieldElementId);
+              });
+
+              categoryElement.properties.fieldCount = categoryElement.children!.length;
+            }
+          });
+
+          // Update page counts
+          pageElement.properties.categoryCount = pageElement.children!.length;
+          let totalFields = 0;
+          pageElement.children!.forEach(catId => {
+            const cat = workflowData.elements.find(el => el.id === catId);
+            if (cat) {
+              totalFields += cat.properties.fieldCount || 0;
+            }
+          });
+          pageElement.properties.fieldCount = totalFields;
+        }
+
+        previousElementId = pageElementId;
+        xPosition += 300;
+      });
+    }
+
+    // Add end element
+    workflowData.elements.push({
+      id: 'end',
+      type: ElementType.END,
+      position: { x: xPosition, y: 100 },
+      properties: { name: 'End', action: 'submit' },
+      connections: []
+    });
+
+    // Connect last page to end
+    if (previousElementId !== 'start') {
+      workflowData.connections.push({
+        id: `conn-${previousElementId}-end`,
+        sourceId: previousElementId,
+        targetId: 'end'
+      });
+    }
+  }
+
+  // Convert workflow back to service flow format with hierarchy
   convertWorkflowToServiceFlow(): ServiceFlow | null {
     if (!this.currentServiceCode) {
       console.warn('No service code set, cannot convert to service flow');
@@ -175,8 +478,10 @@ export class WorkflowService {
       pages: []
     };
 
-    // Group elements by pages
-    const pageElements = this.currentWorkflow.elements.filter(el => el.type === ElementType.PAGE);
+    // Get all page elements (top-level only)
+    const pageElements = this.currentWorkflow.elements.filter(
+      el => el.type === ElementType.PAGE && !el.parentId
+    );
 
     pageElements.forEach(pageEl => {
       const page: any = {
@@ -190,76 +495,70 @@ export class WorkflowService {
         categories: []
       };
 
-      // Find categories connected to this page
-      const categoryConnections = this.currentWorkflow.connections.filter(conn => conn.sourceId === pageEl.id);
-      categoryConnections.forEach(catConn => {
-        const categoryEl = this.currentWorkflow.elements.find(el => el.id === catConn.targetId && el.type === ElementType.CATEGORY);
-        if (categoryEl) {
-          const category: any = {
-            id: categoryEl.properties.category_id || Date.now(),
-            name: categoryEl.properties.name || 'Untitled Category',
-            name_ara: categoryEl.properties.name_ara,
-            repeatable: categoryEl.properties.is_repeatable || false,
-            fields: []
-          };
+      // Get categories that are children of this page
+      if (pageEl.children) {
+        pageEl.children.forEach(categoryId => {
+          const categoryEl = this.currentWorkflow.elements.find(
+            el => el.id === categoryId && el.type === ElementType.CATEGORY
+          );
 
-          // Find fields connected to this category
-          const fieldConnections = this.currentWorkflow.connections.filter(conn => conn.sourceId === categoryEl.id);
-          fieldConnections.forEach(fieldConn => {
-            const fieldEl = this.currentWorkflow.elements.find(el => el.id === fieldConn.targetId && el.type === ElementType.FIELD);
-            if (fieldEl) {
-              const field: any = {
-                name: fieldEl.properties._field_name || fieldEl.properties.name,
-                field_id: fieldEl.properties._field_id || Date.now(),
-                display_name: fieldEl.properties._field_display_name || fieldEl.properties.name,
-                display_name_ara: fieldEl.properties._field_display_name_ara,
-                field_type: fieldEl.properties._field_type || 'text',
-                mandatory: fieldEl.properties._mandatory || false,
-                lookup: fieldEl.properties._lookup,
-                allowed_lookups: [],
-                sub_fields: [],
-                is_hidden: fieldEl.properties._is_hidden || false,
-                is_disabled: fieldEl.properties._is_disabled || false,
-                visibility_conditions: []
-              };
+          if (categoryEl) {
+            const category: any = {
+              id: categoryEl.properties.category_id || Date.now(),
+              name: categoryEl.properties.name || 'Untitled Category',
+              name_ara: categoryEl.properties.name_ara,
+              repeatable: categoryEl.properties.is_repeatable || false,
+              fields: []
+            };
 
-              // Add field type specific properties
-              if (fieldEl.properties._max_length) field.max_length = fieldEl.properties._max_length;
-              if (fieldEl.properties._min_length) field.min_length = fieldEl.properties._min_length;
-              if (fieldEl.properties._regex_pattern) field.regex_pattern = fieldEl.properties._regex_pattern;
-              if (fieldEl.properties._allowed_characters) field.allowed_characters = fieldEl.properties._allowed_characters;
-              if (fieldEl.properties._forbidden_words) field.forbidden_words = fieldEl.properties._forbidden_words;
-              if (fieldEl.properties._value_greater_than) field.value_greater_than = fieldEl.properties._value_greater_than;
-              if (fieldEl.properties._value_less_than) field.value_less_than = fieldEl.properties._value_less_than;
-              if (fieldEl.properties._integer_only) field.integer_only = fieldEl.properties._integer_only;
-              if (fieldEl.properties._positive_only) field.positive_only = fieldEl.properties._positive_only;
-              if (fieldEl.properties._precision) field.precision = fieldEl.properties._precision;
-              if (fieldEl.properties._default_boolean !== undefined) field.default_boolean = fieldEl.properties._default_boolean;
-              if (fieldEl.properties._file_types) field.file_types = fieldEl.properties._file_types;
-              if (fieldEl.properties._max_file_size) field.max_file_size = fieldEl.properties._max_file_size;
-              if (fieldEl.properties._image_max_width) field.image_max_width = fieldEl.properties._image_max_width;
-              if (fieldEl.properties._image_max_height) field.image_max_height = fieldEl.properties._image_max_height;
-              if (fieldEl.properties._max_selections) field.max_selections = fieldEl.properties._max_selections;
-              if (fieldEl.properties._min_selections) field.min_selections = fieldEl.properties._min_selections;
+            // Get fields that are children of this category
+            if (categoryEl.children) {
+              categoryEl.children.forEach(fieldId => {
+                const fieldEl = this.currentWorkflow.elements.find(
+                  el => el.id === fieldId && el.type === ElementType.FIELD
+                );
 
-              // Find condition elements connected to this field
-              const conditionConnections = this.currentWorkflow.connections.filter(conn => conn.sourceId === fieldEl.id);
-              conditionConnections.forEach(condConn => {
-                const conditionEl = this.currentWorkflow.elements.find(el => el.id === condConn.targetId && el.type === ElementType.CONDITION);
-                if (conditionEl && conditionEl.properties.condition_logic) {
-                  field.visibility_conditions.push({
-                    condition_logic: conditionEl.properties.condition_logic
+                if (fieldEl) {
+                  const field: any = {
+                    name: fieldEl.properties._field_name || fieldEl.properties.name,
+                    field_id: fieldEl.properties._field_id || Date.now(),
+                    display_name: fieldEl.properties._field_display_name || fieldEl.properties.name,
+                    display_name_ara: fieldEl.properties._field_display_name_ara,
+                    field_type: fieldEl.properties._field_type || 'text',
+                    mandatory: fieldEl.properties._mandatory || false,
+                    lookup: fieldEl.properties._lookup,
+                    allowed_lookups: [],
+                    sub_fields: [],
+                    is_hidden: fieldEl.properties._is_hidden || false,
+                    is_disabled: fieldEl.properties._is_disabled || false,
+                    visibility_conditions: []
+                  };
+
+                  // Add all validation properties
+                  const validationProps = [
+                    'max_length', 'min_length', 'regex_pattern', 'allowed_characters',
+                    'forbidden_words', 'value_greater_than', 'value_less_than',
+                    'integer_only', 'positive_only', 'precision', 'default_boolean',
+                    'file_types', 'max_file_size', 'image_max_width', 'image_max_height',
+                    'max_selections', 'min_selections'
+                  ];
+
+                  validationProps.forEach(prop => {
+                    const fieldProp = `_${prop}`;
+                    if (fieldEl.properties[fieldProp] !== undefined && fieldEl.properties[fieldProp] !== null) {
+                      field[prop] = fieldEl.properties[fieldProp];
+                    }
                   });
+
+                  category.fields.push(field);
                 }
               });
-
-              category.fields.push(field);
             }
-          });
 
-          page.categories.push(category);
-        }
-      });
+            page.categories.push(category);
+          }
+        });
+      }
 
       serviceFlow.pages.push(page);
     });
@@ -267,14 +566,12 @@ export class WorkflowService {
     return serviceFlow;
   }
 
-  // Save current workflow (not applicable for service flows - they would need API update)
+  // Save workflow
   saveWorkflow(): Observable<any> {
     if (this.apiService.isConfigured() && this.currentServiceCode) {
-      // For service flows, we would need a different API endpoint to update the service flow
-      // For now, just save to localStorage as fallback
+      // For service flows, we would need a different API endpoint to update
       return this.saveToLocalStorage();
     } else {
-      // Fallback to localStorage
       return this.saveToLocalStorage();
     }
   }
@@ -293,14 +590,13 @@ export class WorkflowService {
   loadWorkflow(workflowData?: WorkflowData): void {
     if (workflowData) {
       this.currentWorkflow = { ...workflowData };
-      this.currentServiceCode = undefined; // Clear service code when loading local data
+      this.currentServiceCode = workflowData.metadata?.service_code;
     } else {
-      // Load from localStorage as fallback
       const savedData = localStorage.getItem('current_workflow');
       if (savedData) {
         try {
           this.currentWorkflow = JSON.parse(savedData);
-          this.currentServiceCode = undefined;
+          this.currentServiceCode = this.currentWorkflow.metadata?.service_code;
         } catch (error) {
           console.error('Error loading workflow from localStorage:', error);
           this.resetWorkflow();
@@ -322,23 +618,72 @@ export class WorkflowService {
     this.currentWorkflow = {
       name: 'New Workflow',
       elements: [],
-      connections: []
+      connections: [],
+      viewMode: 'collapsed'
     };
     this.currentServiceCode = undefined;
     this.initializeWithStartElement();
   }
 
-  // Create a new workflow with a specific name
   createNewWorkflow(name: string = 'New Workflow'): void {
     this.currentWorkflow = {
       name,
       elements: [],
-      connections: []
+      connections: [],
+      viewMode: 'collapsed'
     };
     this.currentServiceCode = undefined;
     this.initializeWithStartElement();
   }
 
+  // Toggle view mode
+  setViewMode(mode: 'collapsed' | 'expanded'): void {
+    this.currentWorkflow.viewMode = mode;
+
+    if (mode === 'collapsed') {
+      // Collapse all elements
+      this.currentWorkflow.elements.forEach(el => {
+        if (el.isExpanded) {
+          el.isExpanded = false;
+        }
+      });
+      this.currentWorkflow.expandedElementId = undefined;
+    }
+
+    this.updateWorkflow();
+  }
+
+  // Auto-organize with hierarchy in mind
+// Auto-organize with hierarchy in mind
+  autoOrganizeElements(): void {
+    const elements = this.currentWorkflow.elements;
+
+    // Position top-level elements only
+    const topLevelElements = elements.filter(el => !el.parentId);
+
+    // Sort by type - include all element types
+    const typeOrder: Record<ElementType, number> = {
+      [ElementType.START]: 0,
+      [ElementType.PAGE]: 1,
+      [ElementType.CONDITION]: 2,
+      [ElementType.END]: 3,
+      [ElementType.CATEGORY]: 4,
+      [ElementType.FIELD]: 5
+    };
+
+    topLevelElements.sort((a, b) => (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0));
+
+    // Position in a horizontal line
+    let xPosition = 100;
+    const spacing = 300;
+
+    topLevelElements.forEach(element => {
+      element.position = { x: xPosition, y: 100 };
+      xPosition += spacing;
+    });
+
+    this.updateWorkflow();
+  }
   private addStartElementToWorkflow(workflow: WorkflowData): void {
     const startElement: WorkflowElement = {
       id: uuidv4(),
@@ -371,7 +716,7 @@ export class WorkflowService {
       errors.push('Workflow must have at least one end element');
     }
 
-    // Check for orphaned elements (elements with no connections)
+    // Check for orphaned top-level elements (not counting children)
     const connectedElements = new Set<string>();
     this.currentWorkflow.connections.forEach(conn => {
       connectedElements.add(conn.sourceId);
@@ -379,12 +724,21 @@ export class WorkflowService {
     });
 
     const orphanedElements = this.currentWorkflow.elements.filter(
-      el => el.type !== ElementType.START && !connectedElements.has(el.id)
+      el => el.type !== ElementType.START &&
+        !el.parentId && // Only check top-level elements
+        !connectedElements.has(el.id)
     );
 
     if (orphanedElements.length > 0) {
       errors.push(`Found ${orphanedElements.length} disconnected elements`);
     }
+
+    // Check hierarchy constraints
+    this.currentWorkflow.elements.forEach(element => {
+      if (canBeContained(element.type) && !element.parentId) {
+        errors.push(`${element.type} "${element.properties.name}" must be inside a container`);
+      }
+    });
 
     // Service flow specific validations
     if (this.currentServiceCode) {
@@ -403,57 +757,19 @@ export class WorkflowService {
       }
     }
 
+    // Validate individual elements using validation rules
+    this.currentWorkflow.elements.forEach(element => {
+      const rules = ELEMENT_VALIDATION_RULES[element.type] || [];
+      rules.forEach(rule => {
+        if (rule.validator && !rule.validator(element)) {
+          errors.push(rule.message);
+        }
+      });
+    });
+
     return {
       isValid: errors.length === 0,
       errors
     };
-  }
-
-  // Auto-organize elements for better visual layout
-  autoOrganizeElements(): void {
-    const elements = this.currentWorkflow.elements;
-    const connections = this.currentWorkflow.connections;
-
-    // Sort elements by type hierarchy: start -> pages -> categories -> fields -> conditions -> end
-    const typeOrder = {
-      [ElementType.START]: 0,
-      [ElementType.PAGE]: 1,
-      [ElementType.CATEGORY]: 2,
-      [ElementType.FIELD]: 3,
-      [ElementType.CONDITION]: 4,
-      [ElementType.END]: 5
-    };
-
-    // Group elements by level
-    const levels: { [level: number]: WorkflowElement[] } = {};
-
-    elements.forEach(element => {
-      const level = typeOrder[element.type] || 0;
-      if (!levels[level]) levels[level] = [];
-      levels[level].push(element);
-    });
-
-    // Position elements in a hierarchical layout
-    let yPosition = 100;
-    const levelSpacing = 300;
-    const elementSpacing = 250;
-
-    Object.keys(levels).sort((a, b) => Number(a) - Number(b)).forEach(levelKey => {
-      const level = Number(levelKey);
-      const levelElements = levels[level];
-
-      let xPosition = 100;
-
-      levelElements.forEach((element, index) => {
-        element.position = {
-          x: xPosition + (index * elementSpacing),
-          y: yPosition
-        };
-      });
-
-      yPosition += levelSpacing;
-    });
-
-    this.updateWorkflow();
   }
 }

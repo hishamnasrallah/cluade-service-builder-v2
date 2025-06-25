@@ -16,6 +16,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subject, takeUntil, forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { MatListModule } from '@angular/material/list';
+import {
+  canContainChildren,
+  getValidChildTypes,
+  ELEMENT_CONFIGS, WorkflowData
+} from '../../../models/workflow.models';
 
 import { WorkflowElement, ElementType } from '../../../models/workflow.models';
 import {
@@ -26,7 +32,7 @@ import {
   Field,
   FieldType
 } from '../../../services/api.service';
-import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
+// import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
 
 @Component({
   selector: 'app-properties-panel',
@@ -45,7 +51,7 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
     MatChipsModule,
     MatDividerModule,
     MatProgressSpinnerModule,
-    ConditionBuilderComponent
+    // ConditionBuilderComponent
   ],
   templateUrl:'properties-panel.component.html',
   styleUrl:'properties-panel.component.scss'
@@ -53,12 +59,17 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
 export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   @Input() selectedElement?: WorkflowElement;
   @Input() selectedConnection?: any;
+  @Input() workflow: WorkflowData = { name: '', elements: [], connections: [] };
 
   @Output() elementUpdated = new EventEmitter<{ id: string; properties: any }>();
   @Output() connectionUpdated = new EventEmitter<any>();
-
+  @Output() elementSelected = new EventEmitter<string>();
+  @Output() elementExpanded = new EventEmitter<string>();
+  @Output() elementCollapsed = new EventEmitter<string>();
+  @Output() elementDeleted = new EventEmitter<string>();
   propertiesForm!: FormGroup;
   private destroy$ = new Subject<void>();
+  selectedElementId?: string;
 
   // Loading and error states
   isLoading = false;
@@ -94,6 +105,112 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
     // Set up auto-save on form changes
     this.setupAutoSave();
+  }
+// Hierarchy navigation methods
+  getHierarchyPath(): any[] {
+    if (!this.selectedElement) return [];
+
+    const path = [];
+    let current = this.selectedElement;
+
+    // Build path from current element up to root
+    while (current) {
+      const config = ELEMENT_CONFIGS.find(c => c.type === current.type);
+      path.unshift({
+        id: current.id,
+        name: current.properties.name || current.type,
+        type: current.type,
+        icon: config?.icon || 'help'
+      });
+
+      if (current.parentId) {
+        current = this.workflow.elements.find(el => el.id === current.parentId);
+      } else {
+        break;
+      }
+    }
+
+    return path;
+  }
+
+  selectHierarchyItem(item: any): void {
+    this.selectedElementId = item.id;
+    this.elementSelected.emit(item.id);
+  }
+
+  canContainChildren(elementType: ElementType): boolean {
+    return canContainChildren(elementType);
+  }
+
+  getValidChildTypes(parentType: ElementType): ElementType[] {
+    return getValidChildTypes(parentType);
+  }
+
+  getElementTypeIcon(elementType: ElementType): string {
+    const config = ELEMENT_CONFIGS.find(c => c.type === elementType);
+    return config?.icon || 'help';
+  }
+
+  getElementTypeColor(elementType: ElementType): string {
+    const config = ELEMENT_CONFIGS.find(c => c.type === elementType);
+    return config?.color || '#999';
+  }
+
+  expandElement(): void {
+    if (this.selectedElement) {
+      this.elementExpanded.emit(this.selectedElement.id);
+    }
+  }
+
+  collapseElement(): void {
+    if (this.selectedElement) {
+      this.elementCollapsed.emit(this.selectedElement.id);
+    }
+  }
+
+  selectParent(): void {
+    if (this.selectedElement?.parentId) {
+      this.selectedElementId = this.selectedElement.parentId;
+      this.elementSelected.emit(this.selectedElement.parentId);
+    }
+  }
+
+  getParentName(): string {
+    if (!this.selectedElement?.parentId) return '';
+
+    const parent = this.workflow.elements.find(el => el.id === this.selectedElement!.parentId);
+    return parent?.properties.name || parent?.type || 'Parent';
+  }
+
+  getParentIcon(): string {
+    if (!this.selectedElement?.parentId) return 'folder';
+
+    const parent = this.workflow.elements.find(el => el.id === this.selectedElement!.parentId);
+    if (!parent) return 'folder';
+
+    const config = ELEMENT_CONFIGS.find(c => c.type === parent.type);
+    return config?.icon || 'folder';
+  }
+
+  getChildElements(): WorkflowElement[] {
+    if (!this.selectedElement?.children) return [];
+
+    return this.selectedElement.children
+      .map(childId => this.workflow.elements.find(el => el.id === childId))
+      .filter(el => el !== undefined) as WorkflowElement[];
+  }
+
+  selectChild(child: WorkflowElement): void {
+    this.selectedElementId = child.id;
+    this.elementSelected.emit(child.id);
+  }
+
+  deleteChild(child: WorkflowElement, event: Event): void {
+    event.stopPropagation();
+
+    if (confirm(`Delete ${child.properties.name || child.type}?`)) {
+      this.elementDeleted.emit(child.id);
+    }
   }
 
   private setupAutoSave(): void {

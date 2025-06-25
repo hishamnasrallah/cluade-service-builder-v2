@@ -1,33 +1,36 @@
-// components/workflow-builder/minimap/minimap.component.ts
+// minimap.component.ts - Updated for hierarchy visualization
 import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
-import { WorkflowData, CanvasState } from '../../../models/workflow.models';
+import { WorkflowData, CanvasState, ELEMENT_DIMENSIONS } from '../../../models/workflow.models';
 
 @Component({
   selector: 'app-minimap',
   standalone: true,
   imports: [CommonModule],
-// minimap.component.ts - Updated template and styles for clean minimal look
   template: `
     <div class="minimap" (click)="onMinimapClick($event)">
       <div class="minimap-label">Overview</div>
 
       <div class="minimap-canvas" #minimapCanvas>
         <!-- Elements -->
-        <div *ngFor="let element of workflow.elements; trackBy: trackElement"
+        <div *ngFor="let element of getTopLevelElements(); trackBy: trackElement"
              class="minimap-element"
              [class]="element.type"
+             [class.expanded]="element.isExpanded"
              [style.left.px]="getMinimapX(element.position.x)"
              [style.top.px]="getMinimapY(element.position.y)"
-             [style.background-color]="getElementColor(element.type)">
+             [style.width.px]="getMinimapWidth(element)"
+             [style.height.px]="getMinimapHeight(element)"
+             [style.background-color]="getElementColor(element.type)"
+             [style.opacity]="element.isExpanded ? 0.3 : 0.8">
         </div>
 
         <!-- Connections -->
         <svg class="minimap-connections"
              [attr.width]="minimapSize.width"
              [attr.height]="minimapSize.height">
-          <line *ngFor="let connection of workflow.connections; trackBy: trackConnection"
+          <line *ngFor="let connection of getTopLevelConnections(); trackBy: trackConnection"
                 [attr.x1]="getConnectionX1(connection)"
                 [attr.y1]="getConnectionY1(connection)"
                 [attr.x2]="getConnectionX2(connection)"
@@ -79,23 +82,21 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
 
     .minimap-element {
       position: absolute;
-      width: 6px;
-      height: 4px;
       border-radius: 1px;
-      opacity: 0.8;
+      transition: all 0.3s ease;
+    }
+
+    .minimap-element.expanded {
+      border: 1px dashed;
     }
 
     .minimap-element.start,
     .minimap-element.end {
       border-radius: 50%;
-      width: 4px;
-      height: 4px;
     }
 
     .minimap-element.condition {
       transform: rotate(45deg);
-      width: 3px;
-      height: 3px;
     }
 
     .minimap-connections {
@@ -117,11 +118,6 @@ import { WorkflowData, CanvasState } from '../../../models/workflow.models';
       .minimap-label {
         font-size: 10px;
       }
-
-      .minimap-element {
-        width: 4px;
-        height: 3px;
-      }
     }
   `]
 })
@@ -142,8 +138,6 @@ export class MinimapComponent implements OnChanges {
     'end': '#F44336'
   };
 
-  Math = Math; // Make Math available in template
-
   ngOnChanges(changes: SimpleChanges): void {
     // Recalculate minimap when inputs change
     if (changes['workflow'] || changes['canvasSize']) {
@@ -153,7 +147,17 @@ export class MinimapComponent implements OnChanges {
 
   private updateMinimapSize(): void {
     // Keep the current fixed size for simplicity
-    // In a more advanced implementation, you could calculate optimal size
+  }
+
+  getTopLevelElements() {
+    return this.workflow.elements.filter(el => !el.parentId);
+  }
+
+  getTopLevelConnections() {
+    const topLevelIds = new Set(this.getTopLevelElements().map(el => el.id));
+    return this.workflow.connections.filter(conn =>
+      topLevelIds.has(conn.sourceId) && topLevelIds.has(conn.targetId)
+    );
   }
 
   getMinimapX(x: number): number {
@@ -164,18 +168,44 @@ export class MinimapComponent implements OnChanges {
     return (y / this.canvasSize.height) * this.minimapSize.height;
   }
 
+  getMinimapWidth(element: any): number {
+    const dims = ELEMENT_DIMENSIONS[element.type];
+    if (!dims) return 6;
+
+    const width = element.isExpanded ? dims.expanded.width : dims.collapsed.width;
+    return (width / this.canvasSize.width) * this.minimapSize.width;
+  }
+
+  getMinimapHeight(element: any): number {
+    const dims = ELEMENT_DIMENSIONS[element.type];
+    if (!dims) return 4;
+
+    const height = element.isExpanded ? dims.expanded.height : dims.collapsed.height;
+    return (height / this.canvasSize.height) * this.minimapSize.height;
+  }
+
   getElementColor(elementType: string): string {
     return this.elementColors[elementType] || '#999';
   }
 
   getConnectionX1(connection: any): number {
     const sourceElement = this.workflow.elements.find(el => el.id === connection.sourceId);
-    return sourceElement ? this.getMinimapX(sourceElement.position.x + 100) : 0;
+    if (!sourceElement) return 0;
+
+    const dims = ELEMENT_DIMENSIONS[sourceElement.type];
+    const width = sourceElement.isExpanded ? dims.expanded.width : dims.collapsed.width;
+
+    return this.getMinimapX(sourceElement.position.x + width);
   }
 
   getConnectionY1(connection: any): number {
     const sourceElement = this.workflow.elements.find(el => el.id === connection.sourceId);
-    return sourceElement ? this.getMinimapY(sourceElement.position.y + 15) : 0;
+    if (!sourceElement) return 0;
+
+    const dims = ELEMENT_DIMENSIONS[sourceElement.type];
+    const height = sourceElement.isExpanded ? dims.expanded.height : dims.collapsed.height;
+
+    return this.getMinimapY(sourceElement.position.y + height / 2);
   }
 
   getConnectionX2(connection: any): number {
@@ -185,7 +215,12 @@ export class MinimapComponent implements OnChanges {
 
   getConnectionY2(connection: any): number {
     const targetElement = this.workflow.elements.find(el => el.id === connection.targetId);
-    return targetElement ? this.getMinimapY(targetElement.position.y + 15) : 0;
+    if (!targetElement) return 0;
+
+    const dims = ELEMENT_DIMENSIONS[targetElement.type];
+    const height = targetElement.isExpanded ? dims.expanded.height : dims.collapsed.height;
+
+    return this.getMinimapY(targetElement.position.y + height / 2);
   }
 
   getViewportX(): number {
@@ -197,14 +232,12 @@ export class MinimapComponent implements OnChanges {
   }
 
   getViewportWidth(): number {
-    // Assume visible area based on zoom level
-    const visibleWidth = (window.innerWidth * 0.6) / this.canvasState.zoom; // Approximate canvas visible width
+    const visibleWidth = (window.innerWidth * 0.6) / this.canvasState.zoom;
     return (visibleWidth / this.canvasSize.width) * this.minimapSize.width;
   }
 
   getViewportHeight(): number {
-    // Assume visible area based on zoom level
-    const visibleHeight = (window.innerHeight * 0.8) / this.canvasState.zoom; // Approximate canvas visible height
+    const visibleHeight = (window.innerHeight * 0.8) / this.canvasState.zoom;
     return (visibleHeight / this.canvasSize.height) * this.minimapSize.height;
   }
 
@@ -213,12 +246,10 @@ export class MinimapComponent implements OnChanges {
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
 
-    // Convert minimap coordinates to canvas coordinates
     const canvasX = (clickX / this.minimapSize.width) * this.canvasSize.width;
     const canvasY = (clickY / this.minimapSize.height) * this.canvasSize.height;
 
-    // Calculate new pan position to center the clicked point
-    const newPanX = -(canvasX - (window.innerWidth * 0.3)); // Offset for sidebars
+    const newPanX = -(canvasX - (window.innerWidth * 0.3));
     const newPanY = -(canvasY - (window.innerHeight * 0.4));
 
     this.viewportChanged.emit({

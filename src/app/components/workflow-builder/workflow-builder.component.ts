@@ -1,4 +1,4 @@
-// components/workflow-builder/workflow-builder.component.ts - Updated for service flows
+// workflow-builder.component.ts - Updated template section for hierarchy
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatToolbarModule } from '@angular/material/toolbar';
@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
@@ -13,7 +14,16 @@ import { Subject, takeUntil } from 'rxjs';
 
 import { WorkflowService } from '../../services/workflow.service';
 import { ApiService } from '../../services/api.service';
-import { WorkflowData, WorkflowElement, ElementType, ELEMENT_CONFIGS, Position, CanvasState } from '../../models/workflow.models';
+import {
+  WorkflowData,
+  WorkflowElement,
+  ElementType,
+  ELEMENT_CONFIGS,
+  ELEMENT_DIMENSIONS,
+  Position,
+  CanvasState,
+  canBeContained
+} from '../../models/workflow.models';
 import { WorkflowElementComponent } from './workflow-element/workflow-element.component';
 import { PropertiesPanelComponent } from './properties-panel/properties-panel.component';
 import { ElementPaletteComponent } from './element-palette/element-palette.component';
@@ -34,19 +44,20 @@ import {
     MatIconModule,
     MatSidenavModule,
     MatDividerModule,
+    MatButtonToggleModule,
     WorkflowElementComponent,
     PropertiesPanelComponent,
     ElementPaletteComponent,
     MinimapComponent
   ],
   templateUrl:'workflow-builder.component.html',
-  styleUrl:"workflow-builder.component.scss"
+  styleUrl: 'workflow-builder.component.scss'
 })
 export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('canvas', { static: false }) canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('canvasWrapper', { static: false }) canvasWrapperRef!: ElementRef<HTMLDivElement>;
 
-  workflow: WorkflowData = { name: 'New Workflow', elements: [], connections: [] };
+  workflow: WorkflowData = { name: 'New Workflow', elements: [], connections: [], viewMode: 'collapsed' };
   selectedElementId?: string;
   selectedConnectionId?: string;
   availableElements = ELEMENT_CONFIGS;
@@ -97,13 +108,92 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   ngAfterViewInit(): void {
-    // Canvas is already initialized in constructor, no need to change panX/panY here
+    // Canvas is already initialized
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
   }
+
+  // Get only top-level elements (not children)
+  getTopLevelElements(): WorkflowElement[] {
+    return this.workflow.elements.filter(el => !el.parentId);
+  }
+
+  // Get only connections between top-level elements
+  getTopLevelConnections(): any[] {
+    const topLevelIds = new Set(this.getTopLevelElements().map(el => el.id));
+    return this.workflow.connections.filter(conn =>
+      topLevelIds.has(conn.sourceId) && topLevelIds.has(conn.targetId)
+    );
+  }
+
+  // Handle view mode change
+  onViewModeChange(event: any): void {
+    this.workflowService.setViewMode(event.value);
+  }
+
+  // Handle element expansion toggle
+  onElementExpandToggled(elementId: string): void {
+    this.workflowService.toggleElementExpansion(elementId);
+  }
+
+  // Modified to handle dropping into expanded containers
+  onElementSelected(elementType: ElementType): void {
+    // Check if we have an expanded container that can accept this type
+    let parentId: string | undefined;
+    let position: Position = {
+      x: 200 + Math.random() * 100,
+      y: 200 + Math.random() * 100
+    };
+
+    if (this.workflow.expandedElementId) {
+      const expandedElement = this.workflow.elements.find(el => el.id === this.workflow.expandedElementId);
+      if (expandedElement) {
+        // Check if this element type can be a child
+        const validChildTypes = this.getValidChildTypes(expandedElement.type);
+        if (validChildTypes.includes(elementType)) {
+          parentId = expandedElement.id;
+          // Position will be relative to parent, handled by parent component
+          position = { x: 0, y: 0 };
+        } else if (canBeContained(elementType)) {
+          this.snackBar.open(`${elementType} must be placed inside a container`, 'Close', { duration: 3000 });
+          return;
+        }
+      }
+    } else if (canBeContained(elementType)) {
+      this.snackBar.open(`${elementType} must be placed inside a container. Expand a container first.`, 'Close', { duration: 3000 });
+      return;
+    }
+
+    try {
+      const element = this.workflowService.addElement(elementType, position, {}, parentId);
+      this.selectedElementId = element.id;
+      this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
+    } catch (error) {
+      this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
+    }
+  }
+
+  // Helper to get valid child types
+  private getValidChildTypes(parentType: ElementType): ElementType[] {
+    switch (parentType) {
+      case ElementType.PAGE:
+        return [ElementType.CATEGORY];
+      case ElementType.CATEGORY:
+        return [ElementType.FIELD];
+      default:
+        return [];
+    }
+  }
+
+  // Canvas Transform
+  getCanvasTransform(): string {
+    return `translate(${this.canvasState.panX}px, ${this.canvasState.panY}px) scale(${this.canvasState.zoom})`;
+  }
+
+  // ... rest of the existing methods remain the same ...
 
   showServiceFlowSelector(): void {
     if (!this.apiService.isConfigured()) {
@@ -145,6 +235,9 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         this.selectedElementId = undefined;
         this.selectedConnectionId = undefined;
 
+        // Reset view to collapsed
+        this.workflowService.setViewMode('collapsed');
+
         // Center the view on the workflow
         this.resetZoom();
 
@@ -160,6 +253,8 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
   }
+
+  // ... rest of the methods remain the same ...
 
   createNewWorkflow(): void {
     const newName = `New Workflow ${new Date().toLocaleDateString()}`;
@@ -205,11 +300,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     return this.workflow.elements.filter(el => el.type === type).length;
   }
 
-  // Canvas Transform
-  getCanvasTransform(): string {
-    return `translate(${this.canvasState.panX}px, ${this.canvasState.panY}px) scale(${this.canvasState.zoom})`;
-  }
-
   // Convert screen coordinates to canvas coordinates
   screenToCanvas(screenX: number, screenY: number): { x: number; y: number } {
     const rect = this.canvasWrapperRef.nativeElement.getBoundingClientRect();
@@ -253,7 +343,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.canvasState.panY = 100;
   }
 
-  // Mouse Events (keeping existing implementation)
+  // Mouse Events
   onCanvasMouseDown(event: MouseEvent): void {
     if (this.connectingFrom || this.isDraggingElement) return;
 
@@ -336,8 +426,24 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     if (elementType) {
       const canvasPos = this.screenToCanvas(event.clientX, event.clientY);
 
+      // Check if dropping into an expanded container
+      let parentId: string | undefined;
+      if (this.workflow.expandedElementId) {
+        const expandedElement = this.workflow.elements.find(el => el.id === this.workflow.expandedElementId);
+        if (expandedElement) {
+          // Check if this element type can be a child
+          const validChildTypes = this.getValidChildTypes(expandedElement.type);
+          if (validChildTypes.includes(elementType)) {
+            parentId = expandedElement.id;
+            // Position will be relative to parent
+            canvasPos.x = 0;
+            canvasPos.y = 0;
+          }
+        }
+      }
+
       try {
-        const element = this.workflowService.addElement(elementType, canvasPos);
+        const element = this.workflowService.addElement(elementType, canvasPos, {}, parentId);
         this.selectedElementId = element.id;
         this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
       } catch (error) {
@@ -346,22 +452,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
   }
 
-  onElementSelected(elementType: ElementType): void {
-    const position: Position = {
-      x: 200 + Math.random() * 100,
-      y: 200 + Math.random() * 100
-    };
-
-    try {
-      const element = this.workflowService.addElement(elementType, position);
-      this.selectedElementId = element.id;
-      this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
-    } catch (error) {
-      this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
-    }
-  }
-
-  // Element Management (keeping existing implementation)
+  // Element Management
   selectElement(elementId: string): void {
     this.selectedElementId = elementId;
     this.selectedConnectionId = undefined;
@@ -395,14 +486,30 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.isDraggingElement = false;
   }
 
-  // Connection Management (keeping existing implementation)
+  // Connection Management
   startConnection(elementId: string, event: MouseEvent): void {
+    // Don't allow connections from child elements
+    const element = this.workflow.elements.find(el => el.id === elementId);
+    if (element?.parentId) {
+      this.snackBar.open('Cannot create connections from child elements', 'Close', { duration: 2000 });
+      return;
+    }
+
     this.connectingFrom = elementId;
     event.stopPropagation();
   }
 
   endConnection(elementId: string): void {
     if (this.connectingFrom && this.connectingFrom !== elementId) {
+      // Don't allow connections to child elements
+      const element = this.workflow.elements.find(el => el.id === elementId);
+      if (element?.parentId) {
+        this.snackBar.open('Cannot create connections to child elements', 'Close', { duration: 2000 });
+        this.connectingFrom = undefined;
+        this.tempConnection = undefined;
+        return;
+      }
+
       try {
         this.workflowService.addConnection(this.connectingFrom, elementId);
         this.snackBar.open('Connection created', 'Close', { duration: 2000 });
@@ -427,12 +534,23 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     if (!sourceElement || !targetElement) return '';
 
+    // Get element dimensions
+    const sourceDims = this.getElementDimensions(sourceElement);
+    const targetDims = this.getElementDimensions(targetElement);
+
     return this.createCurvedPath(
-      sourceElement.position.x + 100,
-      sourceElement.position.y + 30,
+      sourceElement.position.x + sourceDims.width,
+      sourceElement.position.y + sourceDims.height / 2,
       targetElement.position.x,
-      targetElement.position.y + 30
+      targetElement.position.y + targetDims.height / 2
     );
+  }
+
+  private getElementDimensions(element: WorkflowElement): { width: number; height: number } {
+    const dims = ELEMENT_DIMENSIONS[element.type];
+    if (!dims) return { width: 100, height: 60 };
+
+    return element.isExpanded ? dims.expanded : dims.collapsed;
   }
 
   private createCurvedPath(x1: number, y1: number, x2: number, y2: number): string {

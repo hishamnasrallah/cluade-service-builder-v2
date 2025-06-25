@@ -1,11 +1,19 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, ElementRef, ViewChild, ViewContainerRef } from '@angular/core';
+// workflow-element.component.ts - Updated with hierarchy support
+import { Component, Input, Output, EventEmitter, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule, MatMenuTrigger } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 
-import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../../models/workflow.models';
+import {
+  WorkflowElement,
+  ElementType,
+  ELEMENT_CONFIGS,
+  ELEMENT_DIMENSIONS,
+  Position,
+  canContainChildren
+} from '../../../models/workflow.models';
 
 @Component({
   selector: 'app-workflow-element',
@@ -20,7 +28,7 @@ import { WorkflowElement, ElementType, ELEMENT_CONFIGS, Position } from '../../.
   templateUrl: 'workflow-element.component.html',
   styleUrl:'workflow-element.component.scss'
 })
-export class WorkflowElementComponent implements OnInit, OnDestroy {
+export class WorkflowElementComponent implements OnInit {
   @ViewChild('elementRef') elementRef!: ElementRef<HTMLDivElement>;
   @ViewChild('menuTrigger', { static: false }) menuTrigger!: MatMenuTrigger;
 
@@ -28,6 +36,8 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
   @Input() isSelected = false;
   @Input() isConnecting = false;
   @Input() canvasZoom = 1;
+  @Input() allElements: WorkflowElement[] = []; // New: Pass all elements
+  @Input() selectedElementId?: string; // New: Pass selected element ID
 
   @Output() elementClick = new EventEmitter<MouseEvent>();
   @Output() elementDoubleClick = new EventEmitter<MouseEvent>();
@@ -37,8 +47,10 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
   @Output() deleteElement = new EventEmitter<void>();
   @Output() dragStart = new EventEmitter<void>();
   @Output() dragEnd = new EventEmitter<void>();
+  @Output() expandToggled = new EventEmitter<string>(); // New: Emit when expanded
 
   elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element?.type);
+  dimensions = ELEMENT_DIMENSIONS[this.element?.type] || ELEMENT_DIMENSIONS[ElementType.PAGE];
 
   // Drag state
   isDragging = false;
@@ -48,78 +60,88 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
   // Menu position
   menuPosition = { x: 0, y: 0 };
 
-  // Mock data for display purposes (in real app, would come from services)
-  private serviceNames: { [key: number]: string } = {
-    9: 'Passport Issuance',
-    42: 'Birth Certificate',
-    46: 'Vacation Request'
-  };
+  get canContainChildren(): boolean {
+    return canContainChildren(this.element.type);
+  }
 
-  private sequenceNames: { [key: number]: string } = {
-    23: 'First Step',
-    24: 'Second Step',
-    25: 'Third Step'
-  };
+  get hasChildren(): boolean {
+    return (this.element.children?.length || 0) > 0;
+  }
 
-  private fieldTypeNames: { [key: number]: string } = {
-    7: 'Text',
-    8: 'Textarea',
-    9: 'Number',
-    10: 'Decimal',
-    11: 'Boolean'
-  };
-
-  constructor(private viewContainerRef: ViewContainerRef) {}
+  get childElements(): WorkflowElement[] {
+    if (!this.element.children || !this.allElements) return [];
+    return this.element.children
+      .map(childId => this.allElements.find(el => el.id === childId))
+      .filter(el => el !== undefined) as WorkflowElement[];
+  }
 
   ngOnInit(): void {
     this.elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element.type);
-    this.setupDragListeners();
+    this.dimensions = ELEMENT_DIMENSIONS[this.element.type] || ELEMENT_DIMENSIONS[ElementType.PAGE];
   }
 
-  ngOnDestroy(): void {
-    this.removeDragListeners();
+  getElementWidth(): number {
+    return this.element.isExpanded
+      ? this.dimensions.expanded.width
+      : this.dimensions.collapsed.width;
   }
 
-  private setupDragListeners(): void {
-    document.addEventListener('mousemove', this.onMouseMove.bind(this));
-    document.addEventListener('mouseup', this.onMouseUp.bind(this));
-  }
-
-  private removeDragListeners(): void {
-    document.removeEventListener('mousemove', this.onMouseMove.bind(this));
-    document.removeEventListener('mouseup', this.onMouseUp.bind(this));
-  }
-
-  // Helper method to convert string | number to number
-  convertToNumber(value: string | number | undefined | null): number {
-    if (value === undefined || value === null) {
-      return 0;
+  getElementHeight(): number {
+    if (this.element.isExpanded && this.hasChildren) {
+      // Calculate height based on children
+      const childrenHeight = Math.ceil(this.childElements.length / 2) * 120 + 80;
+      return Math.max(this.dimensions.expanded.height, childrenHeight);
     }
-    if (typeof value === 'number') {
-      return value;
+    return this.element.isExpanded
+      ? this.dimensions.expanded.height
+      : this.dimensions.collapsed.height;
+  }
+
+  getBackgroundColor(): string {
+    if (this.element.isExpanded) {
+      // Use semi-transparent version of the color
+      const color = this.elementConfig?.color || '#2196F3';
+      return color + '26'; // 15% opacity
     }
-    const parsed = parseInt(value, 10);
-    return isNaN(parsed) ? 0 : parsed;
+    return this.elementConfig?.color || '#2196F3';
+  }
+
+  getBorderStyle(): string {
+    return this.element.isExpanded ? 'dashed' : 'solid';
+  }
+
+  toggleExpand(event?: MouseEvent): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    if (this.canContainChildren) {
+      this.expandToggled.emit(this.element.id);
+    }
   }
 
   onMouseDown(event: MouseEvent): void {
-    // Don't start drag if clicking on menu button or connection points
+    if (this.element.isExpanded || this.element.parentId) return;
+
     const target = event.target as HTMLElement;
-    if (target.closest('.element-menu-btn') || target.closest('.connection-point')) {
+    if (target.closest('.connection-point') || target.closest('.expand-button')) {
       return;
     }
 
-    // Allow dragging from anywhere on the element
     this.isDragging = true;
     this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.elementStartPos = { ...this.element.position };
 
     this.dragStart.emit();
+
+    // Add global listeners
+    document.addEventListener('mousemove', this.onMouseMove);
+    document.addEventListener('mouseup', this.onMouseUp);
+
     event.preventDefault();
     event.stopPropagation();
   }
 
-  private onMouseMove(event: MouseEvent): void {
+  private onMouseMove = (event: MouseEvent): void => {
     if (!this.isDragging) return;
 
     const deltaX = (event.clientX - this.dragStartPos.x) / this.canvasZoom;
@@ -133,10 +155,13 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
     this.positionChanged.emit(newPosition);
   }
 
-  private onMouseUp(event: MouseEvent): void {
+  private onMouseUp = (event: MouseEvent): void => {
     if (this.isDragging) {
       this.isDragging = false;
       this.dragEnd.emit();
+
+      document.removeEventListener('mousemove', this.onMouseMove);
+      document.removeEventListener('mouseup', this.onMouseUp);
     }
   }
 
@@ -168,25 +193,23 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
 
-    // Update menu position
     this.menuPosition = {
       x: event.clientX,
       y: event.clientY
     };
 
-    // Use setTimeout to ensure the menu trigger is ready
     setTimeout(() => {
       if (this.menuTrigger) {
         this.menuTrigger.openMenu();
       }
     }, 0);
   }
+
   onEdit(): void {
     this.elementDoubleClick.emit(new MouseEvent('dblclick'));
   }
 
   onDuplicate(): void {
-    // TODO: Implement duplicate functionality
     console.log('Duplicate element');
   }
 
@@ -196,65 +219,32 @@ export class WorkflowElementComponent implements OnInit, OnDestroy {
     }
   }
 
-  isValidElement(): boolean {
-    switch (this.element.type) {
-      case ElementType.START:
-        return !!this.element.properties.name;
-
-      case ElementType.PAGE:
-        if (this.element.properties.useExisting) {
-          return !!this.element.properties.existingPageId;
-        }
-        return !!(this.element.properties.name &&
-          this.element.properties.service &&
-          this.element.properties.sequence_number &&
-          this.element.properties.applicant_type);
-
-      case ElementType.CATEGORY:
-        if (this.element.properties.useExisting) {
-          return !!this.element.properties.existingCategoryId;
-        }
-        return !!this.element.properties.name;
-
-      case ElementType.FIELD:
-        if (this.element.properties.useExisting) {
-          return !!this.element.properties.existingFieldId;
-        }
-        return !!(this.element.properties._field_name &&
-          this.element.properties._field_display_name &&
-          this.element.properties._field_type);
-
-      case ElementType.CONDITION:
-        return !!(this.element.properties.name &&
-          this.element.properties.condition_logic?.length);
-
-      case ElementType.END:
-        return !!this.element.properties.name;
-
-      default:
-        return false;
-    }
+  // Child element event handlers
+  onChildClick(event: MouseEvent, child: WorkflowElement): void {
+    this.elementClick.emit(event);
   }
 
-  hasWarnings(): boolean {
-    if (this.element.type === ElementType.PAGE && !this.element.properties.description) {
-      return true;
-    }
-    if (this.element.type === ElementType.FIELD && !this.element.properties._mandatory) {
-      return true;
-    }
-    return false;
+  onChildDoubleClick(event: MouseEvent, child: WorkflowElement): void {
+    this.elementDoubleClick.emit(event);
   }
 
-  getServiceName(serviceId: number): string {
-    return this.serviceNames[serviceId] || `Service ${serviceId}`;
+  onChildPositionChanged(childId: string, position: Position): void {
+    // Child positions are relative to parent, no action needed
   }
 
-  getSequenceName(sequenceId: number): string {
-    return this.sequenceNames[sequenceId] || `Step ${sequenceId}`;
+  onChildConnectionStart(event: MouseEvent, child: WorkflowElement): void {
+    this.connectionStart.emit(event);
   }
 
-  getFieldTypeName(typeId: number): string {
-    return this.fieldTypeNames[typeId] || `Type ${typeId}`;
+  onChildConnectionEnd(event: MouseEvent, child: WorkflowElement): void {
+    this.connectionEnd.emit(event);
+  }
+
+  onChildDelete(child: WorkflowElement): void {
+    this.deleteElement.emit();
+  }
+
+  onChildExpandToggled(childId: string): void {
+    this.expandToggled.emit(childId);
   }
 }

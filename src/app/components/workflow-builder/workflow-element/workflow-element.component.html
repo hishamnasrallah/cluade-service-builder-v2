@@ -1,10 +1,14 @@
 <div class="workflow-element"
      #elementRef
      [class.selected]="isSelected"
-     [class.connecting]="isConnecting"
+     [class.expanded]="element.isExpanded"
+     [class.container]="canContainChildren"
      [class.dragging]="isDragging"
      [class]="element.type"
-     [style.background-color]="elementConfig?.color"
+     [style.width.px]="getElementWidth()"
+     [style.height.px]="getElementHeight()"
+     [style.background-color]="getBackgroundColor()"
+     [style.border-style]="getBorderStyle()"
      (mousedown)="onMouseDown($event)"
      (click)="onElementClick($event)"
      (dblclick)="onElementDoubleClick($event)"
@@ -12,12 +16,53 @@
 
   <!-- Element Content -->
   <div class="element-content" (mousedown)="$event.stopPropagation()">
-    <mat-icon class="element-icon">{{ elementConfig?.icon }}</mat-icon>
-    <span class="element-title">{{ element.properties.name || elementConfig?.name }}</span>
+    <div class="element-header">
+      <mat-icon class="element-icon">{{ elementConfig?.icon }}</mat-icon>
+      <span class="element-title">{{ element.properties.name || elementConfig?.name }}</span>
+    </div>
+
+    <!-- Summary Info for Collapsed Container Elements -->
+    <div class="element-summary" *ngIf="!element.isExpanded && canContainChildren">
+      <div class="summary-item" *ngIf="element.type === 'page' && element.properties.categoryCount">
+        <span>{{ element.properties.categoryCount }} Categories</span>
+      </div>
+      <div class="summary-item" *ngIf="element.properties.fieldCount">
+        <span>{{ element.properties.fieldCount }} Fields</span>
+      </div>
+    </div>
+
+    <!-- Expand/Collapse Button for Container Elements -->
+    <button *ngIf="canContainChildren && hasChildren"
+            mat-icon-button
+            class="expand-button"
+            (click)="toggleExpand($event)"
+            [title]="element.isExpanded ? 'Collapse' : 'Expand'">
+      <mat-icon>{{ element.isExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+  </div>
+
+  <!-- Child Elements Container (for expanded elements) -->
+  <div class="children-container" *ngIf="element.isExpanded && childElements.length > 0">
+    <app-workflow-element
+      *ngFor="let child of childElements"
+      [element]="child"
+      [isSelected]="selectedElementId === child.id"
+      [isConnecting]="isConnecting"
+      [canvasZoom]="canvasZoom"
+      [allElements]="allElements"
+      [selectedElementId]="selectedElementId"
+      (elementClick)="onChildClick($event, child)"
+      (elementDoubleClick)="onChildDoubleClick($event, child)"
+      (positionChanged)="onChildPositionChanged(child.id, $event)"
+      (connectionStart)="onChildConnectionStart($event, child)"
+      (connectionEnd)="onChildConnectionEnd($event, child)"
+      (deleteElement)="onChildDelete(child)"
+      (expandToggled)="onChildExpandToggled($event)">
+    </app-workflow-element>
   </div>
 
   <!-- Connection Points -->
-  <div class="connection-points">
+  <div class="connection-points" *ngIf="!element.parentId">
     <!-- Input connection point -->
     <div *ngIf="elementConfig?.canReceiveConnections"
          class="connection-point input"
@@ -33,7 +78,7 @@
   </div>
 </div>
 
-<!-- Context Menu with manual trigger -->
+<!-- Context Menu -->
 <div style="visibility: hidden; position: fixed"
      [style.left.px]="menuPosition.x"
      [style.top.px]="menuPosition.y"
@@ -41,7 +86,6 @@
      #menuTrigger="matMenuTrigger">
 </div>
 
-<!-- Context Menu -->
 <mat-menu #elementMenu="matMenu">
   <button mat-menu-item (click)="onEdit()">
     <mat-icon>edit</mat-icon>
@@ -50,6 +94,18 @@
   <button mat-menu-item (click)="onDuplicate()">
     <mat-icon>content_copy</mat-icon>
     <span>Duplicate</span>
+  </button>
+  <button mat-menu-item
+          *ngIf="canContainChildren && !element.isExpanded"
+          (click)="toggleExpand()">
+    <mat-icon>expand_more</mat-icon>
+    <span>Expand</span>
+  </button>
+  <button mat-menu-item
+          *ngIf="canContainChildren && element.isExpanded"
+          (click)="toggleExpand()">
+    <mat-icon>expand_less</mat-icon>
+    <span>Collapse</span>
   </button>
   <mat-divider></mat-divider>
   <button mat-menu-item (click)="onDelete()" [disabled]="element.type === 'start'">
