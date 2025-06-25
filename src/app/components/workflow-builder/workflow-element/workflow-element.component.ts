@@ -1,4 +1,4 @@
-// workflow-element.component.ts - Updated with hierarchy support
+// workflow-element.component.ts - Complete file with fixes
 import { Component, Input, Output, EventEmitter, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -33,11 +33,12 @@ export class WorkflowElementComponent implements OnInit {
   @ViewChild('menuTrigger', { static: false }) menuTrigger!: MatMenuTrigger;
 
   @Input() element!: WorkflowElement;
-  @Input() isSelected = false;
-  @Input() isConnecting = false;
-  @Input() canvasZoom = 1;
-  @Input() allElements: WorkflowElement[] = []; // NEW: Pass all elements
-  @Input() selectedElementId?: string; // NEW: Pass selected element ID
+  @Input() isSelected: boolean = false;
+  @Input() isConnecting: boolean = false;
+  @Input() canvasZoom: number = 1;
+  @Input() allElements: WorkflowElement[] = [];
+  @Input() selectedElementId?: string;
+  @Input() canvasState?: { zoom: number; panX: number; panY: number };
 
   @Output() elementClick = new EventEmitter<MouseEvent>();
   @Output() elementDoubleClick = new EventEmitter<MouseEvent>();
@@ -47,48 +48,51 @@ export class WorkflowElementComponent implements OnInit {
   @Output() deleteElement = new EventEmitter<void>();
   @Output() dragStart = new EventEmitter<void>();
   @Output() dragEnd = new EventEmitter<void>();
-  @Output() expandToggled = new EventEmitter<string>(); // NEW: Emit when expanded
+  @Output() expandToggled = new EventEmitter<string>();
+  @Output() childElementSelected = new EventEmitter<string>();
+  @Output() childElementDoubleClicked = new EventEmitter<string>();
 
-  elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element?.type);
-  dimensions = ELEMENT_DIMENSIONS[this.element?.type] || ELEMENT_DIMENSIONS[ElementType.PAGE];
+  // Public properties for template access
+  public elementConfig: any;
+  public dimensions: any;
+  public isDragging: boolean = false;
+  public dragStartPos = { x: 0, y: 0 };
+  public elementStartPos = { x: 0, y: 0 };
+  public menuPosition = { x: 0, y: 0 };
 
-  // Drag state
-  isDragging = false;
-  dragStartPos = { x: 0, y: 0 };
-  elementStartPos = { x: 0, y: 0 };
-
-  // Menu position
-  menuPosition = { x: 0, y: 0 };
-
-  get canContainChildren(): boolean {
-    return canContainChildren(this.element.type);
+  // Getters for template
+  public get canContainChildren(): boolean {
+    return this.element ? canContainChildren(this.element.type) : false;
   }
 
-  get hasChildren(): boolean {
-    return (this.element.children?.length || 0) > 0;
+  public get hasChildren(): boolean {
+    return this.element ? (this.element.children?.length || 0) > 0 : false;
   }
 
-  get childElements(): WorkflowElement[] {
-    if (!this.element.children || !this.allElements) return [];
+  public get childElements(): WorkflowElement[] {
+    if (!this.element || !this.element.children || !this.allElements) return [];
     return this.element.children
       .map(childId => this.allElements.find(el => el.id === childId))
       .filter(el => el !== undefined) as WorkflowElement[];
   }
 
   ngOnInit(): void {
-    this.elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element.type);
-    this.dimensions = ELEMENT_DIMENSIONS[this.element.type] || ELEMENT_DIMENSIONS[ElementType.PAGE];
+    if (this.element) {
+      this.elementConfig = ELEMENT_CONFIGS.find(config => config.type === this.element.type);
+      this.dimensions = ELEMENT_DIMENSIONS[this.element.type] || ELEMENT_DIMENSIONS[ElementType.PAGE];
+    }
   }
 
-  getElementWidth(): number {
+  public getElementWidth(): number {
+    if (!this.element || !this.dimensions) return 100;
     return this.element.isExpanded
       ? this.dimensions.expanded.width
       : this.dimensions.collapsed.width;
   }
 
-  getElementHeight(): number {
+  public getElementHeight(): number {
+    if (!this.element || !this.dimensions) return 60;
     if (this.element.isExpanded && this.hasChildren) {
-      // Calculate height based on children
       const childrenHeight = Math.ceil(this.childElements.length / 2) * 120 + 80;
       return Math.max(this.dimensions.expanded.height, childrenHeight);
     }
@@ -97,33 +101,42 @@ export class WorkflowElementComponent implements OnInit {
       : this.dimensions.collapsed.height;
   }
 
-  getBackgroundColor(): string {
+  public getBackgroundColor(): string {
+    if (!this.element) return '#2196F3';
     if (this.element.isExpanded) {
-      // Use semi-transparent version of the color
       const color = this.elementConfig?.color || '#2196F3';
       return color + '26'; // 15% opacity
     }
     return this.elementConfig?.color || '#2196F3';
   }
 
-  getBorderStyle(): string {
-    return this.element.isExpanded ? 'dashed' : 'solid';
+  public getBorderStyle(): string {
+    return this.element?.isExpanded ? 'dashed' : 'solid';
   }
 
-  toggleExpand(event?: MouseEvent): void {
+  public toggleExpand(event?: MouseEvent): void {
     if (event) {
       event.stopPropagation();
     }
-    if (this.canContainChildren) {
+    if (this.canContainChildren && this.element) {
       this.expandToggled.emit(this.element.id);
     }
   }
 
-  onMouseDown(event: MouseEvent): void {
-    if (this.element.isExpanded || this.element.parentId) return;
+  public onMouseDown(event: MouseEvent): void {
+    // Only prevent dragging of child elements, not expanded parents
+    if (this.element.parentId) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
 
     const target = event.target as HTMLElement;
-    if (target.closest('.connection-point') || target.closest('.expand-button')) {
+
+    // Don't start drag if clicking on connection points, expand button, or child elements
+    if (target.closest('.connection-point') ||
+      target.closest('.expand-button') ||
+      target.closest('.children-container')) {
       return;
     }
 
@@ -142,7 +155,7 @@ export class WorkflowElementComponent implements OnInit {
   }
 
   private onMouseMove = (event: MouseEvent): void => {
-    if (!this.isDragging) return;
+    if (!this.isDragging || !this.element) return;
 
     const deltaX = (event.clientX - this.dragStartPos.x) / this.canvasZoom;
     const deltaY = (event.clientY - this.dragStartPos.y) / this.canvasZoom;
@@ -165,39 +178,48 @@ export class WorkflowElementComponent implements OnInit {
     }
   }
 
-  onElementClick(event: MouseEvent): void {
+  public onElementClick(event: MouseEvent): void {
     if (!this.isDragging) {
       event.stopPropagation();
       this.elementClick.emit(event);
     }
   }
 
-  onElementDoubleClick(event: MouseEvent): void {
+  public onElementDoubleClick(event: MouseEvent): void {
     event.stopPropagation();
     this.elementDoubleClick.emit(event);
   }
 
-  onConnectionStart(event: MouseEvent): void {
+  public onConnectionStart(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
     this.connectionStart.emit(event);
   }
 
-  onConnectionEnd(event: MouseEvent): void {
+  public onConnectionEnd(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
     this.connectionEnd.emit(event);
   }
 
-  onRightClick(event: MouseEvent): void {
+  public onRightClick(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
 
+    // Get the element's bounding rect to find its position on screen
+    const elementRect = this.elementRef.nativeElement.getBoundingClientRect();
+
+    // Calculate the click position relative to the element
+    const relativeX = event.clientX - elementRect.left;
+    const relativeY = event.clientY - elementRect.top;
+
+    // The menu should appear at the actual screen coordinates
     this.menuPosition = {
       x: event.clientX,
       y: event.clientY
     };
 
+    // Use setTimeout to ensure the position is updated before opening
     setTimeout(() => {
       if (this.menuTrigger) {
         this.menuTrigger.openMenu();
@@ -205,46 +227,101 @@ export class WorkflowElementComponent implements OnInit {
     }, 0);
   }
 
-  onEdit(): void {
+  public onEdit(): void {
     this.elementDoubleClick.emit(new MouseEvent('dblclick'));
   }
 
-  onDuplicate(): void {
+  public onDuplicate(): void {
     console.log('Duplicate element');
   }
 
-  onDelete(): void {
-    if (this.element.type !== ElementType.START) {
+  public onDelete(): void {
+    if (this.element && this.element.type !== ElementType.START) {
       this.deleteElement.emit();
     }
   }
 
   // Child element event handlers
-  onChildClick(event: MouseEvent, child: WorkflowElement): void {
-    this.elementClick.emit(event);
+  public onChildClick(event: MouseEvent, child: WorkflowElement): void {
+    event.stopPropagation();
+    // Emit a custom event with the child's ID
+    this.childElementSelected.emit(child.id);
   }
 
-  onChildDoubleClick(event: MouseEvent, child: WorkflowElement): void {
-    this.elementDoubleClick.emit(event);
+  public onChildDoubleClick(event: MouseEvent, child: WorkflowElement): void {
+    event.stopPropagation();
+    // Emit a custom event with the child's ID
+    this.childElementDoubleClicked.emit(child.id);
   }
 
-  onChildPositionChanged(childId: string, position: Position): void {
+  public onChildPositionChanged(childId: string, position: Position): void {
     // Child positions are relative to parent, no action needed
   }
 
-  onChildConnectionStart(event: MouseEvent, child: WorkflowElement): void {
+  public onChildConnectionStart(event: MouseEvent, child: WorkflowElement): void {
     this.connectionStart.emit(event);
   }
 
-  onChildConnectionEnd(event: MouseEvent, child: WorkflowElement): void {
+  public onChildConnectionEnd(event: MouseEvent, child: WorkflowElement): void {
     this.connectionEnd.emit(event);
   }
 
-  onChildDelete(child: WorkflowElement): void {
+  public onChildDelete(child: WorkflowElement): void {
     this.deleteElement.emit();
   }
 
-  onChildExpandToggled(childId: string): void {
+  public onChildExpandToggled(childId: string): void {
     this.expandToggled.emit(childId);
+  }
+
+  public getEmptyIcon(): string {
+    if (!this.element) return 'add_circle_outline';
+
+    switch (this.element.type) {
+      case ElementType.PAGE:
+        return 'category';
+      case ElementType.CATEGORY:
+        return 'input';
+      default:
+        return 'add_circle_outline';
+    }
+  }
+
+  public getEmptyMessage(): string {
+    if (!this.element) return 'Drag elements here';
+
+    switch (this.element.type) {
+      case ElementType.PAGE:
+        return 'Drag categories here';
+      case ElementType.CATEGORY:
+        return 'Drag fields here';
+      default:
+        return 'Drag elements here';
+    }
+  }
+
+  public getZIndex(): number {
+    // Child elements should not have z-index set (inherit from parent)
+    if (this.element.parentId) {
+      return 'auto' as any;
+    }
+
+    // Dragging elements should be on top
+    if (this.isDragging) {
+      return 1000;
+    }
+
+    // Selected elements should be higher than normal
+    if (this.isSelected) {
+      return 100;
+    }
+
+    // Expanded elements should be above collapsed ones
+    if (this.element.isExpanded) {
+      return 50;
+    }
+
+    // Default z-index for collapsed elements
+    return 10;
   }
 }

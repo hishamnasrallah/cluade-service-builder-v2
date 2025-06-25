@@ -12,10 +12,44 @@
   border-radius: 8px;
 }
 
+// Ensure expanded elements create a new stacking context
 .workflow-element.expanded {
-  background-color: rgba(255,255,255,0.15) !important;
+  background-color: rgba(58,131,165,0.75) !important;
   border-style: dashed !important;
-  cursor: default;
+  cursor: move;
+  position: relative;
+  isolation: isolate; // Creates a new stacking context
+}
+/* Only the children container area should not be draggable */
+.children-container {
+  position: relative;
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+  z-index: 1;
+  cursor: default; /* Prevent drag cursor in children area */
+}
+.element-container {
+  position: absolute;
+  pointer-events: all;
+  transition: z-index 0.2s ease;
+
+}
+
+.workflow-element.not-draggable,
+.workflow-element.not-draggable .element-content {
+  cursor: default !important;
+}
+
+// Ensure child elements in containers are not draggable
+.children-container .workflow-element {
+  cursor: default !important;
+  position: relative !important;
+  z-index: auto !important;
 }
 
 .workflow-element.container {
@@ -58,6 +92,7 @@
   z-index: 2;
   padding: 8px;
   pointer-events: auto;
+  cursor: inherit; /* Inherit cursor from parent */
 }
 
 .element-header {
@@ -65,12 +100,28 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  position: relative;
+  padding-right: 24px; /* Make room for expand icon */
 }
 
-.element-icon {
-  font-size: 24px;
-  width: 24px;
-  height: 24px;
+.expand-icon {
+  position: absolute;
+  right: 4px;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  color: white;
+  opacity: 0.8;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+
+  /* Add text shadow for better visibility */
+  text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+
+  &:hover {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 
 .workflow-element.field .element-icon {
@@ -97,22 +148,53 @@
   text-align: center;
 }
 
-.expand-button {
+.expand-button-svg {
   position: absolute;
   top: 4px;
   right: 4px;
   width: 24px;
   height: 24px;
-  background: rgba(255,255,255,0.2);
-  color: white;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  opacity: 0.7;
 
-  mat-icon {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
+  &:hover {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  .svg-icon {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    color: white;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.4));
   }
 }
 
+/* Remove the old expand-button class styles if they exist */
+.expand-button {
+  display: none;
+}
+//* Remove any Material button styling that might add background */
+//.expand-button::ng-deep .mat-mdc-button-persistent-ripple {
+//  display: none;
+//}
+//
+//.expand-button::ng-deep .mat-mdc-button-state {
+//  display: none;
+//}
 .children-container {
   position: relative;
   padding: 20px;
@@ -122,6 +204,7 @@
   align-items: flex-start;
   justify-content: center;
   animation: fadeIn 0.3s ease-out;
+  z-index: 1; // Above the parent's background but within its context
 }
 
 @keyframes fadeIn {
@@ -151,6 +234,7 @@
   }
 }
 
+// Add connection points on all sides
 .connection-points {
   position: absolute;
   top: 0;
@@ -160,6 +244,7 @@
   pointer-events: none;
 }
 
+// Connection points on all sides
 .connection-point {
   position: absolute;
   width: 12px;
@@ -178,19 +263,97 @@
   opacity: 1;
 }
 
+// Style differently for input vs output
 .connection-point.input {
+  background: #4CAF50;
+  border-color: #388E3C;
+}
+
+.connection-point.output {
+  background: #2196F3;
+  border-color: #1976D2;
+}
+
+// Left side
+.connection-point.input-left,
+.connection-point.output-left {
   top: 50%;
   left: -6px;
   transform: translateY(-50%);
 }
 
-.connection-point.output {
+// Right side
+.connection-point.input-right,
+.connection-point.output-right {
   top: 50%;
   right: -6px;
   transform: translateY(-50%);
 }
 
+// Top side
+.connection-point.input-top,
+.connection-point.output-top {
+  left: 50%;
+  top: -6px;
+  transform: translateX(-50%);
+}
+
+// Bottom side
+.connection-point.input-bottom,
+.connection-point.output-bottom {
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+}
+
+// Special case for start element (only output on right)
+.workflow-element.start .connection-point.output {
+  display: none;
+}
+.workflow-element.start .connection-point.output-right {
+  display: block;
+}
+
+// Special case for end element (only input on left)
+.workflow-element.end .connection-point.input {
+  display: none;
+}
+.workflow-element.end .connection-point.input-left {
+  display: block;
+}
+
 /* Hide connection points for child elements */
 .children-container .connection-points {
   display: none;
+}
+.empty-container-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  text-align: center;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+
+  span {
+    font-weight: 300;
+  }
+}
+
+.menu-trigger {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 9999;
 }

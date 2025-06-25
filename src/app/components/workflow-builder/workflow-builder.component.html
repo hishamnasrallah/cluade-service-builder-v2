@@ -97,17 +97,44 @@
                (dragover)="onDragOver($event)">
 
             <!-- SVG for Connections -->
+            <!-- SVG for Connections -->
             <svg class="connections-layer"
                  [attr.width]="canvasSize.width"
-                 [attr.height]="canvasSize.height">
+                 [attr.height]="canvasSize.height"
+                 (click)="onSvgClick($event)">
               <defs>
-                <marker id="arrowhead" markerWidth="10" markerHeight="7"
+                <!-- Right-pointing arrow -->
+                <marker id="arrowhead-right" markerWidth="10" markerHeight="7"
+                        refX="9" refY="3.5" orient="auto">
+                  <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
+                </marker>
+
+                <!-- Left-pointing arrow -->
+                <marker id="arrowhead-left" markerWidth="10" markerHeight="7"
+                        refX="1" refY="3.5" orient="auto">
+                  <polygon points="10 0, 0 3.5, 10 7" fill="#666" />
+                </marker>
+
+                <!-- Down-pointing arrow -->
+                <marker id="arrowhead-down" markerWidth="7" markerHeight="10"
+                        refX="3.5" refY="9" orient="auto">
+                  <polygon points="0 0, 3.5 10, 7 0" fill="#666" />
+                </marker>
+
+                <!-- Up-pointing arrow -->
+                <marker id="arrowhead-up" markerWidth="7" markerHeight="10"
+                        refX="3.5" refY="1" orient="auto">
+                  <polygon points="0 10, 3.5 0, 7 10" fill="#666" />
+                </marker>
+
+                <!-- Auto-rotating arrow -->
+                <marker id="arrowhead-auto" markerWidth="10" markerHeight="7"
                         refX="9" refY="3.5" orient="auto">
                   <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
                 </marker>
               </defs>
 
-              <!-- UPDATED: Only show connections between top-level elements -->
+              <!-- Rest of the SVG content -->
               <ng-container *ngFor="let connection of getTopLevelConnections(); trackBy: trackConnection">
                 <!-- Invisible wider stroke for easier clicking -->
                 <path [attr.d]="getConnectionPath(connection)"
@@ -123,7 +150,7 @@
                       stroke="#666"
                       stroke-width="2"
                       fill="none"
-                      marker-end="url(#arrowhead)"
+                      marker-end="url(#arrowhead-auto)"
                       [class.selected]="selectedConnectionId === connection.id"
                       class="connection-line">
                 </path>
@@ -136,26 +163,30 @@
                     stroke-width="2"
                     stroke-dasharray="5,5"
                     fill="none"
-                    marker-end="url(#arrowhead)"
+                    marker-end="url(#arrowhead-auto)"
                     class="temp-connection">
               </path>
             </svg>
 
-            <!-- UPDATED: Workflow Elements (only top-level) -->
+            <!-- Workflow Elements (only top-level) -->
             <div *ngFor="let element of getTopLevelElements(); trackBy: trackElement"
                  class="element-container"
                  [style.left.px]="element.position.x"
-                 [style.top.px]="element.position.y">
+                 [style.top.px]="element.position.y"
+                 [style.z-index]="getElementZIndex(element)">
 
               <app-workflow-element
                 [element]="element"
                 [isSelected]="selectedElementId === element.id"
                 [isConnecting]="!!connectingFrom"
                 [canvasZoom]="canvasState.zoom"
+                [canvasState]="canvasState"
                 [allElements]="workflow.elements"
                 [selectedElementId]="selectedElementId"
                 (elementClick)="selectElement(element.id)"
                 (elementDoubleClick)="editElement(element.id)"
+                (childElementSelected)="selectElement($event)"
+                (childElementDoubleClicked)="editElement($event)"
                 (positionChanged)="updateElementPosition(element.id, $event)"
                 (connectionStart)="startConnection(element.id, $event)"
                 (connectionEnd)="endConnection(element.id)"

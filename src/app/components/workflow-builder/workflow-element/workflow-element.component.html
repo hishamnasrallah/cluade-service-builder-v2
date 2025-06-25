@@ -1,21 +1,25 @@
 <div class="workflow-element"
      #elementRef
+     [attr.data-element-id]="element.id"
      [class.selected]="isSelected"
      [class.expanded]="element.isExpanded"
      [class.container]="canContainChildren"
      [class.dragging]="isDragging"
+     [class.not-draggable]="element.parentId"
      [class]="element.type"
      [style.width.px]="getElementWidth()"
      [style.height.px]="getElementHeight()"
      [style.background-color]="getBackgroundColor()"
      [style.border-style]="getBorderStyle()"
+     [style.cursor]="element.parentId ? 'default' : 'move'"
+     [style.z-index]="getZIndex()"
      (mousedown)="onMouseDown($event)"
      (click)="onElementClick($event)"
      (dblclick)="onElementDoubleClick($event)"
      (contextmenu)="onRightClick($event)">
 
   <!-- Element Content -->
-  <div class="element-content" (mousedown)="$event.stopPropagation()">
+  <div class="element-content">
     <div class="element-header">
       <mat-icon class="element-icon">{{ elementConfig?.icon }}</mat-icon>
       <span class="element-title">{{ element.properties.name || elementConfig?.name }}</span>
@@ -31,28 +35,57 @@
       </div>
     </div>
 
-    <!-- Expand/Collapse Button for Container Elements -->
-    <button *ngIf="canContainChildren && hasChildren"
-            mat-icon-button
-            class="expand-button"
+    <!-- Single Expand/Collapse Button with SVG -->
+    <button *ngIf="canContainChildren"
+            class="expand-button-svg"
+            (mousedown)="$event.stopPropagation()"
             (click)="toggleExpand($event)"
             [title]="element.isExpanded ? 'Collapse' : 'Expand'">
-      <mat-icon>{{ element.isExpanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+      <!-- Expand SVG -->
+      <svg *ngIf="!element.isExpanded" class="svg-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <path d="M459.712 507.568L208 759.28V528H128v368h368v-80H264.56l251.728-251.792-56.576-56.64zM528 128v80h231.44L507.712 459.712l56.576 56.576L816 264.56V496h80V128H528z" fill="currentColor" />
+      </svg>
+      <!-- Collapse SVG -->
+      <svg *ngIf="element.isExpanded" class="svg-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <path d="M264.56 208L516.288 459.712l-56.576 56.576L208 264.56V496H128V128h368v80H264.56zM759.44 816L507.712 564.288l56.576-56.576L816 759.44V528h80v368H528v-80h231.44z" fill="currentColor" />
+      </svg>
+    </button>
+
+    <!-- Single Expand/Collapse Button with SVG -->
+    <button *ngIf="canContainChildren"
+            class="expand-button-svg"
+            (mousedown)="$event.stopPropagation()"
+            (click)="toggleExpand($event)"
+            [title]="element.isExpanded ? 'Collapse' : 'Expand'">
+      <!-- Expand SVG -->
+      <svg *ngIf="!element.isExpanded" class="svg-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <path d="M459.712 507.568L208 759.28V528H128v368h368v-80H264.56l251.728-251.792-56.576-56.64zM528 128v80h231.44L507.712 459.712l56.576 56.576L816 264.56V496h80V128H528z" fill="currentColor" />
+      </svg>
+      <!-- Collapse SVG -->
+      <svg *ngIf="element.isExpanded" class="svg-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <path d="M264.56 208L516.288 459.712l-56.576 56.576L208 264.56V496H128V128h368v80H264.56zM759.44 816L507.712 564.288l56.576-56.576L816 759.44V528h80v368H528v-80h231.44z" fill="currentColor" />
+      </svg>
     </button>
   </div>
-
   <!-- Child Elements Container (for expanded elements) -->
-  <div class="children-container" *ngIf="element.isExpanded && childElements.length > 0">
+  <div class="children-container" *ngIf="element.isExpanded">
+    <div *ngIf="childElements.length === 0" class="empty-container-message">
+      <mat-icon>{{ getEmptyIcon() }}</mat-icon>
+      <span>{{ getEmptyMessage() }}</span>
+    </div>
     <app-workflow-element
       *ngFor="let child of childElements"
       [element]="child"
       [isSelected]="selectedElementId === child.id"
       [isConnecting]="isConnecting"
       [canvasZoom]="canvasZoom"
+      [canvasState]="canvasState"
       [allElements]="allElements"
       [selectedElementId]="selectedElementId"
       (elementClick)="onChildClick($event, child)"
       (elementDoubleClick)="onChildDoubleClick($event, child)"
+      (childElementSelected)="childElementSelected.emit($event)"
+      (childElementDoubleClicked)="childElementDoubleClicked.emit($event)"
       (positionChanged)="onChildPositionChanged(child.id, $event)"
       (connectionStart)="onChildConnectionStart($event, child)"
       (connectionEnd)="onChildConnectionEnd($event, child)"
@@ -62,24 +95,48 @@
   </div>
 
   <!-- Connection Points -->
+  <!-- Connection Points -->
   <div class="connection-points" *ngIf="!element.parentId">
-    <!-- Input connection point -->
-    <div *ngIf="elementConfig?.canReceiveConnections"
-         class="connection-point input"
-         (mouseup)="onConnectionEnd($event)"
-         (mousedown)="$event.stopPropagation()">
-    </div>
+    <!-- Input connection points (all sides) -->
+    <ng-container *ngIf="elementConfig?.canReceiveConnections">
+      <div class="connection-point input input-left"
+           (mouseup)="onConnectionEnd($event)"
+           (mousedown)="$event.stopPropagation()">
+      </div>
+      <div class="connection-point input input-right"
+           (mouseup)="onConnectionEnd($event)"
+           (mousedown)="$event.stopPropagation()">
+      </div>
+      <div class="connection-point input input-top"
+           (mouseup)="onConnectionEnd($event)"
+           (mousedown)="$event.stopPropagation()">
+      </div>
+      <div class="connection-point input input-bottom"
+           (mouseup)="onConnectionEnd($event)"
+           (mousedown)="$event.stopPropagation()">
+      </div>
+    </ng-container>
 
-    <!-- Output connection point -->
-    <div *ngIf="elementConfig?.canSendConnections"
-         class="connection-point output"
-         (mousedown)="onConnectionStart($event)">
-    </div>
+    <!-- Output connection points (all sides) -->
+    <ng-container *ngIf="elementConfig?.canSendConnections">
+      <div class="connection-point output output-left"
+           (mousedown)="onConnectionStart($event)">
+      </div>
+      <div class="connection-point output output-right"
+           (mousedown)="onConnectionStart($event)">
+      </div>
+      <div class="connection-point output output-top"
+           (mousedown)="onConnectionStart($event)">
+      </div>
+      <div class="connection-point output output-bottom"
+           (mousedown)="onConnectionStart($event)">
+      </div>
+    </ng-container>
   </div>
 </div>
 
 <!-- Context Menu -->
-<div style="visibility: hidden; position: fixed"
+<div class="menu-trigger"
      [style.left.px]="menuPosition.x"
      [style.top.px]="menuPosition.y"
      [matMenuTriggerFor]="elementMenu"

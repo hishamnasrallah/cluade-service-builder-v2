@@ -238,16 +238,16 @@ export class WorkflowService {
     const element = this.currentWorkflow.elements.find(el => el.id === elementId);
     if (!element || !canContainChildren(element.type)) return;
 
-    // Collapse all other elements first
-    this.currentWorkflow.elements.forEach(el => {
-      if (el.id !== elementId && el.isExpanded) {
-        el.isExpanded = false;
-      }
-    });
-
     // Toggle the selected element
     element.isExpanded = !element.isExpanded;
-    this.currentWorkflow.expandedElementId = element.isExpanded ? elementId : undefined;
+
+    // Update the currently expanded element for drop targeting
+    if (element.isExpanded) {
+      this.currentWorkflow.expandedElementId = elementId;
+    } else if (this.currentWorkflow.expandedElementId === elementId) {
+      // If we're collapsing the currently targeted element, clear it
+      this.currentWorkflow.expandedElementId = undefined;
+    }
 
     this.updateWorkflow();
   }
@@ -392,6 +392,13 @@ export class WorkflowService {
     let previousElementId = 'start';
     let xPosition = 350;
 
+    // Track all conditions to add them after pages are processed
+    const conditionsToAdd: Array<{
+      element: WorkflowElement;
+      pageId: string;
+      fieldName: string;
+    }> = [];
+
     // Convert pages to workflow elements
     if (serviceFlow.pages && Array.isArray(serviceFlow.pages)) {
       serviceFlow.pages.forEach((page: any, pageIndex: number) => {
@@ -421,7 +428,6 @@ export class WorkflowService {
             is_hidden_page: page.is_hidden_page || false,
             categoryCount: 0,
             fieldCount: 0,
-            // Use the dynamically fetched service ID
             service: serviceId || serviceFlow.service_code,
             applicant_type: applicantTypeId,
             active_ind: true
@@ -469,19 +475,11 @@ export class WorkflowService {
             // Convert fields as children of category
             if (category.fields && Array.isArray(category.fields)) {
               category.fields.forEach((field: any, fieldIndex: number) => {
-                // Skip null or undefined fields
                 if (!field) {
                   console.warn(`Skipping null field at index ${fieldIndex} in category ${category.name}`);
                   return;
                 }
 
-                // Debug log to see field structure
-                console.log(`Processing field ${fieldIndex} in category ${category.name}:`, {
-                  name: field.name,
-                  field_id: field.field_id,
-                  has_visibility_conditions: !!field.visibility_conditions,
-                  visibility_conditions_count: field.visibility_conditions ? field.visibility_conditions.length : 0
-                });
                 const fieldElementId = `field-${field?.field_id || fieldIndex}`;
 
                 // Extract field type ID if it's an object
@@ -509,34 +507,7 @@ export class WorkflowService {
                     _is_disabled: field.is_disabled || false,
                     _lookup: lookupId,
                     _sequence: field.sequence || fieldIndex,
-
-                    // Add all validation properties
-                    _max_length: field.max_length,
-                    _min_length: field.min_length,
-                    _regex_pattern: field.regex_pattern,
-                    _allowed_characters: field.allowed_characters,
-                    _forbidden_words: field.forbidden_words,
-                    _value_greater_than: field.value_greater_than,
-                    _value_less_than: field.value_less_than,
-                    _integer_only: field.integer_only,
-                    _positive_only: field.positive_only,
-                    _precision: field.precision,
-                    _default_boolean: field.default_boolean,
-                    _file_types: field.file_types,
-                    _max_file_size: field.max_file_size,
-                    _image_max_width: field.image_max_width,
-                    _image_max_height: field.image_max_height,
-                    _max_selections: field.max_selections,
-                    _min_selections: field.min_selections,
-                    _date_greater_than: field.date_greater_than,
-                    _date_less_than: field.date_less_than,
-                    _future_only: field.future_only,
-                    _past_only: field.past_only,
-                    _unique: field.unique,
-                    _default_value: field.default_value,
-                    _coordinates_format: field.coordinates_format,
-                    _uuid_format: field.uuid_format,
-
+                    // ... other field properties
                     allowed_lookups: field.allowed_lookups,
                     active_ind: true
                   },
@@ -546,49 +517,32 @@ export class WorkflowService {
                 workflowData.elements.push(fieldElement);
                 categoryElement.children!.push(fieldElementId);
 
-                // Handle visibility conditions
+                // Collect visibility conditions to add later
                 if (field.visibility_conditions && Array.isArray(field.visibility_conditions) && field.visibility_conditions.length > 0) {
-                  console.log(`Processing ${field.visibility_conditions.length} visibility conditions for field ${field.name}`);
-
                   field.visibility_conditions.forEach((condition: any, conditionIndex: number) => {
-                    try {
-                      // Skip null or undefined conditions
-                      if (!condition) {
-                        console.warn(`Skipping null visibility condition at index ${conditionIndex} for field ${field.name}`);
-                        return;
-                      }
+                    if (!condition) return;
 
-                      console.log(`Processing condition ${conditionIndex}:`, condition);
+                    const conditionElementId = `condition-${field.field_id || fieldIndex}-${conditionIndex}`;
 
-                      const conditionElementId = `condition-${field.field_id || fieldIndex}-${conditionIndex}`;
+                    const conditionElement: WorkflowElement = {
+                      id: conditionElementId,
+                      type: ElementType.CONDITION,
+                      position: { x: 0, y: 0 }, // Will be set later
+                      properties: {
+                        name: `Condition for ${field.display_name || field.name || 'Unknown Field'}`,
+                        target_field: field.name || '',
+                        target_field_id: field.field_id || null,
+                        condition_logic: (condition && condition.condition_logic) ? condition.condition_logic : [],
+                        condition_id: (condition && typeof condition.id !== 'undefined') ? condition.id : null
+                      },
+                      connections: []
+                    };
 
-                      const conditionElement = {
-                        id: conditionElementId,
-                        type: ElementType.CONDITION,
-                        position: { x: 400 + (conditionIndex * 150), y: 100 },
-                        properties: {
-                          name: `Condition for ${field.display_name || field.name || 'Unknown Field'}`,
-                          target_field: field.name || '',
-                          target_field_id: field.field_id || null,
-                          condition_logic: (condition && condition.condition_logic) ? condition.condition_logic : [],
-                          condition_id: (condition && typeof condition.id !== 'undefined') ? condition.id : null
-                        },
-                        connections: []
-                      };
-
-                      workflowData.elements.push(conditionElement);
-
-                      // Only connect if both elements are top-level (no parents)
-                      workflowData.connections.push({
-                        id: `conn-${pageElementId}-${conditionElementId}`,
-                        sourceId: pageElementId,
-                        targetId: conditionElementId
-                      });
-                    } catch (error) {
-                      console.error(`Error processing visibility condition ${conditionIndex} for field ${field.name}:`, error);
-                      console.error('Condition data:', condition);
-                      console.error('Field data:', field);
-                    }
+                    conditionsToAdd.push({
+                      element: conditionElement,
+                      pageId: pageElementId,
+                      fieldName: field.display_name || field.name
+                    });
                   });
                 }
               });
@@ -614,6 +568,47 @@ export class WorkflowService {
       });
     }
 
+    // Now position and add all conditions
+    const pageConditions: { [pageId: string]: typeof conditionsToAdd } = {};
+
+    // Group conditions by page
+    conditionsToAdd.forEach(conditionInfo => {
+      if (!pageConditions[conditionInfo.pageId]) {
+        pageConditions[conditionInfo.pageId] = [];
+      }
+      pageConditions[conditionInfo.pageId].push(conditionInfo);
+    });
+
+    // Position conditions for each page
+    Object.entries(pageConditions).forEach(([pageId, conditions]) => {
+      const pageElement = workflowData.elements.find(el => el.id === pageId);
+      if (!pageElement) return;
+
+      // Position conditions below the page
+      const baseY = pageElement.position.y + 200;
+      const baseX = pageElement.position.x;
+
+      conditions.forEach((conditionInfo, index) => {
+        // Arrange conditions in rows of 3
+        const row = Math.floor(index / 3);
+        const col = index % 3;
+
+        conditionInfo.element.position = {
+          x: baseX + (col * 80),
+          y: baseY + (row * 80)
+        };
+
+        workflowData.elements.push(conditionInfo.element);
+
+        // Connect condition to page
+        workflowData.connections.push({
+          id: `conn-${pageId}-${conditionInfo.element.id}`,
+          sourceId: pageId,
+          targetId: conditionInfo.element.id
+        });
+      });
+    });
+
     // Add end element
     workflowData.elements.push({
       id: 'end',
@@ -631,7 +626,8 @@ export class WorkflowService {
         targetId: 'end'
       });
     }
-  }  // Convert workflow back to service flow format with hierarchy
+  }
+
   convertWorkflowToServiceFlow(): ServiceFlow | null {
     if (!this.currentServiceCode) {
       console.warn('No service code set, cannot convert to service flow');

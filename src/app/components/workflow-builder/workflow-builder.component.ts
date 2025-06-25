@@ -82,6 +82,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   isDraggingElement = false;
 
   private destroy$ = new Subject<void>();
+  private keydownHandler?: (event: KeyboardEvent) => void;
 
   constructor(
     private workflowService: WorkflowService,
@@ -110,11 +111,18 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   ngAfterViewInit(): void {
     // Canvas is already initialized
+    this.setupKeyboardListeners();
+
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+
+    // Remove keyboard listener
+    if (this.keydownHandler) {
+      document.removeEventListener('keydown', this.keydownHandler);
+    }
   }
 
   // Get only top-level elements (not children)
@@ -142,41 +150,64 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   // Modified to handle dropping into expanded containers
   onElementSelected(elementType: ElementType): void {
-    // Check if we have an expanded container that can accept this type
+    // Check if we have expanded containers that can accept this type
     let parentId: string | undefined;
     let position: Position = {
       x: 200 + Math.random() * 100,
       y: 200 + Math.random() * 100
     };
 
-    if (this.workflow.expandedElementId) {
-      const expandedElement = this.workflow.elements.find(el => el.id === this.workflow.expandedElementId);
-      if (expandedElement) {
-        // Check if this element type can be a child
-        const validChildTypes = this.getValidChildTypes(expandedElement.type);
-        if (validChildTypes.includes(elementType)) {
-          parentId = expandedElement.id;
-          // Position will be relative to parent, handled by parent component
-          position = { x: 0, y: 0 };
-        } else if (canBeContained(elementType)) {
-          this.snackBar.open(`${elementType} must be placed inside a container`, 'Close', { duration: 3000 });
-          return;
-        }
+    // Get all expanded elements that could contain this type
+    const expandedContainers = this.workflow.elements.filter(el =>
+      el.isExpanded &&
+      canContainChildren(el.type) &&
+      this.getValidChildTypes(el.type).includes(elementType)
+    );
+
+    if (expandedContainers.length > 0) {
+      // Use the most recently expanded container (last in the list)
+      // Or you could use the one stored in expandedElementId if it's valid
+      let targetContainer: WorkflowElement | undefined;
+
+      // First check if the tracked expanded element can accept this type
+      if (this.workflow.expandedElementId) {
+        targetContainer = expandedContainers.find(el => el.id === this.workflow.expandedElementId);
+      }
+
+      // If not found or not valid, use the last expanded container
+      if (!targetContainer) {
+        targetContainer = expandedContainers[expandedContainers.length - 1];
+      }
+
+      if (targetContainer) {
+        parentId = targetContainer.id;
+        position = { x: 0, y: 0 }; // Position will be relative to parent
       }
     } else if (canBeContained(elementType)) {
-      this.snackBar.open(`${elementType} must be placed inside a container. Expand a container first.`, 'Close', { duration: 3000 });
+      // This element type must be in a container but no valid container is expanded
+      const containerType = elementType === ElementType.CATEGORY ? 'page' : 'category';
+      this.snackBar.open(
+        `${elementType} must be placed inside a ${containerType}. Expand a ${containerType} first.`,
+        'Close',
+        { duration: 3000 }
+      );
       return;
     }
 
     try {
       const element = this.workflowService.addElement(elementType, position, {}, parentId);
       this.selectedElementId = element.id;
+
+      // Update the active expanded element if we added to a container
+      if (parentId) {
+        this.workflow.expandedElementId = parentId;
+      }
+
       this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
     } catch (error) {
       this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
     }
   }
-
 // Helper to get valid child types
   private getValidChildTypes(parentType: ElementType): ElementType[] {
     switch (parentType) {
@@ -370,9 +401,10 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       const sourceElement = this.workflow.elements.find(el => el.id === this.connectingFrom);
 
       if (sourceElement) {
+        const sourceDims = this.getElementDimensions(sourceElement);
         this.tempConnection = this.createCurvedPath(
-          sourceElement.position.x + 100,
-          sourceElement.position.y + 30,
+          sourceElement.position.x + sourceDims.width,
+          sourceElement.position.y + sourceDims.height / 2,
           canvasPos.x,
           canvasPos.y
         );
@@ -390,11 +422,17 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   onCanvasClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (target === this.canvasWrapperRef.nativeElement || target === this.canvasRef.nativeElement) {
+      // Cancel any active connection
+      if (this.connectingFrom) {
+        this.cancelConnection();
+        return;
+      }
+
+      // Clear selection
       this.selectedElementId = undefined;
       this.selectedConnectionId = undefined;
     }
   }
-
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -425,32 +463,83 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     if (elementType) {
       const canvasPos = this.screenToCanvas(event.clientX, event.clientY);
 
-      // Check if dropping into an expanded container
-      let parentId: string | undefined;
-      if (this.workflow.expandedElementId) {
-        const expandedElement = this.workflow.elements.find(el => el.id === this.workflow.expandedElementId);
-        if (expandedElement) {
-          // Check if this element type can be a child
-          const validChildTypes = this.getValidChildTypes(expandedElement.type);
-          if (validChildTypes.includes(elementType)) {
-            parentId = expandedElement.id;
-            // Position will be relative to parent
-            canvasPos.x = 0;
-            canvasPos.y = 0;
+      // Check if this element type requires a container
+      if (canBeContained(elementType)) {
+        // Find which expanded container the drop occurred in
+        let parentId: string | undefined;
+        const dropPoint = { x: event.clientX, y: event.clientY };
+
+        // Check all expanded elements to find which one contains the drop point
+        const expandedContainers = this.workflow.elements.filter(el =>
+          el.isExpanded &&
+          canContainChildren(el.type) &&
+          this.getValidChildTypes(el.type).includes(elementType)
+        );
+
+        for (const container of expandedContainers) {
+          // Get the element's DOM bounds
+          const elementNode = document.querySelector(`[data-element-id="${container.id}"]`);
+          if (elementNode) {
+            const rect = elementNode.getBoundingClientRect();
+            if (dropPoint.x >= rect.left && dropPoint.x <= rect.right &&
+              dropPoint.y >= rect.top && dropPoint.y <= rect.bottom) {
+              parentId = container.id;
+              break;
+            }
           }
         }
-      }
 
-      try {
-        const element = this.workflowService.addElement(elementType, canvasPos, {}, parentId);
-        this.selectedElementId = element.id;
-        this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
-      } catch (error) {
-        this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
+        if (!parentId) {
+          const containerType = elementType === ElementType.CATEGORY ? 'page' : 'category';
+          this.snackBar.open(
+            `Drop ${elementType} inside an expanded ${containerType}`,
+            'Close',
+            { duration: 3000 }
+          );
+          return;
+        }
+
+        // Add as child of the found container
+        try {
+          const element = this.workflowService.addElement(elementType, { x: 0, y: 0 }, {}, parentId);
+          this.selectedElementId = element.id;
+          this.workflow.expandedElementId = parentId; // Update active container
+          this.snackBar.open(`${elementType} added to container`, 'Close', { duration: 2000 });
+        } catch (error) {
+          this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
+        }
+      } else {
+        // Top-level element - check if not dropping inside a container
+        const expandedContainers = this.workflow.elements.filter(el => el.isExpanded);
+        const dropPoint = { x: event.clientX, y: event.clientY };
+
+        // Make sure we're not dropping inside an expanded container
+        for (const container of expandedContainers) {
+          const elementNode = document.querySelector(`[data-element-id="${container.id}"]`);
+          if (elementNode) {
+            const rect = elementNode.getBoundingClientRect();
+            if (dropPoint.x >= rect.left && dropPoint.x <= rect.right &&
+              dropPoint.y >= rect.top && dropPoint.y <= rect.bottom) {
+              this.snackBar.open(
+                `${elementType} is a top-level element and cannot be placed inside containers`,
+                'Close',
+                { duration: 3000 }
+              );
+              return;
+            }
+          }
+        }
+
+        try {
+          const element = this.workflowService.addElement(elementType, canvasPos, {});
+          this.selectedElementId = element.id;
+          this.snackBar.open(`${elementType} element added`, 'Close', { duration: 2000 });
+        } catch (error) {
+          this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
+        }
       }
     }
   }
-
   // Element Management
   selectElement(elementId: string): void {
     this.selectedElementId = elementId;
@@ -534,17 +623,86 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     if (!sourceElement || !targetElement) return '';
 
-    // Get element dimensions
     const sourceDims = this.getElementDimensions(sourceElement);
     const targetDims = this.getElementDimensions(targetElement);
 
+    // Calculate centers of both elements
+    const sourceCenterX = sourceElement.position.x + sourceDims.width / 2;
+    const sourceCenterY = sourceElement.position.y + sourceDims.height / 2;
+    const targetCenterX = targetElement.position.x + targetDims.width / 2;
+    const targetCenterY = targetElement.position.y + targetDims.height / 2;
+
+    // Get the best connection point on source element (output)
+    const sourceConnectionPoint = this.getBestConnectionPoint(
+      targetCenterX,
+      targetCenterY,
+      sourceElement.position,
+      sourceDims,
+      'output'
+    );
+
+    // Get the best connection point on target element (input)
+    const targetConnectionPoint = this.getBestConnectionPoint(
+      sourceCenterX,
+      sourceCenterY,
+      targetElement.position,
+      targetDims,
+      'input'
+    );
+
     return this.createCurvedPath(
-      sourceElement.position.x + sourceDims.width,
-      sourceElement.position.y + sourceDims.height / 2,
-      targetElement.position.x,
-      targetElement.position.y + targetDims.height / 2
+      sourceConnectionPoint.x,
+      sourceConnectionPoint.y,
+      targetConnectionPoint.x,
+      targetConnectionPoint.y
     );
   }
+
+  private getBestConnectionPoint(
+    fromX: number,
+    fromY: number,
+    elementPos: Position,
+    elementDims: { width: number; height: number },
+    type: 'input' | 'output'
+  ): { x: number; y: number; side: 'left' | 'right' | 'top' | 'bottom' } {
+    // Calculate center of element
+    const centerX = elementPos.x + elementDims.width / 2;
+    const centerY = elementPos.y + elementDims.height / 2;
+
+    // Calculate angle from element center to the other element
+    const angle = Math.atan2(fromY - centerY, fromX - centerX);
+    const angleDeg = angle * 180 / Math.PI;
+
+    // Determine which side to use based on angle
+    let side: 'left' | 'right' | 'top' | 'bottom';
+    let connectionX: number;
+    let connectionY: number;
+
+    if (angleDeg >= -45 && angleDeg <= 45) {
+      // Right side
+      side = 'right';
+      connectionX = elementPos.x + elementDims.width;
+      connectionY = elementPos.y + elementDims.height / 2;
+    } else if (angleDeg > 45 && angleDeg <= 135) {
+      // Bottom side
+      side = 'bottom';
+      connectionX = elementPos.x + elementDims.width / 2;
+      connectionY = elementPos.y + elementDims.height;
+    } else if (angleDeg > 135 || angleDeg <= -135) {
+      // Left side
+      side = 'left';
+      connectionX = elementPos.x;
+      connectionY = elementPos.y + elementDims.height / 2;
+    } else {
+      // Top side
+      side = 'top';
+      connectionX = elementPos.x + elementDims.width / 2;
+      connectionY = elementPos.y;
+    }
+
+    return { x: connectionX, y: connectionY, side };
+  }
+
 
   private getElementDimensions(element: WorkflowElement): { width: number; height: number } {
     const dims = ELEMENT_DIMENSIONS[element.type];
@@ -557,13 +715,49 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   private createCurvedPath(x1: number, y1: number, x2: number, y2: number): string {
     const dx = x2 - x1;
     const dy = y2 - y1;
+    const distance = Math.sqrt(dx * dx + dy * dy);
 
-    const controlPoint1X = x1 + dx * 0.3;
-    const controlPoint1Y = y1;
-    const controlPoint2X = x2 - dx * 0.3;
-    const controlPoint2Y = y2;
+    // Calculate control point offset based on distance
+    const offset = Math.min(distance * 0.5, 100);
 
-    return `M ${x1} ${y1} C ${controlPoint1X} ${controlPoint1Y} ${controlPoint2X} ${controlPoint2Y} ${x2} ${y2}`;
+    let cp1x: number, cp1y: number, cp2x: number, cp2y: number;
+
+    // Determine curve direction based on relative positions
+    const horizontalDominant = Math.abs(dx) > Math.abs(dy);
+
+    if (horizontalDominant) {
+      // Horizontal curve
+      if (dx > 0) {
+        // Left to right
+        cp1x = x1 + offset;
+        cp1y = y1;
+        cp2x = x2 - offset;
+        cp2y = y2;
+      } else {
+        // Right to left
+        cp1x = x1 - offset;
+        cp1y = y1;
+        cp2x = x2 + offset;
+        cp2y = y2;
+      }
+    } else {
+      // Vertical curve
+      if (dy > 0) {
+        // Top to bottom
+        cp1x = x1;
+        cp1y = y1 + offset;
+        cp2x = x2;
+        cp2y = y2 - offset;
+      } else {
+        // Bottom to top
+        cp1x = x1;
+        cp1y = y1 - offset;
+        cp2x = x2;
+        cp2y = y2 + offset;
+      }
+    }
+
+    return `M ${x1} ${y1} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${x2} ${y2}`;
   }
 
   // Workflow Operations
@@ -620,5 +814,55 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   trackConnection(index: number, connection: any): string {
     return connection.id;
+  }
+
+  private cancelConnection(): void {
+    this.connectingFrom = undefined;
+    this.tempConnection = undefined;
+    this.snackBar.open('Connection cancelled', 'Close', { duration: 2000 });
+  }
+
+  private setupKeyboardListeners(): void {
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        if (this.connectingFrom) {
+          this.cancelConnection();
+          event.preventDefault();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeydown);
+
+    // Store the handler so we can remove it on destroy
+    this.keydownHandler = handleKeydown;
+  }
+
+  onSvgClick(event: MouseEvent): void {
+    // Cancel connection if clicking on empty SVG area
+    if (this.connectingFrom) {
+      this.cancelConnection();
+      event.stopPropagation();
+    }
+  }
+
+  getElementZIndex(element: WorkflowElement): number {
+    // Dragging elements should be on top
+    if (this.isDraggingElement && this.selectedElementId === element.id) {
+      return 1000;
+    }
+
+    // Expanded elements should be above collapsed ones
+    if (element.isExpanded) {
+      return 100;
+    }
+
+    // Selected elements should be higher than normal
+    if (this.selectedElementId === element.id) {
+      return 50;
+    }
+
+    // Default z-index
+    return 10;
   }
 }
