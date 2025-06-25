@@ -513,7 +513,7 @@ export class ApiService {
 
   // Field Type APIs
   getFieldTypes(): Observable<FieldTypeResponse> {
-    return this.http.get<FieldTypeResponse>(this.getApiUrl('/define/api/field-types/'))
+    return this.http.get<FieldTypeResponse>(this.getApiUrl('/dynamic/api/v1/field-types/'))
       .pipe(
         tap(response => console.log('Loaded field types:', response)),
         catchError(this.handleError)
@@ -522,7 +522,7 @@ export class ApiService {
 
   // Page APIs
   getPages(): Observable<PageResponse> {
-    return this.http.get<PageResponse>(this.getApiUrl('/define/api/pages/'))
+    return this.http.get<PageResponse>(this.getApiUrl('/dynamic/api/v1/pages/'))
       .pipe(
         tap(response => console.log('Loaded pages:', response)),
         catchError(this.handleError)
@@ -531,7 +531,7 @@ export class ApiService {
 
   // Category APIs
   getCategories(): Observable<CategoryResponse> {
-    return this.http.get<CategoryResponse>(this.getApiUrl('/define/api/categories/'))
+    return this.http.get<CategoryResponse>(this.getApiUrl('/dynamic/api/v1/categories/'))
       .pipe(
         tap(response => console.log('Loaded categories:', response)),
         catchError(this.handleError)
@@ -540,7 +540,7 @@ export class ApiService {
 
   // Field APIs
   getFields(): Observable<FieldResponse> {
-    return this.http.get<FieldResponse>(this.getApiUrl('/define/api/fields/'))
+    return this.http.get<FieldResponse>(this.getApiUrl('/dynamic/api/v1/fields/'))
       .pipe(
         tap(response => console.log('Loaded fields:', response)),
         catchError(this.handleError)
@@ -565,8 +565,9 @@ export class ApiService {
       );
   }
   // PAGE CRUD Operations
+  // PAGE CRUD Operations
   createPage(page: Partial<Page>): Observable<Page> {
-    return this.http.post<Page>(this.getApiUrl('/define/api/pages/'), page)
+    return this.http.post<Page>(this.getApiUrl('/dynamic/api/v1/pages/'), page)
       .pipe(
         tap(response => console.log('Page created:', response)),
         catchError(this.handleError)
@@ -574,7 +575,7 @@ export class ApiService {
   }
 
   updatePage(id: number, page: Partial<Page>): Observable<Page> {
-    return this.http.patch<Page>(this.getApiUrl(`/define/api/pages/${id}/`), page)
+    return this.http.patch<Page>(this.getApiUrl(`/dynamic/api/v1/pages/${id}/`), page)
       .pipe(
         tap(response => console.log('Page updated:', response)),
         catchError(this.handleError)
@@ -582,16 +583,16 @@ export class ApiService {
   }
 
   deletePage(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/define/api/pages/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/pages/${id}/`))
       .pipe(
         tap(() => console.log('Page deleted:', id)),
         catchError(this.handleError)
       );
   }
 
-  // CATEGORY CRUD Operations
+// CATEGORY CRUD Operations
   createCategory(category: Partial<Category>): Observable<Category> {
-    return this.http.post<Category>(this.getApiUrl('/define/api/categories/'), category)
+    return this.http.post<Category>(this.getApiUrl('/dynamic/api/v1/categories/'), category)
       .pipe(
         tap(response => console.log('Category created:', response)),
         catchError(this.handleError)
@@ -599,7 +600,7 @@ export class ApiService {
   }
 
   updateCategory(id: number, category: Partial<Category>): Observable<Category> {
-    return this.http.patch<Category>(this.getApiUrl(`/define/api/categories/${id}/`), category)
+    return this.http.patch<Category>(this.getApiUrl(`/dynamic/api/v1/categories/${id}/`), category)
       .pipe(
         tap(response => console.log('Category updated:', response)),
         catchError(this.handleError)
@@ -607,7 +608,7 @@ export class ApiService {
   }
 
   deleteCategory(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/define/api/categories/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/categories/${id}/`))
       .pipe(
         tap(() => console.log('Category deleted:', id)),
         catchError(this.handleError)
@@ -616,7 +617,7 @@ export class ApiService {
 
   addPagesToCategory(categoryId: number, pageIds: number[]): Observable<Category> {
     return this.http.post<Category>(
-      this.getApiUrl(`/define/api/categories/${categoryId}/add_pages/`),
+      this.getApiUrl(`/dynamic/api/v1/categories/${categoryId}/add_pages/`),
       { page_ids: pageIds }
     ).pipe(
       tap(response => console.log('Pages added to category:', response)),
@@ -624,9 +625,9 @@ export class ApiService {
     );
   }
 
-  // FIELD CRUD Operations
+// FIELD CRUD Operations
   createField(field: Partial<Field>): Observable<Field> {
-    return this.http.post<Field>(this.getApiUrl('/define/api/fields/'), field)
+    return this.http.post<Field>(this.getApiUrl('/dynamic/api/v1/fields/'), field)
       .pipe(
         tap(response => console.log('Field created:', response)),
         catchError(this.handleError)
@@ -634,7 +635,7 @@ export class ApiService {
   }
 
   updateField(id: number, field: Partial<Field>): Observable<Field> {
-    return this.http.patch<Field>(this.getApiUrl(`/define/api/fields/${id}/`), field)
+    return this.http.patch<Field>(this.getApiUrl(`/dynamic/api/v1/fields/${id}/`), field)
       .pipe(
         tap(response => console.log('Field updated:', response)),
         catchError(this.handleError)
@@ -642,16 +643,16 @@ export class ApiService {
   }
 
   deleteField(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/define/api/fields/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/fields/${id}/`))
       .pipe(
         tap(() => console.log('Field deleted:', id)),
         catchError(this.handleError)
       );
   }
 
-  // CONDITION CRUD Operations
+// CONDITION CRUD Operations
   createCondition(condition: Partial<Condition>): Observable<Condition> {
-    return this.http.post<Condition>(this.getApiUrl('/define/api/conditions/'), condition)
+    return this.http.post<Condition>(this.getApiUrl('/dynamic/api/v1/conditions/'), condition)
       .pipe(
         tap(response => console.log('Condition created:', response)),
         catchError(this.handleError)
@@ -659,7 +660,7 @@ export class ApiService {
   }
 
   updateCondition(id: number, condition: Partial<Condition>): Observable<Condition> {
-    return this.http.patch<Condition>(this.getApiUrl(`/define/api/conditions/${id}/`), condition)
+    return this.http.patch<Condition>(this.getApiUrl(`/dynamic/api/v1/conditions/${id}/`), condition)
       .pipe(
         tap(response => console.log('Condition updated:', response)),
         catchError(this.handleError)
@@ -667,7 +668,7 @@ export class ApiService {
   }
 
   deleteCondition(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/define/api/conditions/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/conditions/${id}/`))
       .pipe(
         tap(() => console.log('Condition deleted:', id)),
         catchError(this.handleError)
@@ -676,7 +677,7 @@ export class ApiService {
 
   // Bulk operations
   bulkUpdateFields(fieldIds: number[], action: string): Observable<any> {
-    return this.http.post(this.getApiUrl('/define/api/fields/bulk_update/'), {
+    return this.http.post(this.getApiUrl('/dynamic/api/v1/fields/bulk_update/'), {
       field_ids: fieldIds,
       action: action
     }).pipe(
@@ -685,10 +686,10 @@ export class ApiService {
     );
   }
 
-  // Additional operations
+// Additional operations
   duplicateField(fieldId: number, newName: string): Observable<Field> {
     return this.http.post<Field>(
-      this.getApiUrl(`/define/api/fields/${fieldId}/duplicate/`),
+      this.getApiUrl(`/dynamic/api/v1/fields/${fieldId}/duplicate/`),
       { _field_name: newName }
     ).pipe(
       tap(response => console.log('Field duplicated:', response)),
@@ -698,7 +699,7 @@ export class ApiService {
 
   validateField(fieldId: number, value: any): Observable<any> {
     const params = new HttpParams().set('value', value);
-    return this.http.get(this.getApiUrl(`/define/api/fields/${fieldId}/validate_field/`), { params })
+    return this.http.get(this.getApiUrl(`/dynamic/api/v1/fields/${fieldId}/validate_field/`), { params })
       .pipe(
         tap(response => console.log('Field validation result:', response)),
         catchError(this.handleError)
@@ -707,7 +708,7 @@ export class ApiService {
 
   testCondition(conditionId: number, fieldData: any): Observable<any> {
     return this.http.post(
-      this.getApiUrl(`/define/api/conditions/${conditionId}/test_condition/`),
+      this.getApiUrl(`/dynamic/api/v1/conditions/${conditionId}/test_condition/`),
       { field_data: fieldData }
     ).pipe(
       tap(response => console.log('Condition test result:', response)),
