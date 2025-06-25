@@ -503,13 +503,22 @@ export class ApiService {
 
   // Flow Step lookup
   getFlowSteps(): Observable<LookupResponse> {
-    return this.getLookups('Flow Step');
+    const params = new HttpParams().set('name', 'Flow Step');
+    return this.http.get<LookupResponse>(this.getApiUrl('/lookup/'), { params })
+      .pipe(
+        tap(response => console.log('Loaded Flow Step lookups:', response)),
+        catchError(this.handleError)
+      );
   }
 
   // Applicant Type lookup
   getApplicantTypes(): Observable<LookupResponse> {
-    return this.getLookups('Applicant Type');
-  }
+    const params = new HttpParams().set('name', 'Applicant Type');
+    return this.http.get<LookupResponse>(this.getApiUrl('/lookup/'), { params })
+      .pipe(
+        tap(response => console.log('Loaded Applicant Type lookups:', response)),
+        catchError(this.handleError)
+      );  }
 
   // Field Type APIs
   getFieldTypes(): Observable<FieldTypeResponse> {
