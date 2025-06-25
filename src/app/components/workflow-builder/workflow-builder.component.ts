@@ -223,11 +223,11 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     if (result.action === 'create') {
       this.createNewWorkflow();
     } else if (result.action === 'load' && result.serviceCode) {
-      this.loadServiceFlowFromApi(result.serviceCode, result.serviceName || 'Service Flow');
+      // Pass additional metadata when loading
+      this.loadServiceFlowFromApi(result.serviceCode, result.serviceName || 'Service Flow', result);
     }
   }
-
-  private loadServiceFlowFromApi(serviceCode: string, serviceName: string): void {
+  private loadServiceFlowFromApi(serviceCode: string, serviceName: string, result: ServiceFlowSelectionResult): void {
     this.snackBar.open(`Loading ${serviceName}...`, '', { duration: 2000 });
 
     this.workflowService.loadServiceFlowFromApi(serviceCode).subscribe({
@@ -254,8 +254,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
   }
-
-  // ... rest of the methods remain the same ...
 
   createNewWorkflow(): void {
     const newName = `New Workflow ${new Date().toLocaleDateString()}`;

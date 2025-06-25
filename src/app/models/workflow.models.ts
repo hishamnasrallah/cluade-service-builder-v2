@@ -46,7 +46,7 @@ export interface ElementProperties {
   existingPageId?: number;
   service?: number | string;
   sequence_number?: number | string;
-  applicant_type?: number;
+  applicant_type?: number | string;
   name_ara?: string;
   description_ara?: string;
   page_id?: number;
@@ -70,10 +70,12 @@ export interface ElementProperties {
   _mandatory?: boolean;
   _is_hidden?: boolean;
   _is_disabled?: boolean;
-  _lookup?: number;
+  _lookup?: number | string;
 
   // Condition properties
+  condition_id?: number;
   target_field?: string;
+  target_field_id?: number;
   condition_logic?: ConditionLogic[];
 
   // End properties
@@ -132,38 +134,53 @@ export interface FieldElementProperties extends ElementProperties {
   _lookup?: number;
   useExisting?: boolean;
   existingFieldId?: number;
+  _parent_field?: number;
 
-  // Validation properties (matching API structure exactly)
+  // Text Validation properties
   _max_length?: number;
   _min_length?: number;
   _regex_pattern?: string;
   _allowed_characters?: string;
   _forbidden_words?: string;
+
+  // Number Validation properties
   _value_greater_than?: number;
   _value_less_than?: number;
   _integer_only?: boolean;
   _positive_only?: boolean;
+  _precision?: number;
+
+  // Date Validation properties
   _date_greater_than?: string;
   _date_less_than?: string;
   _future_only?: boolean;
   _past_only?: boolean;
+
+  // Boolean Default
   _default_boolean?: boolean;
+
+  // File and Image Validation properties
   _file_types?: string;
   _max_file_size?: number;
   _image_max_width?: number;
   _image_max_height?: number;
+
+  // Choice Validation properties
+  allowed_lookups?: any[];
   _max_selections?: number;
   _min_selections?: number;
-  _precision?: number;
+
+  // Advanced Field Validation properties
   _unique?: boolean;
   _default_value?: string;
   _coordinates_format?: boolean;
   _uuid_format?: boolean;
-  _parent_field?: number;
 }
 
 export interface ConditionElementProperties extends ElementProperties {
+  condition_id?: number;
   target_field?: string;
+  target_field_id?: number;
   condition_logic: ConditionLogic[];
   name: string;
   description?: string;

@@ -526,3 +526,20 @@ mat-list {
     min-height: 200px;
   }
 }
+.validation-section {
+  margin-bottom: 24px;
+
+  h4 {
+    margin: 0 0 16px 0;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}

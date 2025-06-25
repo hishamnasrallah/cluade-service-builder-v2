@@ -346,10 +346,168 @@
             </mat-tab>
 
             <!-- Advanced Properties Tab (for Field) -->
+            <!-- Validation Properties Tab (for Field) -->
             <mat-tab label="Validation" *ngIf="selectedElement.type === 'field' && !propertiesForm.get('useExisting')?.value">
-              <!-- ... existing validation content ... -->
-            </mat-tab>
+              <div class="tab-content">
+                <!-- Text Validation -->
+                <div *ngIf="shouldShowTextValidation()" class="validation-section">
+                  <h4>Text Validation</h4>
 
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Minimum Length</mat-label>
+                    <input matInput type="number" formControlName="_min_length" min="0">
+                    <mat-hint>Minimum number of characters required</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Maximum Length</mat-label>
+                    <input matInput type="number" formControlName="_max_length" min="1">
+                    <mat-hint>Maximum number of characters allowed</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Regex Pattern</mat-label>
+                    <input matInput formControlName="_regex_pattern">
+                    <mat-hint>Regular expression pattern for validation</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Allowed Characters</mat-label>
+                    <input matInput formControlName="_allowed_characters">
+                    <mat-hint>Characters allowed in this field (e.g., alphanumeric only)</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Forbidden Words</mat-label>
+                    <textarea matInput formControlName="_forbidden_words" rows="2"></textarea>
+                    <mat-hint>Comma-separated list of words not allowed</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                <!-- Number Validation -->
+                <div *ngIf="shouldShowNumberValidation()" class="validation-section">
+                  <h4>Number Validation</h4>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Minimum Value</mat-label>
+                    <input matInput type="number" formControlName="_value_greater_than">
+                    <mat-hint>Value must be greater than this</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Maximum Value</mat-label>
+                    <input matInput type="number" formControlName="_value_less_than">
+                    <mat-hint>Value must be less than this</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Decimal Precision</mat-label>
+                    <input matInput type="number" formControlName="_precision" min="0">
+                    <mat-hint>Number of decimal places allowed</mat-hint>
+                  </mat-form-field>
+
+                  <div class="checkbox-group">
+                    <mat-checkbox formControlName="_integer_only">Integer Only</mat-checkbox>
+                    <mat-checkbox formControlName="_positive_only">Positive Only</mat-checkbox>
+                  </div>
+                </div>
+
+                <!-- Date Validation -->
+                <div *ngIf="shouldShowDateValidation()" class="validation-section">
+                  <h4>Date Validation</h4>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Earliest Date</mat-label>
+                    <input matInput type="date" formControlName="_date_greater_than">
+                    <mat-hint>Date must be after this date</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Latest Date</mat-label>
+                    <input matInput type="date" formControlName="_date_less_than">
+                    <mat-hint>Date must be before this date</mat-hint>
+                  </mat-form-field>
+
+                  <div class="checkbox-group">
+                    <mat-checkbox formControlName="_future_only">Future Dates Only</mat-checkbox>
+                    <mat-checkbox formControlName="_past_only">Past Dates Only</mat-checkbox>
+                  </div>
+                </div>
+
+                <!-- File Validation -->
+                <div *ngIf="shouldShowFileValidation()" class="validation-section">
+                  <h4>File Validation</h4>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Allowed File Types</mat-label>
+                    <input matInput formControlName="_file_types">
+                    <mat-hint>Comma-separated file extensions (e.g., .pdf,.docx)</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Maximum File Size (bytes)</mat-label>
+                    <input matInput type="number" formControlName="_max_file_size" min="0">
+                    <mat-hint>Maximum file size in bytes</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Maximum Image Width (pixels)</mat-label>
+                    <input matInput type="number" formControlName="_image_max_width" min="1">
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Maximum Image Height (pixels)</mat-label>
+                    <input matInput type="number" formControlName="_image_max_height" min="1">
+                  </mat-form-field>
+                </div>
+
+                <!-- Choice Validation -->
+                <div *ngIf="shouldShowChoiceValidation()" class="validation-section">
+                  <h4>Choice Validation</h4>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Minimum Selections</mat-label>
+                    <input matInput type="number" formControlName="_min_selections" min="0">
+                    <mat-hint>Minimum number of selections required</mat-hint>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Maximum Selections</mat-label>
+                    <input matInput type="number" formControlName="_max_selections" min="1">
+                    <mat-hint>Maximum number of selections allowed</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                <!-- Boolean Field -->
+                <div *ngIf="shouldShowBooleanValidation()" class="validation-section">
+                  <h4>Boolean Field Settings</h4>
+                  <mat-checkbox formControlName="_default_boolean">Default to True</mat-checkbox>
+                </div>
+
+                <!-- Advanced Validation -->
+                <div class="validation-section">
+                  <h4>Advanced Settings</h4>
+
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>Default Value</mat-label>
+                    <input matInput formControlName="_default_value">
+                    <mat-hint>Default value for this field</mat-hint>
+                  </mat-form-field>
+
+                  <div class="checkbox-group">
+                    <mat-checkbox formControlName="_unique">Unique Value Required</mat-checkbox>
+                    <mat-checkbox formControlName="_coordinates_format"
+                                  *ngIf="getFieldType() === 'coordinates'">
+                      Validate as Coordinates
+                    </mat-checkbox>
+                    <mat-checkbox formControlName="_uuid_format"
+                                  *ngIf="getFieldType() === 'uuid'">
+                      Validate as UUID
+                    </mat-checkbox>
+                  </div>
+                </div>
+              </div>
+            </mat-tab>
             <!-- Condition Logic Tab (for Condition) -->
             <mat-tab label="Logic" *ngIf="selectedElement.type === 'condition'">
               <!-- ... existing condition logic content ... -->

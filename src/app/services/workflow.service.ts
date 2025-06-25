@@ -1,7 +1,7 @@
 // services/workflow.service.ts - Complete version with hierarchy support
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import {BehaviorSubject, Observable, of, throwError} from 'rxjs';
+import {map, catchError, switchMap} from 'rxjs/operators';
 import {
   WorkflowData,
   WorkflowElement,
@@ -144,6 +144,72 @@ export class WorkflowService {
       throw new Error('Start element cannot be removed');
     }
 
+    // Delete from backend if it has an ID
+    let deleteObservable: Observable<any> = of(null);
+
+    switch (element.type) {
+      case ElementType.PAGE:
+        if (element.properties.page_id) {
+          deleteObservable = this.apiService.deletePage(element.properties.page_id);
+        }
+        break;
+      case ElementType.CATEGORY:
+        if (element.properties.category_id) {
+          deleteObservable = this.apiService.deleteCategory(element.properties.category_id);
+        }
+        break;
+      case ElementType.FIELD:
+        if (element.properties._field_id) {
+          deleteObservable = this.apiService.deleteField(element.properties._field_id);
+        }
+        break;
+      case ElementType.CONDITION:
+        if (element.properties.condition_id) {
+          deleteObservable = this.apiService.deleteCondition(element.properties.condition_id);
+        }
+        break;
+    }
+
+    deleteObservable.subscribe({
+      next: () => {
+        console.log('Element deleted from backend');
+
+        // Remove all children recursively
+        if (element.children && element.children.length > 0) {
+          [...element.children].forEach(childId => this.removeElement(childId));
+        }
+
+        // Remove from parent's children array
+        if (element.parentId) {
+          const parent = this.currentWorkflow.elements.find(el => el.id === element.parentId);
+          if (parent && parent.children) {
+            parent.children = parent.children.filter(childId => childId !== id);
+            this.updateParentCounts(element.parentId);
+          }
+        }
+
+        // Remove element
+        this.currentWorkflow.elements = this.currentWorkflow.elements.filter(el => el.id !== id);
+
+        // Remove connections involving this element
+        this.currentWorkflow.connections = this.currentWorkflow.connections.filter(
+          conn => conn.sourceId !== id && conn.targetId !== id
+        );
+
+        this.updateWorkflow();
+      },
+      error: (error) => {
+        console.error('Failed to delete element from backend:', error);
+        // Still remove from local state even if backend fails
+        this.removeElementLocally(id);
+      }
+    });
+  }
+
+  private removeElementLocally(id: string): void {
+    const element = this.currentWorkflow.elements.find(el => el.id === id);
+    if (!element) return;
+
     // Remove all children recursively
     if (element.children && element.children.length > 0) {
       [...element.children].forEach(childId => this.removeElement(childId));
@@ -168,7 +234,6 @@ export class WorkflowService {
 
     this.updateWorkflow();
   }
-
   toggleElementExpansion(elementId: string): void {
     const element = this.currentWorkflow.elements.find(el => el.id === elementId);
     if (!element || !canContainChildren(element.type)) return;
@@ -271,31 +336,40 @@ export class WorkflowService {
   // Load service flow from API with hierarchy
   loadServiceFlowFromApi(serviceCode: string): Observable<WorkflowData> {
     return this.apiService.getServiceFlow(serviceCode).pipe(
-      map((serviceFlow: ServiceFlow) => {
-        this.currentServiceCode = serviceCode;
+      switchMap((serviceFlow: ServiceFlow) => {
+        // Get service ID first, then convert
+        return this.apiService.getServices().pipe(
+          map(servicesResponse => {
+            const service = servicesResponse.results.find(s => s.code === serviceCode);
+            const serviceId = service?.id;
 
-        const workflowData: WorkflowData = {
-          name: `Service Flow - ${serviceCode}`,
-          description: `Service flow for service ${serviceCode}`,
-          elements: [],
-          connections: [],
-          viewMode: 'collapsed',
-          metadata: {
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            version: '1.0',
-            service_code: serviceCode
-          }
-        };
+            this.currentServiceCode = serviceCode;
 
-        // Convert service flow data to workflow elements with hierarchy
-        this.convertServiceFlowToElements(serviceFlow, workflowData);
+            const workflowData: WorkflowData = {
+              name: `Service Flow - ${service?.name || serviceCode}`,
+              description: `Service flow for service ${serviceCode}`,
+              elements: [],
+              connections: [],
+              viewMode: 'collapsed',
+              metadata: {
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                version: '1.0',
+                service_code: serviceCode,
+                service_id: serviceId
+              }
+            };
 
-        this.currentWorkflow = workflowData;
-        this.updateWorkflow();
+            // Convert service flow data to workflow elements with hierarchy
+            this.convertServiceFlowToElements(serviceFlow, workflowData, serviceId);
 
-        console.log('Loaded service flow from API with hierarchy:', workflowData);
-        return workflowData;
+            this.currentWorkflow = workflowData;
+            this.updateWorkflow();
+
+            console.log('Loaded service flow from API with hierarchy:', workflowData);
+            return workflowData;
+          })
+        );
       }),
       catchError(error => {
         console.error('Error loading service flow from API:', error);
@@ -303,9 +377,8 @@ export class WorkflowService {
       })
     );
   }
-
   // Convert service flow with hierarchy
-  private convertServiceFlowToElements(serviceFlow: ServiceFlow, workflowData: WorkflowData): void {
+  private convertServiceFlowToElements(serviceFlow: ServiceFlow, workflowData: WorkflowData, serviceId?: number): void {
     // Add start element
     const startElement: WorkflowElement = {
       id: 'start',
@@ -324,7 +397,16 @@ export class WorkflowService {
       serviceFlow.pages.forEach((page: any, pageIndex: number) => {
         const pageElementId = `page-${page.page_id || pageIndex}`;
 
-        // Create page element with children array
+        // Extract IDs from objects if necessary
+        const sequenceNumberId = typeof page.sequence_number === 'object'
+          ? page.sequence_number.id
+          : page.sequence_number;
+
+        const applicantTypeId = typeof page.applicant_type === 'object'
+          ? page.applicant_type.id
+          : page.applicant_type;
+
+        // Create page element with properly extracted IDs
         const pageElement: WorkflowElement = {
           id: pageElementId,
           type: ElementType.PAGE,
@@ -334,11 +416,15 @@ export class WorkflowService {
             name_ara: page.name_ara,
             description: page.description,
             description_ara: page.description_ara,
-            sequence_number: page.sequence_number,
+            sequence_number: sequenceNumberId,
             page_id: page.page_id,
             is_hidden_page: page.is_hidden_page || false,
             categoryCount: 0,
-            fieldCount: 0
+            fieldCount: 0,
+            // Use the dynamically fetched service ID
+            service: serviceId || serviceFlow.service_code,
+            applicant_type: applicantTypeId,
+            active_ind: true
           },
           connections: [],
           children: [],
@@ -361,13 +447,16 @@ export class WorkflowService {
             const categoryElement: WorkflowElement = {
               id: categoryElementId,
               type: ElementType.CATEGORY,
-              position: { x: 0, y: 0 }, // Position relative to parent
+              position: { x: 0, y: 0 },
               properties: {
                 name: category.name || `Category ${categoryIndex + 1}`,
                 name_ara: category.name_ara,
                 category_id: category.id,
                 is_repeatable: category.repeatable || false,
-                fieldCount: 0
+                fieldCount: 0,
+                description: category.description,
+                code: category.code,
+                active_ind: true
               },
               connections: [],
               parentId: pageElementId,
@@ -382,27 +471,95 @@ export class WorkflowService {
               category.fields.forEach((field: any, fieldIndex: number) => {
                 const fieldElementId = `field-${field.field_id || fieldIndex}`;
 
+                // Extract field type ID if it's an object
+                const fieldTypeId = typeof field.field_type === 'object'
+                  ? field.field_type.id
+                  : field.field_type;
+
+                const lookupId = typeof field.lookup === 'object'
+                  ? field.lookup.id
+                  : field.lookup;
+
                 const fieldElement: WorkflowElement = {
                   id: fieldElementId,
                   type: ElementType.FIELD,
-                  position: { x: 0, y: 0 }, // Position relative to parent
+                  position: { x: 0, y: 0 },
                   properties: {
                     name: field.display_name || field.name || `Field ${fieldIndex + 1}`,
                     _field_name: field.name,
                     _field_display_name: field.display_name,
                     _field_display_name_ara: field.display_name_ara,
-                    _field_type: field.field_type,
+                    _field_type: fieldTypeId,
                     _field_id: field.field_id,
                     _mandatory: field.mandatory || false,
                     _is_hidden: field.is_hidden || false,
                     _is_disabled: field.is_disabled || false,
-                    _lookup: field.lookup
+                    _lookup: lookupId,
+                    _sequence: field.sequence || fieldIndex,
+
+                    // Add all validation properties
+                    _max_length: field.max_length,
+                    _min_length: field.min_length,
+                    _regex_pattern: field.regex_pattern,
+                    _allowed_characters: field.allowed_characters,
+                    _forbidden_words: field.forbidden_words,
+                    _value_greater_than: field.value_greater_than,
+                    _value_less_than: field.value_less_than,
+                    _integer_only: field.integer_only,
+                    _positive_only: field.positive_only,
+                    _precision: field.precision,
+                    _default_boolean: field.default_boolean,
+                    _file_types: field.file_types,
+                    _max_file_size: field.max_file_size,
+                    _image_max_width: field.image_max_width,
+                    _image_max_height: field.image_max_height,
+                    _max_selections: field.max_selections,
+                    _min_selections: field.min_selections,
+                    _date_greater_than: field.date_greater_than,
+                    _date_less_than: field.date_less_than,
+                    _future_only: field.future_only,
+                    _past_only: field.past_only,
+                    _unique: field.unique,
+                    _default_value: field.default_value,
+                    _coordinates_format: field.coordinates_format,
+                    _uuid_format: field.uuid_format,
+
+                    allowed_lookups: field.allowed_lookups,
+                    active_ind: true
                   },
                   connections: [],
                   parentId: categoryElementId
                 };
                 workflowData.elements.push(fieldElement);
                 categoryElement.children!.push(fieldElementId);
+
+                // Handle visibility conditions
+                if (field.visibility_conditions && field.visibility_conditions.length > 0) {
+                  field.visibility_conditions.forEach((condition: any, conditionIndex: number) => {
+                    const conditionElementId = `condition-${field.field_id || fieldIndex}-${conditionIndex}`;
+
+                    workflowData.elements.push({
+                      id: conditionElementId,
+                      type: ElementType.CONDITION,
+                      position: { x: 400 + (conditionIndex * 150), y: 100 },
+                      properties: {
+                        name: `Condition for ${field.display_name || field.name}`,
+                        target_field: field.name,
+                        target_field_id: field.field_id,
+                        condition_logic: condition.condition_logic || [],
+                        condition_id: condition.id
+                      },
+                      connections: []
+                    });
+
+                    // Only connect if both elements are top-level (no parents)
+                    workflowData.connections.push({
+                      id: `conn-${pageElementId}-${conditionElementId}`,
+                      sourceId: pageElementId,
+                      targetId: conditionElementId
+                    });
+                  });
+                }
               });
 
               categoryElement.properties.fieldCount = categoryElement.children!.length;
@@ -443,9 +600,7 @@ export class WorkflowService {
         targetId: 'end'
       });
     }
-  }
-
-  // Convert workflow back to service flow format with hierarchy
+  }  // Convert workflow back to service flow format with hierarchy
   convertWorkflowToServiceFlow(): ServiceFlow | null {
     if (!this.currentServiceCode) {
       console.warn('No service code set, cannot convert to service flow');
@@ -665,7 +820,23 @@ export class WorkflowService {
 
     this.updateWorkflow();
   }
+  private serviceMetadata: any = {};
 
+  setServiceMetadata(metadata: any): void {
+    this.serviceMetadata = metadata;
+    // Optionally store in workflow metadata
+    if (this.currentWorkflow.metadata) {
+      this.currentWorkflow.metadata = {
+        ...this.currentWorkflow.metadata,
+        ...metadata
+      };
+    }
+    this.updateWorkflow();
+  }
+
+  getServiceMetadata(): any {
+    return this.serviceMetadata;
+  }
   private addStartElementToWorkflow(workflow: WorkflowData): void {
     const startElement: WorkflowElement = {
       id: uuidv4(),

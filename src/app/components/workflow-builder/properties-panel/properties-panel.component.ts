@@ -15,8 +15,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Subject, takeUntil, forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import {Subject, takeUntil, forkJoin, of, Observable} from 'rxjs';
+import {catchError, map} from 'rxjs/operators';
 
 import {
   canContainChildren,
@@ -31,9 +31,10 @@ import {
   Page,
   Category,
   Field,
-  FieldType
+  FieldType, Condition
 } from '../../../services/api.service';
 import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
+
 
 @Component({
   selector: 'app-properties-panel',
@@ -133,8 +134,9 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
       current = parent;        // guaranteed WorkflowElement here
     }
-}
 
+    return path; // ADD THIS LINE
+  }
     selectHierarchyItem(item: any): void {
     this.selectedElementId = item.id;
     this.elementSelected.emit(item.id);
@@ -158,15 +160,15 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     return config?.color || '#999';
   }
 
-  // Validation helper methods
+// Validation helper methods
   shouldShowTextValidation(): boolean {
     const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['text', 'textarea', 'email', 'url', 'phone', 'password'].includes(fieldType?.toString());
+    return ['text', 'textarea', 'email', 'url', 'phone', 'password', 'rich_text', 'slug'].includes(fieldType?.toString());
   }
 
   shouldShowNumberValidation(): boolean {
     const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['number', 'decimal', 'percentage', 'range'].includes(fieldType?.toString());
+    return ['number', 'decimal', 'percentage', 'range', 'currency', 'rating'].includes(fieldType?.toString());
   }
 
   shouldShowDateValidation(): boolean {
@@ -176,7 +178,21 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   shouldShowFileValidation(): boolean {
     const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return fieldType?.toString() === 'file';
+    return ['file', 'image'].includes(fieldType?.toString());
+  }
+
+  shouldShowChoiceValidation(): boolean {
+    const fieldType = this.propertiesForm.get('_field_type')?.value;
+    return ['choice', 'multi_choice'].includes(fieldType?.toString());
+  }
+
+  shouldShowBooleanValidation(): boolean {
+    const fieldType = this.propertiesForm.get('_field_type')?.value;
+    return fieldType?.toString() === 'boolean';
+  }
+
+  getFieldType(): string {
+    return this.propertiesForm.get('_field_type')?.value?.toString() || '';
   }
 
   expandElement(): void {
@@ -250,7 +266,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   // Ensure data is loaded when needed
-  private async ensureDataLoaded(): Promise<void> {
+  private ensureDataLoaded(): Promise<void> {
     // Check if we have any data loaded
     const hasLookupData = this.services.length > 0 || this.flowSteps.length > 0 ||
       this.applicantTypes.length > 0 || this.fieldTypes.length > 0;
@@ -260,17 +276,20 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
     console.log('Data check:', { hasLookupData, hasExistingData });
 
+    // Always load lookup data for foreign key fields
     if (!hasLookupData) {
       console.log('Loading lookup data...');
-      await this.loadLookupDataAsync();
+      return this.loadLookupDataAsync();
     }
 
+    // Load existing data if needed
     if (!hasExistingData) {
       console.log('Loading existing data...');
-      this.loadExistingData(); // This can be async, doesn't need to block
+      this.loadExistingData();
     }
-  }
 
+    return Promise.resolve();
+  }
   private async loadLookupDataAsync(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.apiService.isConfigured()) {
@@ -356,7 +375,27 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       // Ensure data is loaded before updating form
       this.ensureDataLoaded().then(() => {
         this.updateFormForElement();
+
+        // If this is an existing element (has backend IDs), mark as already saved
+        if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
+          this.autoSaveStatus = 'saved';
+        }
       });
+    }
+  }
+
+  private hasBackendId(element: WorkflowElement): boolean {
+    switch (element.type) {
+      case ElementType.PAGE:
+        return !!element.properties.page_id;
+      case ElementType.CATEGORY:
+        return !!element.properties.category_id;
+      case ElementType.FIELD:
+        return !!element.properties._field_id;
+      case ElementType.CONDITION:
+        return !!element.properties.condition_id;
+      default:
+        return false;
     }
   }
 
@@ -402,6 +441,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       _is_disabled: [false],
 
       // Field validation properties
+      // Field validation properties
       _min_length: [''],
       _max_length: [''],
       _regex_pattern: [''],
@@ -422,9 +462,17 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       _precision: [''],
       _unique: [false],
       _default_value: [''],
+      _default_boolean: [false],
+      _max_selections: [''],
+      _min_selections: [''],
+      _coordinates_format: [false],
+      _uuid_format: [false],
+      _parent_field: [''],
 
       // Condition properties
+      condition_id: [''],
       target_field: [''],
+      target_field_id: [''],
       condition_logic: [[]],
 
       // End properties
@@ -622,9 +670,12 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
     switch (this.selectedElement.type) {
       case ElementType.PAGE:
+        // Check if this is an existing page
+        const isExistingPage = !!properties.page_id && properties.page_id !== 'new';
+
         this.propertiesForm.patchValue({
-          useExisting: properties.useExisting || false,
-          existingPageId: properties.existingPageId || '',
+          useExisting: false, // Don't mark as "use existing" for loaded elements
+          existingPageId: '',
           service: properties.service || '',
           sequence_number: properties.sequence_number || '',
           applicant_type: properties.applicant_type || '',
@@ -681,7 +732,9 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
       case ElementType.CONDITION:
         this.propertiesForm.patchValue({
+          condition_id: properties.condition_id || '',
           target_field: properties.target_field || '',
+          target_field_id: properties.target_field_id || '',
           condition_logic: properties.condition_logic || []
         });
         break;
@@ -695,67 +748,227 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private autoSaveProperties(formValue: any): void {
-    // Guard against saving when no element is selected
     if (!this.selectedElement) {
       console.log('Auto-save cancelled: No element selected');
       return;
     }
 
-    // Guard against saving invalid forms
     if (!this.propertiesForm.valid) {
       console.log('Auto-save cancelled: Form is invalid');
       return;
     }
 
-    // Store the current element ID to prevent race conditions
     const currentElementId = this.selectedElement.id;
 
-    // Clear existing timeout
     if (this.autoSaveTimeout) {
       clearTimeout(this.autoSaveTimeout);
     }
 
-    // Show saving status
     this.autoSaveStatus = 'saving';
     this.showAutoSaveStatus = true;
 
-    // Debounce auto-save by 500ms
     this.autoSaveTimeout = setTimeout(() => {
-      // Double-check that we're still on the same element
       if (!this.selectedElement || this.selectedElement.id !== currentElementId) {
         console.log('Auto-save cancelled: Element changed during timeout');
         return;
       }
 
       try {
-        // Clean up the form value based on element type
         const cleanedProperties = this.cleanFormValue(formValue);
 
-        console.log('Auto-saving for element:', currentElementId, cleanedProperties);
+        // Save to backend based on element type
+        this.saveElementToBackend(this.selectedElement, cleanedProperties).subscribe({
+          next: (response) => {
+            console.log('Element saved to backend:', response);
 
-        this.elementUpdated.emit({
-          id: currentElementId,
-          properties: cleanedProperties
+            // Update local state
+            this.elementUpdated.emit({
+              id: currentElementId,
+              properties: cleanedProperties
+            });
+
+            this.autoSaveStatus = 'saved';
+
+            setTimeout(() => {
+              this.showAutoSaveStatus = false;
+            }, 2000);
+          },
+          error: (error) => {
+            console.error('Auto-save error:', error);
+            this.autoSaveStatus = 'error';
+            this.snackBar.open('Failed to save changes', 'Retry', { duration: 5000 })
+              .onAction().subscribe(() => {
+              this.autoSaveProperties(formValue);
+            });
+          }
         });
-
-        this.autoSaveStatus = 'saved';
-
-        // Hide status after 2 seconds
-        setTimeout(() => {
-          this.showAutoSaveStatus = false;
-        }, 2000);
 
       } catch (error) {
         console.error('Auto-save error:', error);
         this.autoSaveStatus = 'error';
-
-        // Show error for longer
-        setTimeout(() => {
-          this.showAutoSaveStatus = false;
-        }, 5000);
       }
     }, 500);
   }
+
+  private saveElementToBackend(element: WorkflowElement, properties: any): Observable<any> {
+    switch (element.type) {
+      case ElementType.PAGE:
+        if (properties.page_id) {
+          return this.apiService.updatePage(properties.page_id, this.mapPageProperties(properties));
+        } else if (!properties.useExisting) {
+          return this.apiService.createPage(this.mapPageProperties(properties)).pipe(
+            map(response => {
+              // Update the element with the new page_id
+              element.properties.page_id = response.id;
+              return response;
+            })
+          );
+        }
+        break;
+
+      case ElementType.CATEGORY:
+        if (properties.category_id) {
+          return this.apiService.updateCategory(properties.category_id, this.mapCategoryProperties(properties));
+        } else if (!properties.useExisting) {
+          return this.apiService.createCategory(this.mapCategoryProperties(properties)).pipe(
+            map(response => {
+              element.properties.category_id = response.id;
+              return response;
+            })
+          );
+        }
+        break;
+
+      case ElementType.FIELD:
+        if (properties._field_id) {
+          return this.apiService.updateField(properties._field_id, this.mapFieldProperties(properties));
+        } else if (!properties.useExisting) {
+          return this.apiService.createField(this.mapFieldProperties(properties)).pipe(
+            map(response => {
+              element.properties._field_id = response.id;
+              return response;
+            })
+          );
+        }
+        break;
+
+      case ElementType.CONDITION:
+        if (properties.condition_id) {
+          return this.apiService.updateCondition(properties.condition_id, this.mapConditionProperties(properties));
+        } else {
+          return this.apiService.createCondition(this.mapConditionProperties(properties)).pipe(
+            map(response => {
+              element.properties.condition_id = response.id;
+              return response;
+            })
+          );
+        }
+        break;
+    }
+
+    // For other element types, just return a mock observable
+    return of({ success: true });
+  }
+
+  private mapPageProperties(properties: any): Partial<Page> {
+    return {
+      name: properties.name,
+      name_ara: properties.name_ara,
+      description: properties.description,
+      description_ara: properties.description_ara,
+      service: properties.service,
+      sequence_number: properties.sequence_number,
+      applicant_type: properties.applicant_type,
+      active_ind: true
+    };
+  }
+
+  private mapCategoryProperties(properties: any): Partial<Category> {
+    const mapped: Partial<Category> = {
+      name: properties.name,
+      name_ara: properties.name_ara,
+      description: properties.description,
+      code: properties.code,
+      is_repeatable: properties.is_repeatable,
+      active_ind: true
+    };
+
+    // Handle page assignment
+    if (this.selectedElement?.parentId) {
+      const parentPage = this.workflow.elements.find(el => el.id === this.selectedElement!.parentId);
+      if (parentPage?.properties.page_id) {
+        mapped.page = [parentPage.properties.page_id];
+      }
+    }
+
+    return mapped;
+  }
+
+  private mapFieldProperties(properties: any): Partial<Field> {
+    const mapped: Partial<Field> = {
+      _field_name: properties._field_name,
+      _field_display_name: properties._field_display_name,
+      _field_display_name_ara: properties._field_display_name_ara,
+      _field_type: properties._field_type,
+      _sequence: properties._sequence,
+      _mandatory: properties._mandatory,
+      _is_hidden: properties._is_hidden,
+      _is_disabled: properties._is_disabled,
+      _lookup: properties._lookup,
+      active_ind: true,
+
+      // Validation properties
+      _max_length: properties._max_length,
+      _min_length: properties._min_length,
+      _regex_pattern: properties._regex_pattern,
+      _allowed_characters: properties._allowed_characters,
+      _forbidden_words: properties._forbidden_words,
+      _value_greater_than: properties._value_greater_than,
+      _value_less_than: properties._value_less_than,
+      _integer_only: properties._integer_only,
+      _positive_only: properties._positive_only,
+      _date_greater_than: properties._date_greater_than,
+      _date_less_than: properties._date_less_than,
+      _future_only: properties._future_only,
+      _past_only: properties._past_only,
+      _file_types: properties._file_types,
+      _max_file_size: properties._max_file_size,
+      _image_max_width: properties._image_max_width,
+      _image_max_height: properties._image_max_height,
+      _precision: properties._precision,
+      _unique: properties._unique,
+      _default_value: properties._default_value,
+      _default_boolean: properties._default_boolean,
+      _max_selections: properties._max_selections,
+      _min_selections: properties._min_selections,
+      _coordinates_format: properties._coordinates_format,
+      _uuid_format: properties._uuid_format
+    };
+
+    // Handle category assignment
+    if (this.selectedElement?.parentId) {
+      const parentCategory = this.workflow.elements.find(el => el.id === this.selectedElement!.parentId);
+      if (parentCategory?.properties.category_id) {
+        mapped._category = [parentCategory.properties.category_id];
+      }
+    }
+
+    // Handle parent field
+    if (properties._parent_field) {
+      mapped._parent_field = properties._parent_field;
+    }
+
+    return mapped;
+  }
+
+  private mapConditionProperties(properties: any): Partial<Condition> {
+    return {
+      target_field: properties.target_field_id || 0, // Need to get the actual field ID
+      condition_logic: properties.condition_logic || [],
+      active_ind: true
+    };
+  }
+
 
   getAutoSaveIcon(): string {
     switch (this.autoSaveStatus) {
@@ -928,7 +1141,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
 
       case ElementType.CONDITION:
-        ['target_field'].forEach(key => {
+        ['condition_id', 'target_field', 'target_field_id'].forEach(key => {
           if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
             cleaned[key] = formValue[key];
           }

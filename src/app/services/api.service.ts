@@ -1,38 +1,29 @@
 // services/api.service.ts - Updated for real service flow API
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
+import {Observable, of, throwError} from 'rxjs';
 import { catchError, tap, map } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 import { WorkflowData } from '../models/workflow.models';
 
 // Service Flow API Response Structure
 export interface ServiceFlowResponse {
-  service_flow: ServiceFlow[];
+  service_flow: ServiceFlow[] | GroupedServiceFlow[];
 }
-
-export interface ServiceFlow {
+// Add Condition interface
+export interface Condition {
+  id?: number;
+  target_field: number;
+  active_ind: boolean;
+  condition_logic: any[];
+}
+export interface GroupedServiceFlow {
   service_code: string;
   pages: ServiceFlowPage[];
 }
-
-export interface ServiceFlowPage {
-  sequence_number: string;
-  name: string;
-  name_ara?: string;
-  description?: string;
-  description_ara?: string;
-  is_hidden_page: boolean;
-  page_id: number;
-  categories: ServiceFlowCategory[];
-}
-
-export interface ServiceFlowCategory {
-  id: number;
-  name: string;
-  name_ara?: string;
-  repeatable: boolean;
-  fields: ServiceFlowField[];
+export interface ServiceFlow {
+  service_code: string;
+  pages: ServiceFlowPage[];
 }
 
 export interface ServiceFlowField {
@@ -40,16 +31,17 @@ export interface ServiceFlowField {
   field_id: number;
   display_name: string;
   display_name_ara?: string;
-  field_type: string;
+  field_type: string | number | { id: number; name: string; code: string; };
   mandatory: boolean;
-  lookup?: number;
+  lookup?: number | { id: number; name: string; };
   allowed_lookups: any[];
   sub_fields: any[];
   is_hidden: boolean;
   is_disabled: boolean;
   visibility_conditions: VisibilityCondition[];
+  sequence?: number;
 
-  // Field type specific properties
+  // Add all validation properties
   max_length?: number;
   min_length?: number;
   regex_pattern?: string;
@@ -67,7 +59,40 @@ export interface ServiceFlowField {
   image_max_height?: number;
   max_selections?: number;
   min_selections?: number;
+  date_greater_than?: string;
+  date_less_than?: string;
+  future_only?: boolean;
+  past_only?: boolean;
+  unique?: boolean;
+  default_value?: string;
+  coordinates_format?: boolean;
+  uuid_format?: boolean;
 }
+
+export interface ServiceFlowCategory {
+  id: number;
+  name: string;
+  name_ara?: string;
+  repeatable: boolean;
+  fields: ServiceFlowField[];
+  description?: string;
+  code?: string;
+}
+
+export interface ServiceFlowPage {
+  sequence_number: string | { id: number; code: string; name: string; };
+  name: string;
+  name_ara?: string;
+  description?: string;
+  description_ara?: string;
+  is_hidden_page: boolean;
+  page_id: number;
+  categories: ServiceFlowCategory[];
+  applicant_type?: number | { id: number; name: string; };
+  service?: number | { id: number; code: string; name: string; };
+}
+
+
 
 export interface VisibilityCondition {
   condition_logic: ConditionLogicItem[];
@@ -155,7 +180,23 @@ export class ApiService {
   getServiceFlow(serviceCode: string): Observable<ServiceFlow> {
     return this.getServiceFlows().pipe(
       map(response => {
-        const serviceFlow = response.service_flow.find(sf => sf.service_code === serviceCode);
+        // Handle both flat and grouped formats
+        let serviceFlows: ServiceFlow[];
+
+        // Check if response is in grouped format
+        if (response.service_flow.length > 0 && 'service_code' in response.service_flow[0]) {
+          // Grouped format
+          serviceFlows = response.service_flow as ServiceFlow[];
+        } else {
+          // Flat format - need to extract the service code from pages
+          const flatResponse = response.service_flow as any[];
+          serviceFlows = [{
+            service_code: serviceCode,
+            pages: flatResponse
+          }];
+        }
+
+        const serviceFlow = serviceFlows.find(sf => sf.service_code === serviceCode);
         if (!serviceFlow) {
           throw new Error(`Service flow with code ${serviceCode} not found`);
         }
@@ -165,7 +206,6 @@ export class ApiService {
       catchError(this.handleError)
     );
   }
-
   // Convert service flows to workflow summaries for the selector
   getServiceFlowSummaries(): Observable<ServiceFlowSummary[]> {
     return this.getServiceFlows().pipe(
@@ -198,205 +238,251 @@ export class ApiService {
   }
 
   // Convert service flow to workflow data format
-  convertServiceFlowToWorkflow(serviceFlow: ServiceFlow): WorkflowData {
-    const workflowData: WorkflowData = {
-      id: serviceFlow.service_code,
-      name: `Service Flow - ${this.getServiceName(serviceFlow.service_code)}`,
-      description: `Service flow for service ${serviceFlow.service_code}`,
-      elements: [],
-      connections: [],
-      metadata: {
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        version: '1.0'
-      }
-    };
 
-    // Add start element
-    workflowData.elements.push({
-      id: 'start',
-      type: 'start' as any,
-      position: { x: 100, y: 100 },
-      properties: { name: 'Start' },
-      connections: []
-    });
+  private getServiceIdFromCode(serviceCode: string): Observable<number | undefined> {
+    return this.getServices().pipe(
+      map(response => {
+        const service = response.results.find(s => s.code === serviceCode);
+        return service?.id;
+      }),
+      catchError(() => of(undefined))
+    );
+  }
 
-    let previousElementId = 'start';
-    let yPosition = 100;
+  convertServiceFlowToWorkflow(serviceFlow: ServiceFlow): Observable<WorkflowData> {
+    // First get the service ID from the service code
+    return this.getServiceIdFromCode(serviceFlow.service_code).pipe(
+      map(serviceId => {
+        const workflowData: WorkflowData = {
+          id: serviceFlow.service_code,
+          name: `Service Flow - ${this.getServiceName(serviceFlow.service_code)}`,
+          description: `Service flow for service ${serviceFlow.service_code}`,
+          elements: [],
+          connections: [],
+          metadata: {
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            version: '1.0',
+            service_code: serviceFlow.service_code,
+            service_id: serviceId
+          }
+        };
 
-    // Convert pages to workflow elements
-    serviceFlow.pages.forEach((page, pageIndex) => {
-      const pageElementId = `page-${page.page_id}`;
-      yPosition += 200;
-
-      // Add page element
-      workflowData.elements.push({
-        id: pageElementId,
-        type: 'page' as any,
-        position: { x: 100, y: yPosition },
-        properties: {
-          name: page.name,
-          name_ara: page.name_ara,
-          description: page.description,
-          description_ara: page.description_ara,
-          service: serviceFlow.service_code,
-          sequence_number: page.sequence_number,
-          page_id: page.page_id,
-          is_hidden_page: page.is_hidden_page
-        },
-        connections: []
-      });
-
-      // Connect to previous element
-      workflowData.connections.push({
-        id: `conn-${previousElementId}-${pageElementId}`,
-        sourceId: previousElementId,
-        targetId: pageElementId
-      });
-
-      let xPosition = 300;
-      let lastCategoryElementId = pageElementId;
-
-      // Convert categories to workflow elements
-      page.categories.forEach((category, categoryIndex) => {
-        const categoryElementId = `category-${category.id}`;
-
+        // Add start element
         workflowData.elements.push({
-          id: categoryElementId,
-          type: 'category' as any,
-          position: { x: xPosition, y: yPosition },
-          properties: {
-            name: category.name,
-            name_ara: category.name_ara,
-            category_id: category.id,
-            is_repeatable: category.repeatable
-          },
+          id: 'start',
+          type: 'start' as any,
+          position: { x: 100, y: 100 },
+          properties: { name: 'Start' },
           connections: []
         });
 
-        // Connect category to page
-        workflowData.connections.push({
-          id: `conn-${pageElementId}-${categoryElementId}`,
-          sourceId: pageElementId,
-          targetId: categoryElementId
-        });
+        let previousElementId = 'start';
+        let yPosition = 100;
 
-        let fieldYPosition = yPosition + 50;
-        let lastFieldElementId = categoryElementId;
+        // Convert pages to workflow elements
+        serviceFlow.pages.forEach((page, pageIndex) => {
+          const pageElementId = `page-${page.page_id}`;
+          yPosition += 200;
 
-        // Convert fields to workflow elements
-        category.fields.forEach((field, fieldIndex) => {
-          const fieldElementId = `field-${field.field_id}`;
-          fieldYPosition += 100;
+          // Extract IDs from objects if they are objects
+          const sequenceNumberId = typeof page.sequence_number === 'object'
+            ? page.sequence_number.id
+            : page.sequence_number;
 
+          const applicantTypeId = typeof page.applicant_type === 'object'
+            ? page.applicant_type.id
+            : page.applicant_type;
+
+          // Add page element with proper service ID
           workflowData.elements.push({
-            id: fieldElementId,
-            type: 'field' as any,
-            position: { x: xPosition + 200, y: fieldYPosition },
+            id: pageElementId,
+            type: 'page' as any,
+            position: { x: 100, y: yPosition },
             properties: {
-              name: field.display_name,
-              _field_name: field.name,
-              _field_display_name: field.display_name,
-              _field_display_name_ara: field.display_name_ara,
-              _field_type: field.field_type,
-              _field_id: field.field_id,
-              _mandatory: field.mandatory,
-              _is_hidden: field.is_hidden,
-              _is_disabled: field.is_disabled,
-              _lookup: field.lookup,
-
-              // Validation properties
-              _max_length: field.max_length,
-              _min_length: field.min_length,
-              _regex_pattern: field.regex_pattern,
-              _allowed_characters: field.allowed_characters,
-              _forbidden_words: field.forbidden_words,
-              _value_greater_than: field.value_greater_than,
-              _value_less_than: field.value_less_than,
-              _integer_only: field.integer_only,
-              _positive_only: field.positive_only,
-              _precision: field.precision,
-              _default_boolean: field.default_boolean,
-              _file_types: field.file_types,
-              _max_file_size: field.max_file_size,
-              _image_max_width: field.image_max_width,
-              _image_max_height: field.image_max_height,
-              _max_selections: field.max_selections,
-              _min_selections: field.min_selections
+              name: page.name,
+              name_ara: page.name_ara,
+              description: page.description,
+              description_ara: page.description_ara,
+              service: serviceId || serviceFlow.service_code, // Use the fetched service ID
+              sequence_number: sequenceNumberId,
+              applicant_type: applicantTypeId,
+              page_id: page.page_id,
+              is_hidden_page: page.is_hidden_page
             },
             connections: []
           });
 
-          // Connect field to category
+          // Connect to previous element
           workflowData.connections.push({
-            id: `conn-${categoryElementId}-${fieldElementId}`,
-            sourceId: categoryElementId,
-            targetId: fieldElementId
+            id: `conn-${previousElementId}-${pageElementId}`,
+            sourceId: previousElementId,
+            targetId: pageElementId
           });
 
-          // Add visibility conditions as condition elements
-          if (field.visibility_conditions && field.visibility_conditions.length > 0) {
-            field.visibility_conditions.forEach((condition, conditionIndex) => {
-              const conditionElementId = `condition-${field.field_id}-${conditionIndex}`;
+          let xPosition = 300;
+
+          // Convert categories to workflow elements
+          page.categories.forEach((category, categoryIndex) => {
+            const categoryElementId = `category-${category.id}`;
+
+            workflowData.elements.push({
+              id: categoryElementId,
+              type: 'category' as any,
+              position: { x: xPosition, y: yPosition },
+              properties: {
+                name: category.name,
+                name_ara: category.name_ara,
+                category_id: category.id,
+                is_repeatable: category.repeatable,
+                description: category.description,
+                code: category.code
+              },
+              connections: []
+            });
+
+            // Connect category to page
+            workflowData.connections.push({
+              id: `conn-${pageElementId}-${categoryElementId}`,
+              sourceId: pageElementId,
+              targetId: categoryElementId
+            });
+
+            let fieldYPosition = yPosition + 50;
+
+            // Convert fields to workflow elements
+            category.fields.forEach((field, fieldIndex) => {
+              const fieldElementId = `field-${field.field_id}`;
+              fieldYPosition += 100;
+
+              // Extract field type ID if it's an object
+              const fieldTypeId = typeof field.field_type === 'object'
+                ? field.field_type.id
+                : field.field_type;
+
+              const lookupId = typeof field.lookup === 'object'
+                ? field.lookup.id
+                : field.lookup;
 
               workflowData.elements.push({
-                id: conditionElementId,
-                type: 'condition' as any,
-                position: { x: xPosition + 400, y: fieldYPosition + (conditionIndex * 80) },
+                id: fieldElementId,
+                type: 'field' as any,
+                position: { x: xPosition + 200, y: fieldYPosition },
                 properties: {
-                  name: `Visibility Condition for ${field.display_name}`,
-                  target_field: field.name,
-                  condition_logic: condition.condition_logic
+                  name: field.display_name,
+                  _field_name: field.name,
+                  _field_display_name: field.display_name,
+                  _field_display_name_ara: field.display_name_ara,
+                  _field_type: fieldTypeId,
+                  _field_id: field.field_id,
+                  _mandatory: field.mandatory,
+                  _is_hidden: field.is_hidden,
+                  _is_disabled: field.is_disabled,
+                  _lookup: lookupId,
+                  _sequence: field.sequence,
+
+                  // Validation properties
+                  _max_length: field.max_length,
+                  _min_length: field.min_length,
+                  _regex_pattern: field.regex_pattern,
+                  _allowed_characters: field.allowed_characters,
+                  _forbidden_words: field.forbidden_words,
+                  _value_greater_than: field.value_greater_than,
+                  _value_less_than: field.value_less_than,
+                  _integer_only: field.integer_only,
+                  _positive_only: field.positive_only,
+                  _precision: field.precision,
+                  _default_boolean: field.default_boolean,
+                  _file_types: field.file_types,
+                  _max_file_size: field.max_file_size,
+                  _image_max_width: field.image_max_width,
+                  _image_max_height: field.image_max_height,
+                  _max_selections: field.max_selections,
+                  _min_selections: field.min_selections,
+                  _date_greater_than: field.date_greater_than,
+                  _date_less_than: field.date_less_than,
+                  _future_only: field.future_only,
+                  _past_only: field.past_only,
+                  _unique: field.unique,
+                  _default_value: field.default_value,
+                  _coordinates_format: field.coordinates_format,
+                  _uuid_format: field.uuid_format,
+
+                  allowed_lookups: field.allowed_lookups
                 },
                 connections: []
               });
 
-              // Connect condition to field
+              // Connect field to category
               workflowData.connections.push({
-                id: `conn-${fieldElementId}-${conditionElementId}`,
-                sourceId: fieldElementId,
-                targetId: conditionElementId
+                id: `conn-${categoryElementId}-${fieldElementId}`,
+                sourceId: categoryElementId,
+                targetId: fieldElementId
               });
-            });
-          }
 
-          lastFieldElementId = fieldElementId;
+              // Add visibility conditions as condition elements
+              if (field.visibility_conditions && field.visibility_conditions.length > 0) {
+                field.visibility_conditions.forEach((condition, conditionIndex) => {
+                  const conditionElementId = `condition-${field.field_id}-${conditionIndex}`;
+
+                  workflowData.elements.push({
+                    id: conditionElementId,
+                    type: 'condition' as any,
+                    position: { x: xPosition + 400, y: fieldYPosition + (conditionIndex * 80) },
+                    properties: {
+                      name: `Visibility Condition for ${field.display_name}`,
+                      target_field: field.name,
+                      target_field_id: field.field_id,
+                      condition_logic: condition.condition_logic,
+                      condition_id: condition.id
+                    },
+                    connections: []
+                  });
+
+                  // Connect condition to field
+                  workflowData.connections.push({
+                    id: `conn-${fieldElementId}-${conditionElementId}`,
+                    sourceId: fieldElementId,
+                    targetId: conditionElementId
+                  });
+                });
+              }
+            });
+
+            xPosition += 300;
+          });
+
+          previousElementId = pageElementId;
         });
 
-        xPosition += 300;
-        lastCategoryElementId = categoryElementId;
-      });
+        // Add end element
+        const endElementId = 'end';
+        yPosition += 200;
 
-      previousElementId = pageElementId;
-    });
+        workflowData.elements.push({
+          id: endElementId,
+          type: 'end' as any,
+          position: { x: 100, y: yPosition },
+          properties: {
+            name: 'End',
+            action: 'submit'
+          },
+          connections: []
+        });
 
-    // Add end element
-    const endElementId = 'end';
-    yPosition += 200;
+        // Connect last page to end
+        if (previousElementId !== 'start') {
+          workflowData.connections.push({
+            id: `conn-${previousElementId}-${endElementId}`,
+            sourceId: previousElementId,
+            targetId: endElementId
+          });
+        }
 
-    workflowData.elements.push({
-      id: endElementId,
-      type: 'end' as any,
-      position: { x: 100, y: yPosition },
-      properties: {
-        name: 'End',
-        action: 'submit'
-      },
-      connections: []
-    });
-
-    // Connect last page to end
-    if (previousElementId !== 'start') {
-      workflowData.connections.push({
-        id: `conn-${previousElementId}-${endElementId}`,
-        sourceId: previousElementId,
-        targetId: endElementId
-      });
-    }
-
-    return workflowData;
+        return workflowData;
+      })
+    );
   }
-
   // ... existing methods for other APIs (getLookups, getPages, etc.) remain the same ...
 
   // Lookup APIs
@@ -476,6 +562,156 @@ export class ApiService {
         tap(response => console.log('Connection test successful:', response)),
         catchError(this.handleError)
       );
+  }
+  // PAGE CRUD Operations
+  createPage(page: Partial<Page>): Observable<Page> {
+    return this.http.post<Page>(this.getApiUrl('/define/api/pages/'), page)
+      .pipe(
+        tap(response => console.log('Page created:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updatePage(id: number, page: Partial<Page>): Observable<Page> {
+    return this.http.patch<Page>(this.getApiUrl(`/define/api/pages/${id}/`), page)
+      .pipe(
+        tap(response => console.log('Page updated:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deletePage(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/define/api/pages/${id}/`))
+      .pipe(
+        tap(() => console.log('Page deleted:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // CATEGORY CRUD Operations
+  createCategory(category: Partial<Category>): Observable<Category> {
+    return this.http.post<Category>(this.getApiUrl('/define/api/categories/'), category)
+      .pipe(
+        tap(response => console.log('Category created:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateCategory(id: number, category: Partial<Category>): Observable<Category> {
+    return this.http.patch<Category>(this.getApiUrl(`/define/api/categories/${id}/`), category)
+      .pipe(
+        tap(response => console.log('Category updated:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteCategory(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/define/api/categories/${id}/`))
+      .pipe(
+        tap(() => console.log('Category deleted:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  addPagesToCategory(categoryId: number, pageIds: number[]): Observable<Category> {
+    return this.http.post<Category>(
+      this.getApiUrl(`/define/api/categories/${categoryId}/add_pages/`),
+      { page_ids: pageIds }
+    ).pipe(
+      tap(response => console.log('Pages added to category:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+  // FIELD CRUD Operations
+  createField(field: Partial<Field>): Observable<Field> {
+    return this.http.post<Field>(this.getApiUrl('/define/api/fields/'), field)
+      .pipe(
+        tap(response => console.log('Field created:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateField(id: number, field: Partial<Field>): Observable<Field> {
+    return this.http.patch<Field>(this.getApiUrl(`/define/api/fields/${id}/`), field)
+      .pipe(
+        tap(response => console.log('Field updated:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteField(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/define/api/fields/${id}/`))
+      .pipe(
+        tap(() => console.log('Field deleted:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // CONDITION CRUD Operations
+  createCondition(condition: Partial<Condition>): Observable<Condition> {
+    return this.http.post<Condition>(this.getApiUrl('/define/api/conditions/'), condition)
+      .pipe(
+        tap(response => console.log('Condition created:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateCondition(id: number, condition: Partial<Condition>): Observable<Condition> {
+    return this.http.patch<Condition>(this.getApiUrl(`/define/api/conditions/${id}/`), condition)
+      .pipe(
+        tap(response => console.log('Condition updated:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteCondition(id: number): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/define/api/conditions/${id}/`))
+      .pipe(
+        tap(() => console.log('Condition deleted:', id)),
+        catchError(this.handleError)
+      );
+  }
+
+  // Bulk operations
+  bulkUpdateFields(fieldIds: number[], action: string): Observable<any> {
+    return this.http.post(this.getApiUrl('/define/api/fields/bulk_update/'), {
+      field_ids: fieldIds,
+      action: action
+    }).pipe(
+      tap(response => console.log('Bulk update completed:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+  // Additional operations
+  duplicateField(fieldId: number, newName: string): Observable<Field> {
+    return this.http.post<Field>(
+      this.getApiUrl(`/define/api/fields/${fieldId}/duplicate/`),
+      { _field_name: newName }
+    ).pipe(
+      tap(response => console.log('Field duplicated:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+  validateField(fieldId: number, value: any): Observable<any> {
+    const params = new HttpParams().set('value', value);
+    return this.http.get(this.getApiUrl(`/define/api/fields/${fieldId}/validate_field/`), { params })
+      .pipe(
+        tap(response => console.log('Field validation result:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  testCondition(conditionId: number, fieldData: any): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/define/api/conditions/${conditionId}/test_condition/`),
+      { field_data: fieldData }
+    ).pipe(
+      tap(response => console.log('Condition test result:', response)),
+      catchError(this.handleError)
+    );
   }
 }
 
