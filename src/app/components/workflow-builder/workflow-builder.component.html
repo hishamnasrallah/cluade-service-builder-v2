@@ -9,9 +9,9 @@
     <span class="workflow-title">{{ workflow.name }}</span>
 
     <span class="workflow-status" [class.saved]="currentServiceCode" *ngIf="currentServiceCode || !currentServiceCode">
-      <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
-      <span>{{ currentServiceCode ? 'Online' : 'Local Only' }}</span>
-    </span>
+  <mat-icon>cloud{{ currentServiceCode ? '' : '_off' }}</mat-icon>
+  <span>{{ getWorkflowStatus() }}</span>
+</span>
 
     <span class="spacer"></span>
 

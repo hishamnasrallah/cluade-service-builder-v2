@@ -41,6 +41,33 @@ export interface ServiceFlowField {
   visibility_conditions: VisibilityCondition[];
   sequence?: number;
 
+  // Explicit foreign key fields from workflow API
+  field_type_id?: number;
+  field_type_name?: string;
+  field_type_code?: string;
+  lookup_id?: number;
+  lookup_name?: string;
+  lookup_code?: string;
+  parent_field_id?: number;
+  parent_field_name?: string;
+  service?: number[];
+  services?: number[];
+  _category?: number[];
+  categories?: number[];
+  active_ind?: boolean;
+
+  // Alternative field names (with underscore prefix)
+  _field_name?: string;
+  _field_display_name?: string;
+  _field_display_name_ara?: string;
+  _field_type?: string | number;
+  _field_id?: number;
+  _mandatory?: boolean;
+  _is_hidden?: boolean;
+  _is_disabled?: boolean;
+  _lookup?: number;
+  _sequence?: number;
+
   // Add all validation properties
   max_length?: number;
   min_length?: number;
@@ -67,6 +94,33 @@ export interface ServiceFlowField {
   default_value?: string;
   coordinates_format?: boolean;
   uuid_format?: boolean;
+
+  // Validation properties with underscore prefix
+  _max_length?: number;
+  _min_length?: number;
+  _regex_pattern?: string;
+  _allowed_characters?: string;
+  _forbidden_words?: string;
+  _value_greater_than?: number;
+  _value_less_than?: number;
+  _integer_only?: boolean;
+  _positive_only?: boolean;
+  _precision?: number;
+  _default_boolean?: boolean;
+  _file_types?: string;
+  _max_file_size?: number;
+  _image_max_width?: number;
+  _image_max_height?: number;
+  _max_selections?: number;
+  _min_selections?: number;
+  _date_greater_than?: string;
+  _date_less_than?: string;
+  _future_only?: boolean;
+  _past_only?: boolean;
+  _unique?: boolean;
+  _default_value?: string;
+  _coordinates_format?: boolean;
+  _uuid_format?: boolean;
 }
 
 export interface ServiceFlowCategory {
@@ -90,6 +144,18 @@ export interface ServiceFlowPage {
   categories: ServiceFlowCategory[];
   applicant_type?: number | { id: number; name: string; };
   service?: number | { id: number; code: string; name: string; };
+
+  // Explicit foreign key fields from workflow API
+  service_id?: number;
+  service_code?: string;
+  service_name?: string;
+  sequence_number_id?: number;
+  sequence_number_code?: string;
+  sequence_number_name?: string;
+  applicant_type_id?: number;
+  applicant_type_code?: string;
+  applicant_type_name?: string;
+  active_ind?: boolean;
 }
 
 
@@ -133,9 +199,11 @@ export class ApiService {
       throw new Error('Base URL not configured. Please configure the API base URL first.');
     }
 
-    // Always use workflow-specific endpoints for workflow builder operations
-    if (endpoint.startsWith('/dynamic/')) {
-      return `${baseUrl}/dynamic/workflow${endpoint.replace('/dynamic', '')}`;
+    // Use workflow-specific endpoints for all workflow builder operations
+    if (useWorkflowApi && endpoint.startsWith('/dynamic/')) {
+      // Remove the /dynamic prefix and prepend /dynamic/workflow
+      const cleanEndpoint = endpoint.replace('/dynamic/', '/');
+      return `${baseUrl}/dynamic/workflow${cleanEndpoint}`;
     }
 
     return `${baseUrl}${endpoint}`;

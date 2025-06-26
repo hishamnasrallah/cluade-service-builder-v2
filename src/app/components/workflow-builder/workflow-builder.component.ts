@@ -952,4 +952,16 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
   }
+
+  getWorkflowStatus(): string {
+    if (!this.currentServiceCode) {
+      return 'Local Only';
+    }
+
+    if (this.workflow.metadata?.is_existing) {
+      return `Service ${this.currentServiceCode} (Existing)`;
+    }
+
+    return `Service ${this.currentServiceCode} (New)`;
+  }
 }

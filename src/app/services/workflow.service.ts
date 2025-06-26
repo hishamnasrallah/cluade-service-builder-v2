@@ -13,7 +13,7 @@ import {
   getValidChildTypes,
   ELEMENT_VALIDATION_RULES
 } from '../models/workflow.models';
-import { ApiService, ServiceFlow } from './api.service';
+import {ApiService, Field, ServiceFlow} from './api.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable({
@@ -35,6 +35,17 @@ export class WorkflowService {
     this.currentWorkflow = this.workflowSubject.value;
     this.initializeWithStartElement();
   }
+  private deletedElements: {
+    pages: number[];
+    categories: number[];
+    fields: number[];
+    conditions: number[];
+  } = {
+    pages: [],
+    categories: [],
+    fields: [],
+    conditions: []
+  };
 
   private initializeWithStartElement(): void {
     if (this.currentWorkflow.elements.length === 0) {
@@ -49,6 +60,34 @@ export class WorkflowService {
       this.currentWorkflow.elements.push(startElement);
       this.updateWorkflow();
     }
+  }
+
+// Helper method to convert values to number
+  private toNumber(value: any): number {
+    if (value === null || value === undefined || value === '') {
+      return 0;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    return 0;
+  }
+
+// Helper method to convert values to number or null
+  private toNumberOrNull(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    return null;
   }
 
   getWorkflow(): WorkflowData {
@@ -143,6 +182,9 @@ export class WorkflowService {
     if (element.type === ElementType.START) {
       throw new Error('Start element cannot be removed');
     }
+
+    // Track deleted elements for later cleanup
+    this.trackDeletedElement(element);
 
     // Delete from backend if it has an ID
     let deleteObservable: Observable<any> = of(null);
@@ -356,7 +398,8 @@ export class WorkflowService {
                 updated_at: new Date().toISOString(),
                 version: '1.0',
                 service_code: serviceCode,
-                service_id: serviceId
+                service_id: serviceId,
+                is_existing: true  // Mark as loaded from backend
               }
             };
 
@@ -467,8 +510,7 @@ export class WorkflowService {
           raw_page: page
         });
 
-        // Store the lookup data for later mapping
-// Store the lookup data from workflow API which provides explicit fields
+        // Store the lookup data from workflow API which provides explicit fields
         const pageElement: WorkflowElement = {
           id: pageElementId,
           type: ElementType.PAGE,
@@ -478,11 +520,13 @@ export class WorkflowService {
             name_ara: page.name_ara,
             description: page.description,
             description_ara: page.description_ara,
-            // Store both old format and new explicit fields for compatibility
+            // Prefer explicit fields from workflow API
             sequence_number: page.sequence_number_id || sequenceNumberData.id || page.sequence_number,
             sequence_number_id: page.sequence_number_id || sequenceNumberData.id,
-            sequence_number_code: page.sequence_number_code || sequenceNumberData.code,
+            sequence_number_code: page.sequence_number_code || sequenceNumberData.code || page.sequence_number,
             sequence_number_name: page.sequence_number_name || sequenceNumberData.name,
+
+
             page_id: page.page_id,
             is_hidden_page: page.is_hidden_page || false,
             categoryCount: 0,
@@ -840,202 +884,408 @@ export class WorkflowService {
       return this.saveToLocalStorage();
     }
 
-    // We don't have a dedicated workflow API, so we save by ensuring all elements are saved
-    const saveOperations: Observable<any>[] = [];
+    // First, handle deletions of removed elements
+    const deleteOperations: Observable<any>[] = [];
 
-    // Group elements by type
-    const pages = this.currentWorkflow.elements.filter(el => el.type === ElementType.PAGE);
-    const categories = this.currentWorkflow.elements.filter(el => el.type === ElementType.CATEGORY);
-    const fields = this.currentWorkflow.elements.filter(el => el.type === ElementType.FIELD);
-    const conditions = this.currentWorkflow.elements.filter(el => el.type === ElementType.CONDITION);
-
-    // Save/update pages
-    pages.forEach(page => {
-      if (page.properties.page_id) {
-        // Update existing page
-        saveOperations.push(
-          this.apiService.updatePage(page.properties.page_id, {
-            name: page.properties.name,
-            name_ara: page.properties.name_ara,
-            description: page.properties.description,
-            description_ara: page.properties.description_ara,
-            service: page.properties.service_id || page.properties.service,
-            sequence_number: page.properties.sequence_number_id || page.properties.sequence_number,
-            applicant_type: page.properties.applicant_type_id || page.properties.applicant_type,
-            active_ind: true
-          }).pipe(
-            catchError(error => {
-              console.error('Failed to update page:', error);
-              return of(null);
-            })
-          )
-        );
-      } else if (!page.properties.useExisting) {
-        // Create new page
-        saveOperations.push(
-          this.apiService.createPage({
-            name: page.properties.name,
-            name_ara: page.properties.name_ara,
-            description: page.properties.description,
-            description_ara: page.properties.description_ara,
-            service: page.properties.service_id || page.properties.service,
-            sequence_number: page.properties.sequence_number_id || page.properties.sequence_number,
-            applicant_type: page.properties.applicant_type_id || page.properties.applicant_type,
-            active_ind: true
-          }).pipe(
-            map(response => {
-              page.properties.page_id = response.id;
-              return response;
-            }),
-            catchError(error => {
-              console.error('Failed to create page:', error);
-              return of(null);
-            })
-          )
-        );
-      }
+    // Delete removed elements from backend
+    this.deletedElements.conditions.forEach(id => {
+      deleteOperations.push(
+        this.apiService.deleteCondition(id).pipe(
+          catchError(error => {
+            console.warn('Failed to delete condition:', error);
+            return of(null);
+          })
+        )
+      );
     });
 
-    // Save/update categories
-    categories.forEach(category => {
-      const parentPage = this.currentWorkflow.elements.find(el => el.id === category.parentId);
-      const pageId = parentPage?.properties.page_id;
-
-      if (category.properties.category_id) {
-        // Update existing category
-        saveOperations.push(
-          this.apiService.updateCategory(category.properties.category_id, {
-            name: category.properties.name,
-            name_ara: category.properties.name_ara,
-            description: category.properties.description,
-            code: category.properties.code,
-            is_repeatable: category.properties.is_repeatable,
-            page: pageId ? [pageId] : [],
-            active_ind: true
-          }).pipe(
-            catchError(error => {
-              console.error('Failed to update category:', error);
-              return of(null);
-            })
-          )
-        );
-      } else if (!category.properties.useExisting) {
-        // Create new category
-        saveOperations.push(
-          this.apiService.createCategory({
-            name: category.properties.name,
-            name_ara: category.properties.name_ara,
-            description: category.properties.description,
-            code: category.properties.code,
-            is_repeatable: category.properties.is_repeatable,
-            page: pageId ? [pageId] : [],
-            active_ind: true
-          }).pipe(
-            map(response => {
-              category.properties.category_id = response.id;
-              return response;
-            }),
-            catchError(error => {
-              console.error('Failed to create category:', error);
-              return of(null);
-            })
-          )
-        );
-      }
+    this.deletedElements.fields.forEach(id => {
+      deleteOperations.push(
+        this.apiService.deleteField(id).pipe(
+          catchError(error => {
+            console.warn('Failed to delete field:', error);
+            return of(null);
+          })
+        )
+      );
     });
 
-    // Save/update fields
-    fields.forEach(field => {
-      const parentCategory = this.currentWorkflow.elements.find(el => el.id === field.parentId);
-      const categoryId = parentCategory?.properties.category_id;
-      const parentPage = this.findParentPage(field);
-      const serviceId = parentPage?.properties.service_id;
+    this.deletedElements.categories.forEach(id => {
+      deleteOperations.push(
+        this.apiService.deleteCategory(id).pipe(
+          catchError(error => {
+            console.warn('Failed to delete category:', error);
+            return of(null);
+          })
+        )
+      );
+    });
 
-      if (field.properties._field_id) {
-        // Update existing field
-        saveOperations.push(
-          this.apiService.updateField(field.properties._field_id, {
+    this.deletedElements.pages.forEach(id => {
+      deleteOperations.push(
+        this.apiService.deletePage(id).pipe(
+          catchError(error => {
+            console.warn('Failed to delete page:', error);
+            return of(null);
+          })
+        )
+      );
+    });
+
+    // Clear the deletion tracking after processing
+    const clearDeletions = () => {
+      this.deletedElements = {
+        pages: [],
+        categories: [],
+        fields: [],
+        conditions: []
+      };
+    };
+
+    // Prepare save operations
+    const prepareSaveOperations = (): Observable<any>[] => {
+      const saveOperations: Observable<any>[] = [];
+
+      // Group elements by type
+      const pages = this.currentWorkflow.elements.filter(el => el.type === ElementType.PAGE);
+      const categories = this.currentWorkflow.elements.filter(el => el.type === ElementType.CATEGORY);
+      const fields = this.currentWorkflow.elements.filter(el => el.type === ElementType.FIELD);
+      const conditions = this.currentWorkflow.elements.filter(el => el.type === ElementType.CONDITION);
+
+      // Save/update pages
+      pages.forEach(page => {
+        if (page.properties.page_id) {
+          // Update existing page
+          saveOperations.push(
+            this.apiService.updatePage(page.properties.page_id, {
+              name: page.properties.name,
+              name_ara: page.properties.name_ara,
+              description: page.properties.description,
+              description_ara: page.properties.description_ara,
+              service: this.toNumber(page.properties.service_id || page.properties.service),
+              sequence_number: this.toNumber(page.properties.sequence_number_id || page.properties.sequence_number),
+              applicant_type: this.toNumber(page.properties.applicant_type_id || page.properties.applicant_type),
+              active_ind: true
+            }).pipe(
+              catchError(error => {
+                console.error('Failed to update page:', error);
+                return of(null);
+              })
+            )
+          );
+        } else if (!page.properties.useExisting) {
+          // Create new page
+          saveOperations.push(
+            this.apiService.createPage({
+              name: page.properties.name,
+              name_ara: page.properties.name_ara,
+              description: page.properties.description,
+              description_ara: page.properties.description_ara,
+              service: this.toNumber(page.properties.service_id || page.properties.service),
+              sequence_number: this.toNumber(page.properties.sequence_number_id || page.properties.sequence_number),
+              applicant_type: this.toNumber(page.properties.applicant_type_id || page.properties.applicant_type),
+              active_ind: true
+            }).pipe(
+              map(response => {
+                page.properties.page_id = response.id;
+                return response;
+              }),
+              catchError(error => {
+                console.error('Failed to create page:', error);
+                return of(null);
+              })
+            )
+          );
+        }
+      });
+
+      // Save/update categories
+      categories.forEach(category => {
+        const parentPage = this.currentWorkflow.elements.find(el => el.id === category.parentId);
+        const pageId = parentPage?.properties.page_id;
+
+        if (category.properties.category_id) {
+          // Update existing category
+          saveOperations.push(
+            this.apiService.updateCategory(category.properties.category_id, {
+              name: category.properties.name,
+              name_ara: category.properties.name_ara,
+              description: category.properties.description,
+              code: category.properties.code,
+              is_repeatable: category.properties.is_repeatable,
+              page: pageId ? [pageId] : [],
+              active_ind: true
+            }).pipe(
+              catchError(error => {
+                console.error('Failed to update category:', error);
+                return of(null);
+              })
+            )
+          );
+        } else if (!category.properties.useExisting) {
+          // Create new category
+          saveOperations.push(
+            this.apiService.createCategory({
+              name: category.properties.name,
+              name_ara: category.properties.name_ara,
+              description: category.properties.description,
+              code: category.properties.code,
+              is_repeatable: category.properties.is_repeatable,
+              page: pageId ? [pageId] : [],
+              active_ind: true
+            }).pipe(
+              map(response => {
+                category.properties.category_id = response.id;
+                return response;
+              }),
+              catchError(error => {
+                console.error('Failed to create category:', error);
+                return of(null);
+              })
+            )
+          );
+        }
+      });
+
+      // Save/update fields
+      fields.forEach(field => {
+        const parentCategory = this.currentWorkflow.elements.find(el => el.id === field.parentId);
+        const categoryId = parentCategory?.properties.category_id;
+        const parentPage = this.findParentPage(field);
+        const serviceId = parentPage?.properties.service_id;
+
+        if (field.properties._field_id) {
+          // Update existing field
+          const updateData: Partial<Field> = {
             _field_name: field.properties._field_name,
             _field_display_name: field.properties._field_display_name,
             _field_display_name_ara: field.properties._field_display_name_ara,
-            _field_type: field.properties.field_type_id || field.properties._field_type,
+            _field_type: this.toNumber(field.properties.field_type_id || field.properties._field_type),
             _sequence: field.properties._sequence,
             _mandatory: field.properties._mandatory,
             _is_hidden: field.properties._is_hidden,
             _is_disabled: field.properties._is_disabled,
-            _lookup: field.properties.lookup_id || field.properties._lookup,
+            _lookup: this.toNumberOrNull(field.properties.lookup_id || field.properties._lookup),
             _category: categoryId ? [categoryId] : [],
             service: serviceId ? [serviceId] : [],
-            active_ind: true,
-            // Add all validation properties...
-            _max_length: field.properties._max_length,
-            _min_length: field.properties._min_length,
-            // ... etc
-          }).pipe(
-            catchError(error => {
-              console.error('Failed to update field:', error);
-              return of(null);
-            })
-          )
-        );
-      } else if (!field.properties.useExisting) {
-        // Create new field
-        saveOperations.push(
-          this.apiService.createField({
+            active_ind: true
+          };
+
+          // Add validation properties using bracket notation
+          const validationProps = [
+            '_max_length', '_min_length', '_regex_pattern', '_allowed_characters',
+            '_forbidden_words', '_value_greater_than', '_value_less_than',
+            '_integer_only', '_positive_only', '_precision', '_default_boolean',
+            '_file_types', '_max_file_size', '_image_max_width', '_image_max_height',
+            '_max_selections', '_min_selections', '_date_greater_than', '_date_less_than',
+            '_future_only', '_past_only', '_unique', '_default_value',
+            '_coordinates_format', '_uuid_format'
+          ];
+
+          validationProps.forEach(prop => {
+            if (field.properties[prop] !== undefined && field.properties[prop] !== null) {
+              (updateData as any)[prop] = field.properties[prop];
+            }
+          });
+
+          saveOperations.push(
+            this.apiService.updateField(field.properties._field_id, updateData).pipe(
+              catchError(error => {
+                console.error('Failed to update field:', error);
+                return of(null);
+              })
+            )
+          );
+        } else if (!field.properties.useExisting) {
+          // Create new field
+          const createData: Partial<Field> = {
             _field_name: field.properties._field_name,
             _field_display_name: field.properties._field_display_name,
             _field_display_name_ara: field.properties._field_display_name_ara,
-            _field_type: field.properties.field_type_id || field.properties._field_type,
+            _field_type: this.toNumber(field.properties.field_type_id || field.properties._field_type),
             _sequence: field.properties._sequence,
             _mandatory: field.properties._mandatory,
             _is_hidden: field.properties._is_hidden,
             _is_disabled: field.properties._is_disabled,
-            _lookup: field.properties.lookup_id || field.properties._lookup,
+            _lookup: this.toNumberOrNull(field.properties.lookup_id || field.properties._lookup),
             _category: categoryId ? [categoryId] : [],
             service: serviceId ? [serviceId] : [],
-            active_ind: true,
-            // Add all validation properties...
-            _max_length: field.properties._max_length,
-            _min_length: field.properties._min_length,
-            // ... etc
-          }).pipe(
-            map(response => {
-              field.properties._field_id = response.id;
-              return response;
-            }),
-            catchError(error => {
-              console.error('Failed to create field:', error);
-              return of(null);
+            active_ind: true
+          };
+
+          // Add validation properties using bracket notation
+          const validationProps = [
+            '_max_length', '_min_length', '_regex_pattern', '_allowed_characters',
+            '_forbidden_words', '_value_greater_than', '_value_less_than',
+            '_integer_only', '_positive_only', '_precision', '_default_boolean',
+            '_file_types', '_max_file_size', '_image_max_width', '_image_max_height',
+            '_max_selections', '_min_selections', '_date_greater_than', '_date_less_than',
+            '_future_only', '_past_only', '_unique', '_default_value',
+            '_coordinates_format', '_uuid_format'
+          ];
+
+          validationProps.forEach(prop => {
+            if (field.properties[prop] !== undefined && field.properties[prop] !== null) {
+              (createData as any)[prop] = field.properties[prop];
+            }
+          });
+
+          saveOperations.push(
+            this.apiService.createField(createData).pipe(
+              map(response => {
+                field.properties._field_id = response.id;
+                return response;
+              }),
+              catchError(error => {
+                console.error('Failed to create field:', error);
+                return of(null);
+              })
+            )
+          );
+        }
+      });
+
+// Save/update conditions
+      conditions.forEach(condition => {
+        // Find the target field for this condition
+        let targetFieldId: number | null = null;
+
+        // If we have an explicit target field ID, use it
+        if (condition.properties.target_field_id) {
+          targetFieldId = this.toNumber(condition.properties.target_field_id);
+        } else if (condition.properties.target_field) {
+          // Try to find the field by name
+          const targetField = fields.find(f =>
+            f.properties._field_name === condition.properties.target_field ||
+            f.properties.name === condition.properties.target_field
+          );
+
+          if (targetField && targetField.properties._field_id) {
+            targetFieldId = targetField.properties._field_id;
+          }
+        }
+
+        // Only save/update if we have a valid target field
+        if (targetFieldId) {
+          if (condition.properties.condition_id) {
+            // Update existing condition
+            saveOperations.push(
+              this.apiService.updateCondition(condition.properties.condition_id, {
+                target_field: targetFieldId,
+                condition_logic: condition.properties.condition_logic || [],
+                active_ind: true
+              }).pipe(
+                catchError(error => {
+                  console.error('Failed to update condition:', error);
+                  return of(null);
+                })
+              )
+            );
+          } else {
+            // Create new condition
+            saveOperations.push(
+              this.apiService.createCondition({
+                target_field: targetFieldId,
+                condition_logic: condition.properties.condition_logic || [],
+                active_ind: true
+              }).pipe(
+                map(response => {
+                  condition.properties.condition_id = response.id;
+                  return response;
+                }),
+                catchError(error => {
+                  console.error('Failed to create condition:', error);
+                  return of(null);
+                })
+              )
+            );
+          }
+        } else {
+          console.warn('Condition has no valid target field, skipping:', condition);
+        }
+      });
+
+      return saveOperations;
+    };
+
+    // Main execution logic
+    if (deleteOperations.length > 0) {
+      // First execute deletions, then saves
+      return forkJoin(deleteOperations).pipe(
+        switchMap(() => {
+          console.log('Deletions completed, proceeding with saves...');
+          clearDeletions();
+
+          const saveOperations = prepareSaveOperations();
+
+          if (saveOperations.length === 0) {
+            return this.saveToLocalStorage();
+          }
+
+          return forkJoin(saveOperations).pipe(
+            map(results => {
+              // Also save to local storage for backup
+              this.saveToLocalStorage();
+
+              // Update metadata
+              if (this.currentWorkflow.metadata) {
+                this.currentWorkflow.metadata.updated_at = new Date().toISOString();
+                this.currentWorkflow.metadata.is_existing = true;
+              }
+
+              return {
+                success: true,
+                message: this.currentWorkflow.metadata?.is_existing
+                  ? 'Workflow updated successfully'
+                  : 'Workflow saved successfully',
+                results
+              };
             })
-          )
-        );
-      }
-    });
+          );
+        }),
+        catchError(error => {
+          console.error('Error during workflow save:', error);
+          // Clear deletions even on error
+          clearDeletions();
+          // Fallback to local storage
+          return this.saveToLocalStorage();
+        })
+      );
+    } else {
+      // No deletions, just execute saves
+      const saveOperations = prepareSaveOperations();
 
-    // If no operations to perform, just save to local storage
-    if (saveOperations.length === 0) {
-      return this.saveToLocalStorage();
-    }
-
-    // Execute all save operations
-    return forkJoin(saveOperations).pipe(
-      map(results => {
-        // Also save to local storage for backup
-        this.saveToLocalStorage();
-        return {
-          success: true,
-          message: 'Workflow saved successfully',
-          results
-        };
-      }),
-      catchError(error => {
-        console.error('Error saving workflow:', error);
-        // Fallback to local storage
+      if (saveOperations.length === 0) {
         return this.saveToLocalStorage();
-      })
-    );
-  }
+      }
 
+      return forkJoin(saveOperations).pipe(
+        map(results => {
+          // Also save to local storage for backup
+          this.saveToLocalStorage();
+
+          // Update metadata
+          if (this.currentWorkflow.metadata) {
+            this.currentWorkflow.metadata.updated_at = new Date().toISOString();
+            this.currentWorkflow.metadata.is_existing = true;
+          }
+
+          return {
+            success: true,
+            message: this.currentWorkflow.metadata?.is_existing
+              ? 'Workflow updated successfully'
+              : 'Workflow saved successfully',
+            results
+          };
+        }),
+        catchError(error => {
+          console.error('Error saving workflow:', error);
+          // Fallback to local storage
+          return this.saveToLocalStorage();
+        })
+      );
+    }
+  }
   private findParentPage(element: WorkflowElement): WorkflowElement | undefined {
     let current = element;
     while (current.parentId) {
@@ -1364,5 +1614,30 @@ export class WorkflowService {
       isValid: errors.length === 0,
       errors
     };
+  }
+
+  private trackDeletedElement(element: WorkflowElement): void {
+    switch (element.type) {
+      case ElementType.PAGE:
+        if (element.properties.page_id) {
+          this.deletedElements.pages.push(element.properties.page_id);
+        }
+        break;
+      case ElementType.CATEGORY:
+        if (element.properties.category_id) {
+          this.deletedElements.categories.push(element.properties.category_id);
+        }
+        break;
+      case ElementType.FIELD:
+        if (element.properties._field_id) {
+          this.deletedElements.fields.push(element.properties._field_id);
+        }
+        break;
+      case ElementType.CONDITION:
+        if (element.properties.condition_id) {
+          this.deletedElements.conditions.push(element.properties.condition_id);
+        }
+        break;
+    }
   }
 }

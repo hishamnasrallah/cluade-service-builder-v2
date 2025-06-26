@@ -805,18 +805,25 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         if (properties.sequence_number_id !== undefined && properties.sequence_number_id !== null) {
           mappedSequenceNumber = properties.sequence_number_id;
         } else if (properties.sequence_number !== undefined && properties.sequence_number !== null) {
-          // Fallback to old format
-          const found = this.findLookupValue(
-            this.flowSteps,
-            properties.sequence_number,
-            properties.sequence_number_code,
-            properties.sequence_number_name
-          );
-          mappedSequenceNumber = found !== null ? found : properties.sequence_number;
+          // Check if it's already a numeric ID
+          if (typeof properties.sequence_number === 'number') {
+            mappedSequenceNumber = properties.sequence_number;
+          } else if (typeof properties.sequence_number === 'string' && /^\d+$/.test(properties.sequence_number) && properties.sequence_number.length > 2) {
+            // It's a numeric string ID (not a code like "01")
+            mappedSequenceNumber = parseInt(properties.sequence_number, 10);
+          } else {
+            // Try to find in lookup
+            const found = this.findLookupValue(
+              this.flowSteps,
+              properties.sequence_number,
+              properties.sequence_number_code,
+              properties.sequence_number_name
+            );
+            mappedSequenceNumber = found !== null ? found : properties.sequence_number;
+          }
         }
 
         // Handle applicant_type - prefer explicit ID from workflow API
-// Handle applicant_type - prefer explicit ID from workflow API
         if (properties.applicant_type_id !== undefined && properties.applicant_type_id !== null) {
           mappedApplicantType = properties.applicant_type_id;
         } else if (properties.applicant_type !== undefined && properties.applicant_type !== null) {
@@ -868,6 +875,10 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         });
 
         break;
+
+
+
+
       case ElementType.CATEGORY:
         this.propertiesForm.patchValue({
           useExisting: properties.useExisting || false,
@@ -879,13 +890,16 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
 
       case ElementType.FIELD:
+        // Use explicit field type ID if available
+        const fieldTypeValue = properties.field_type_id || properties._field_type || '';
+
         this.propertiesForm.patchValue({
           useExisting: properties.useExisting || false,
           existingFieldId: properties.existingFieldId || '',
           _field_name: properties._field_name || '',
           _field_display_name: properties._field_display_name || '',
           _field_display_name_ara: properties._field_display_name_ara || '',
-          _field_type: properties._field_type || '',
+          _field_type: fieldTypeValue,
           _sequence: properties._sequence || '',
           _mandatory: properties._mandatory || false,
           _is_hidden: properties._is_hidden || false,
@@ -1059,16 +1073,31 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private mapPageProperties(properties: any): Partial<Page> {
-    return {
+    const mapped: Partial<Page> = {
       name: properties.name,
       name_ara: properties.name_ara,
       description: properties.description,
       description_ara: properties.description_ara,
-      service: properties.service,
-      sequence_number: properties.sequence_number,
-      applicant_type: properties.applicant_type,
       active_ind: true
     };
+
+    // Convert to numbers, ensuring we have valid values
+    const serviceValue = properties.service_id || properties.service;
+    if (serviceValue !== undefined && serviceValue !== null && serviceValue !== '') {
+      mapped.service = typeof serviceValue === 'number' ? serviceValue : parseInt(serviceValue, 10);
+    }
+
+    const sequenceValue = properties.sequence_number_id || properties.sequence_number;
+    if (sequenceValue !== undefined && sequenceValue !== null && sequenceValue !== '') {
+      mapped.sequence_number = typeof sequenceValue === 'number' ? sequenceValue : parseInt(sequenceValue, 10);
+    }
+
+    const applicantValue = properties.applicant_type_id || properties.applicant_type;
+    if (applicantValue !== undefined && applicantValue !== null && applicantValue !== '') {
+      mapped.applicant_type = typeof applicantValue === 'number' ? applicantValue : parseInt(applicantValue, 10);
+    }
+
+    return mapped;
   }
 
   private mapCategoryProperties(properties: any): Partial<Category> {
@@ -1105,6 +1134,25 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private mapFieldProperties(properties: any): Partial<Field> {
+    // Convert validation properties - handle both underscore and non-underscore versions
+    const validationProperties: any = {};
+    const validationKeys = [
+      'max_length', 'min_length', 'regex_pattern', 'allowed_characters',
+      'forbidden_words', 'value_greater_than', 'value_less_than',
+      'integer_only', 'positive_only', 'date_greater_than', 'date_less_than',
+      'future_only', 'past_only', 'file_types', 'max_file_size',
+      'image_max_width', 'image_max_height', 'precision', 'unique',
+      'default_value', 'default_boolean', 'max_selections', 'min_selections',
+      'coordinates_format', 'uuid_format'
+    ];
+
+    validationKeys.forEach(key => {
+      const underscoreKey = `_${key}`;
+      if (properties[underscoreKey] !== undefined && properties[underscoreKey] !== null && properties[underscoreKey] !== '') {
+        validationProperties[underscoreKey] = properties[underscoreKey];
+      }
+    });
+
     const mapped: Partial<Field> = {
       _field_name: properties._field_name,
       _field_display_name: properties._field_display_name,
@@ -1116,6 +1164,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       _is_disabled: properties._is_disabled,
       _lookup: properties.lookup_id || properties._lookup,
       active_ind: true,
+      ...validationProperties,
 
       // Validation properties
       _max_length: properties._max_length,
