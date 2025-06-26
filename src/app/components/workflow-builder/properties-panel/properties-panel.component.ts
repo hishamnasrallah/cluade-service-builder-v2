@@ -374,12 +374,15 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
       // Ensure data is loaded before updating form
       this.ensureDataLoaded().then(() => {
-        this.updateFormForElement();
+        // Add a small delay to ensure dropdowns are fully initialized
+        setTimeout(() => {
+          this.updateFormForElement();
 
-        // If this is an existing element (has backend IDs), mark as already saved
-        if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
-          this.autoSaveStatus = 'saved';
-        }
+          // If this is an existing element (has backend IDs), mark as already saved
+          if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
+            this.autoSaveStatus = 'saved';
+          }
+        }, 100);
       });
     }
   }
@@ -673,15 +676,38 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         // Check if this is an existing page
         const isExistingPage = !!properties.page_id && properties.page_id !== 'new';
 
+        // Ensure numeric values for dropdowns
+        let serviceValue = properties.service;
+        if (serviceValue && typeof serviceValue === 'string') {
+          serviceValue = parseInt(serviceValue, 10);
+        }
+
+        let sequenceValue = properties.sequence_number;
+        if (sequenceValue && typeof sequenceValue === 'string') {
+          sequenceValue = parseInt(sequenceValue, 10);
+        }
+
+        let applicantValue = properties.applicant_type;
+        if (applicantValue && typeof applicantValue === 'string') {
+          applicantValue = parseInt(applicantValue, 10);
+        }
+
+        // Delay setting dropdown values to ensure options are loaded
         this.propertiesForm.patchValue({
-          useExisting: false, // Don't mark as "use existing" for loaded elements
+          useExisting: false,
           existingPageId: '',
-          service: properties.service || '',
-          sequence_number: properties.sequence_number || '',
-          applicant_type: properties.applicant_type || '',
           name_ara: properties.name_ara || '',
           description_ara: properties.description_ara || ''
         });
+
+        // Set dropdown values after a delay to ensure options are loaded
+        setTimeout(() => {
+          this.propertiesForm.patchValue({
+            service: serviceValue || '',
+            sequence_number: sequenceValue || '',
+            applicant_type: applicantValue || ''
+          });
+        }, 500);
         break;
 
       case ElementType.CATEGORY:

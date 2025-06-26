@@ -287,13 +287,23 @@ export class ApiService {
           yPosition += 200;
 
           // Extract IDs from objects if they are objects
-          const sequenceNumberId = typeof page.sequence_number === 'object'
-            ? page.sequence_number.id
-            : page.sequence_number;
+          let sequenceNumberId: number | undefined;
+          if (page.sequence_number) {
+            if (typeof page.sequence_number === 'object' && page.sequence_number.id) {
+              sequenceNumberId = Number(page.sequence_number.id);
+            } else if (typeof page.sequence_number === 'string' || typeof page.sequence_number === 'number') {
+              sequenceNumberId = Number(page.sequence_number);
+            }
+          }
 
-          const applicantTypeId = typeof page.applicant_type === 'object'
-            ? page.applicant_type.id
-            : page.applicant_type;
+          let applicantTypeId: number | undefined;
+          if (page.applicant_type) {
+            if (typeof page.applicant_type === 'object' && page.applicant_type.id) {
+              applicantTypeId = Number(page.applicant_type.id);
+            } else if (typeof page.applicant_type === 'string' || typeof page.applicant_type === 'number') {
+              applicantTypeId = Number(page.applicant_type);
+            }
+          }
 
           // Add page element with proper service ID
           workflowData.elements.push({
@@ -306,12 +316,11 @@ export class ApiService {
               description: page.description,
               description_ara: page.description_ara,
               service: serviceId || serviceFlow.service_code, // Use the fetched service ID
-              sequence_number: sequenceNumberId,
-              applicant_type: applicantTypeId,
+              sequence_number: sequenceNumberId || '',
+              applicant_type: applicantTypeId || '',
               page_id: page.page_id,
               is_hidden_page: page.is_hidden_page
-            },
-            connections: []
+            },            connections: []
           });
 
           // Connect to previous element
@@ -503,22 +512,13 @@ export class ApiService {
 
   // Flow Step lookup
   getFlowSteps(): Observable<LookupResponse> {
-    const params = new HttpParams().set('name', 'Flow Step');
-    return this.http.get<LookupResponse>(this.getApiUrl('/lookup/'), { params })
-      .pipe(
-        tap(response => console.log('Loaded Flow Step lookups:', response)),
-        catchError(this.handleError)
-      );
+    return this.getLookups('Flow Step');
   }
 
   // Applicant Type lookup
   getApplicantTypes(): Observable<LookupResponse> {
-    const params = new HttpParams().set('name', 'Applicant Type');
-    return this.http.get<LookupResponse>(this.getApiUrl('/lookup/'), { params })
-      .pipe(
-        tap(response => console.log('Loaded Applicant Type lookups:', response)),
-        catchError(this.handleError)
-      );  }
+    return this.getLookups('Applicant Type');
+  }
 
   // Field Type APIs
   getFieldTypes(): Observable<FieldTypeResponse> {

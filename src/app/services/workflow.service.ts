@@ -405,14 +405,40 @@ export class WorkflowService {
         const pageElementId = `page-${page.page_id || pageIndex}`;
 
         // Extract IDs from objects if necessary
-        const sequenceNumberId = page.sequence_number
-          ? (typeof page.sequence_number === 'object' ? page.sequence_number.id : page.sequence_number)
-          : null;
+// Extract IDs from objects if necessary - handle all possible formats
+        let sequenceNumberId = null;
+        if (page.sequence_number) {
+          if (typeof page.sequence_number === 'object' && page.sequence_number.id) {
+            sequenceNumberId = page.sequence_number.id;
+          } else {
+            sequenceNumberId = page.sequence_number;
+          }
+        }
 
-        const applicantTypeId = page.applicant_type
-          ? (typeof page.applicant_type === 'object' ? page.applicant_type.id : page.applicant_type)
-          : null;
+        let applicantTypeId = null;
+        if (page.applicant_type) {
+          if (typeof page.applicant_type === 'object' && page.applicant_type.id) {
+            applicantTypeId = page.applicant_type.id;
+          } else {
+            applicantTypeId = page.applicant_type;
+          }
+        }
 
+        // Also check if the page has these as direct properties
+        if (!sequenceNumberId && page.sequence_number_id) {
+          sequenceNumberId = page.sequence_number_id;
+        }
+        if (!applicantTypeId && page.applicant_type_id) {
+          applicantTypeId = page.applicant_type_id;
+        }
+
+        console.log('Page data extraction:', {
+          service: serviceId,
+          sequence_number_raw: page.sequence_number,
+          sequence_number_id: sequenceNumberId,
+          applicant_type_raw: page.applicant_type,
+          applicant_type_id: applicantTypeId
+        });
         // Create page element with properly extracted IDs
         const pageElement: WorkflowElement = {
           id: pageElementId,
@@ -423,19 +449,20 @@ export class WorkflowService {
             name_ara: page.name_ara,
             description: page.description,
             description_ara: page.description_ara,
-            sequence_number: sequenceNumberId,
+            sequence_number: sequenceNumberId || '',
             page_id: page.page_id,
             is_hidden_page: page.is_hidden_page || false,
             categoryCount: 0,
             fieldCount: 0,
             service: serviceId || serviceFlow.service_code,
-            applicant_type: applicantTypeId,
+            applicant_type: applicantTypeId || '',
             active_ind: true
           },
           connections: [],
           children: [],
           isExpanded: false
         };
+
         workflowData.elements.push(pageElement);
 
         // Connect to previous element
