@@ -586,9 +586,14 @@ export class WorkflowService {
   }
 
   private updatePage(page: WorkflowElement): Observable<any> {
-    const payload = this.mapPageProperties(page.properties);
+    const pageId = page.properties.page_id;
+    if (!pageId) {
+      console.error('Cannot update page without page_id');
+      return of(null);
+    }
 
-    return this.apiService.updatePage(page.properties.page_id, payload).pipe(
+    const payload = this.mapPageProperties(page.properties);
+    return this.apiService.updatePage(pageId, payload).pipe(
       catchError(error => {
         console.error('Failed to update page:', error);
         return of(null);
@@ -612,15 +617,21 @@ export class WorkflowService {
   }
 
   private updateCategory(category: WorkflowElement): Observable<any> {
-    const payload = this.mapCategoryProperties(category);
+    const categoryId = category.properties.category_id;
+    if (!categoryId) {
+      console.error('Cannot update category without category_id');
+      return of(null);
+    }
 
-    return this.apiService.updateCategory(category.properties.category_id, payload).pipe(
+    const payload = this.mapCategoryProperties(category);
+    return this.apiService.updateCategory(categoryId, payload).pipe(
       catchError(error => {
         console.error('Failed to update category:', error);
         return of(null);
       })
     );
   }
+
 
   private createField(field: WorkflowElement): Observable<any> {
     const payload = this.mapFieldProperties(field);
@@ -638,15 +649,21 @@ export class WorkflowService {
   }
 
   private updateField(field: WorkflowElement): Observable<any> {
-    const payload = this.mapFieldProperties(field);
+    const fieldId = field.properties._field_id;
+    if (!fieldId) {
+      console.error('Cannot update field without _field_id');
+      return of(null);
+    }
 
-    return this.apiService.updateField(field.properties._field_id, payload).pipe(
+    const payload = this.mapFieldProperties(field);
+    return this.apiService.updateField(fieldId, payload).pipe(
       catchError(error => {
         console.error('Failed to update field:', error);
         return of(null);
       })
     );
   }
+
 
   private createCondition(condition: WorkflowElement): Observable<any> {
     const payload = this.mapConditionProperties(condition);
@@ -664,9 +681,14 @@ export class WorkflowService {
   }
 
   private updateCondition(condition: WorkflowElement): Observable<any> {
-    const payload = this.mapConditionProperties(condition);
+    const conditionId = condition.properties.condition_id;
+    if (!conditionId) {
+      console.error('Cannot update condition without condition_id');
+      return of(null);
+    }
 
-    return this.apiService.updateCondition(condition.properties.condition_id, payload).pipe(
+    const payload = this.mapConditionProperties(condition);
+    return this.apiService.updateCondition(conditionId, payload).pipe(
       catchError(error => {
         console.error('Failed to update condition:', error);
         return of(null);

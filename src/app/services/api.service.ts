@@ -794,7 +794,10 @@ export class ApiService {
       );
   }
 
-  updatePage(id: number, page: Partial<Page>): Observable<Page> {
+  updatePage(id: number | null | undefined, page: Partial<Page>): Observable<Page> {
+    if (!id) {
+      return throwError(() => new Error('Page ID is required'));
+    }
     return this.http.patch<Page>(this.getApiUrl(`/dynamic/api/v1/pages/${id}/`), page)
       .pipe(
         tap(response => console.log('Page updated:', response)),

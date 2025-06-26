@@ -239,6 +239,7 @@ export interface WorkflowData {
     service_id?: number;
     workflow_id?: string;  // Backend workflow ID if exists
     is_existing?: boolean; // Track if loaded from backend
+    is_draft?: boolean;
   };
 }
 
