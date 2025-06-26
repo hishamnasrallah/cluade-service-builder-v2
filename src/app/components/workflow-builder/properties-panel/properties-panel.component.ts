@@ -107,7 +107,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     console.log('Properties panel initialized');
 
     // Set up auto-save on form changes
-    this.setupAutoSave();
+    // this.setupAutoSave();
   }
 // Hierarchy navigation methods
   // @ts-ignore
@@ -341,18 +341,18 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  private setupAutoSave(): void {
-    this.propertiesForm.valueChanges
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((formValue) => {
-        // Only auto-save if we have a selected element, form is valid, and auto-save is enabled
-        if (this.selectedElement &&
-          this.propertiesForm.valid &&
-          this.showAutoSaveStatus) { // Only save when auto-save status is visible (form is ready)
-          this.autoSaveProperties(formValue);
-        }
-      });
-  }
+  // private setupAutoSave(): void {
+  //   this.propertiesForm.valueChanges
+  //     .pipe(takeUntil(this.destroy$))
+  //     .subscribe((formValue) => {
+  //       // Only auto-save if we have a selected element, form is valid, and auto-save is enabled
+  //       if (this.selectedElement &&
+  //         this.propertiesForm.valid &&
+  //         this.showAutoSaveStatus) { // Only save when auto-save status is visible (form is ready)
+  //         this.autoSaveProperties(formValue);
+  //       }
+  //     });
+  // }
 
   // Ensure data is loaded when needed
   private ensureDataLoaded(): Promise<void> {
@@ -949,68 +949,68 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
     }
   }
-  private autoSaveProperties(formValue: any): void {
-    if (!this.selectedElement) {
-      console.log('Auto-save cancelled: No element selected');
-      return;
-    }
-
-    if (!this.propertiesForm.valid) {
-      console.log('Auto-save cancelled: Form is invalid');
-      return;
-    }
-
-    const currentElementId = this.selectedElement.id;
-
-    if (this.autoSaveTimeout) {
-      clearTimeout(this.autoSaveTimeout);
-    }
-
-    this.autoSaveStatus = 'saving';
-    this.showAutoSaveStatus = true;
-
-    this.autoSaveTimeout = setTimeout(() => {
-      if (!this.selectedElement || this.selectedElement.id !== currentElementId) {
-        console.log('Auto-save cancelled: Element changed during timeout');
-        return;
-      }
-
-      try {
-        const cleanedProperties = this.cleanFormValue(formValue);
-
-        // Save to backend based on element type
-        this.saveElementToBackend(this.selectedElement, cleanedProperties).subscribe({
-          next: (response) => {
-            console.log('Element saved to backend:', response);
-
-            // Update local state
-            this.elementUpdated.emit({
-              id: currentElementId,
-              properties: cleanedProperties
-            });
-
-            this.autoSaveStatus = 'saved';
-
-            setTimeout(() => {
-              this.showAutoSaveStatus = false;
-            }, 2000);
-          },
-          error: (error) => {
-            console.error('Auto-save error:', error);
-            this.autoSaveStatus = 'error';
-            this.snackBar.open('Failed to save changes', 'Retry', { duration: 5000 })
-              .onAction().subscribe(() => {
-              this.autoSaveProperties(formValue);
-            });
-          }
-        });
-
-      } catch (error) {
-        console.error('Auto-save error:', error);
-        this.autoSaveStatus = 'error';
-      }
-    }, 500);
-  }
+  // private autoSaveProperties(formValue: any): void {
+  //   if (!this.selectedElement) {
+  //     console.log('Auto-save cancelled: No element selected');
+  //     return;
+  //   }
+  //
+  //   if (!this.propertiesForm.valid) {
+  //     console.log('Auto-save cancelled: Form is invalid');
+  //     return;
+  //   }
+  //
+  //   const currentElementId = this.selectedElement.id;
+  //
+  //   if (this.autoSaveTimeout) {
+  //     clearTimeout(this.autoSaveTimeout);
+  //   }
+  //
+  //   this.autoSaveStatus = 'saving';
+  //   this.showAutoSaveStatus = true;
+  //
+  //   this.autoSaveTimeout = setTimeout(() => {
+  //     if (!this.selectedElement || this.selectedElement.id !== currentElementId) {
+  //       console.log('Auto-save cancelled: Element changed during timeout');
+  //       return;
+  //     }
+  //
+  //     try {
+  //       const cleanedProperties = this.cleanFormValue(formValue);
+  //
+  //       // Save to backend based on element type
+  //       this.saveElementToBackend(this.selectedElement, cleanedProperties).subscribe({
+  //         next: (response) => {
+  //           console.log('Element saved to backend:', response);
+  //
+  //           // Update local state
+  //           this.elementUpdated.emit({
+  //             id: currentElementId,
+  //             properties: cleanedProperties
+  //           });
+  //
+  //           this.autoSaveStatus = 'saved';
+  //
+  //           setTimeout(() => {
+  //             this.showAutoSaveStatus = false;
+  //           }, 2000);
+  //         },
+  //         error: (error) => {
+  //           console.error('Auto-save error:', error);
+  //           this.autoSaveStatus = 'error';
+  //           this.snackBar.open('Failed to save changes', 'Retry', { duration: 5000 })
+  //             .onAction().subscribe(() => {
+  //             this.autoSaveProperties(formValue);
+  //           });
+  //         }
+  //       });
+  //
+  //     } catch (error) {
+  //       console.error('Auto-save error:', error);
+  //       this.autoSaveStatus = 'error';
+  //     }
+  //   }, 500);
+  // }
 
   private saveElementToBackend(element: WorkflowElement, properties: any): Observable<any> {
     switch (element.type) {
