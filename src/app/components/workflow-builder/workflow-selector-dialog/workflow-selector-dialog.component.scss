@@ -1,0 +1,203 @@
+.workflow-selector-dialog {
+  width: 100%;
+  max-width: 900px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.dialog-content {
+  max-height: 600px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.tab-content {
+  padding: 20px;
+  min-height: 400px;
+  overflow-y: auto;
+}
+
+.loading-container,
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.loading-container p,
+.error-container p {
+  margin: 16px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.error-container mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: #f44336;
+  margin-bottom: 8px;
+}
+
+.search-field {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+::ng-deep .search-field .mat-mdc-form-field-icon-prefix {
+  padding-right: 8px;
+}
+
+.flow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 16px;
+}
+
+.flow-card,
+.workflow-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.flow-card:hover,
+.workflow-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateY(-2px);
+}
+
+.flow-card.selected,
+.workflow-card.selected {
+  border-color: #2196F3;
+  box-shadow: 0 0 0 1px rgba(33, 150, 243, 0.3);
+}
+
+mat-card-header {
+  padding-bottom: 12px;
+}
+
+mat-card-title {
+  font-size: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+mat-card-subtitle {
+  margin-top: 4px;
+  color: #666;
+}
+
+.service-code {
+  display: inline-block;
+  background: #1976d2;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.flow-metadata,
+.workflow-metadata {
+  margin: 16px 0;
+}
+
+.metadata-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.metadata-item mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: #888;
+}
+
+mat-chip-set {
+  margin-top: 12px;
+}
+
+mat-chip {
+  font-size: 12px;
+}
+
+.no-flows {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: #666;
+}
+
+.no-flows mat-icon {
+  font-size: 64px;
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  color: #ddd;
+}
+
+.no-flows h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #444;
+}
+
+.no-flows p {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+}
+
+mat-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 8px 8px 16px;
+}
+
+mat-dialog-actions {
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .flow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-content {
+    max-height: 500px;
+  }
+
+  mat-dialog-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  mat-dialog-actions button {
+    width: 100%;
+    margin: 4px 0;
+  }
+}

@@ -1,0 +1,210 @@
+<div class="workflow-selector-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>account_tree</mat-icon>
+    Select Workflow or Service Flow
+  </h2>
+
+  <mat-dialog-content class="dialog-content">
+    <!-- Tab Group for Workflows vs Service Flows -->
+    <mat-tab-group [(selectedIndex)]="selectedTabIndex">
+      <!-- Workflows Tab -->
+      <mat-tab label="My Workflows">
+        <div class="tab-content">
+          <!-- Loading State -->
+          <div *ngIf="isLoadingWorkflows" class="loading-container">
+            <mat-spinner diameter="40"></mat-spinner>
+            <p>Loading workflows...</p>
+          </div>
+
+          <!-- Workflows List -->
+          <div *ngIf="!isLoadingWorkflows" class="workflows-section">
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-label>Search workflows</mat-label>
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput
+                     [(ngModel)]="workflowSearchTerm"
+                     (input)="filterWorkflows()"
+                     placeholder="Search by name or service">
+            </mat-form-field>
+
+            <div class="flow-grid" *ngIf="filteredWorkflows.length > 0">
+              <mat-card *ngFor="let workflow of filteredWorkflows"
+                        class="workflow-card"
+                        [class.selected]="selectedWorkflowId === workflow.id"
+                        (click)="selectWorkflow(workflow)">
+
+                <mat-card-header>
+                  <mat-card-title>{{ workflow.name }}</mat-card-title>
+                  <mat-card-subtitle>
+                        <span class="service-code" *ngIf="workflow.service_code">
+                          {{ workflow.service_code }}
+                        </span>
+                    {{ workflow.service_name }}
+                  </mat-card-subtitle>
+                </mat-card-header>
+
+                <mat-card-content>
+                  <div class="workflow-metadata">
+                    <div class="metadata-item">
+                      <mat-icon>description</mat-icon>
+                      <span>{{ workflow.element_count?.pages || 0 }} pages</span>
+                    </div>
+                    <div class="metadata-item">
+                      <mat-icon>input</mat-icon>
+                      <span>{{ workflow.element_count?.fields || 0 }} fields</span>
+                    </div>
+                    <div class="metadata-item">
+                      <mat-icon>schedule</mat-icon>
+                      <span>{{ workflow.updated_at | date:'short' }}</span>
+                    </div>
+                  </div>
+
+                  <mat-chip-set>
+                    <mat-chip [color]="workflow.is_draft ? 'warn' : 'primary'" highlighted>
+                      {{ workflow.is_draft ? 'Draft' : 'Published' }}
+                    </mat-chip>
+                    <mat-chip *ngIf="workflow.version > 1" highlighted>
+                      v{{ workflow.version }}
+                    </mat-chip>
+                  </mat-chip-set>
+                </mat-card-content>
+
+                <mat-card-actions>
+                  <button mat-button color="primary" (click)="loadWorkflow(workflow, $event)">
+                    <mat-icon>open_in_new</mat-icon>
+                    Open
+                  </button>
+                  <button mat-icon-button (click)="deleteWorkflow(workflow, $event)"
+                          matTooltip="Delete workflow">
+                    <mat-icon color="warn">delete</mat-icon>
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
+
+            <div *ngIf="filteredWorkflows.length === 0" class="no-flows">
+              <mat-icon>dashboard</mat-icon>
+              <h3>No Workflows Found</h3>
+              <p>Create a new workflow or import from a service flow.</p>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+
+      <!-- Service Flows Tab -->
+      <mat-tab label="Service Flows">
+        <div class="tab-content">
+          <!-- Loading State -->
+          <div *ngIf="isLoading" class="loading-container">
+            <mat-spinner diameter="40"></mat-spinner>
+            <p>Loading service flows...</p>
+          </div>
+
+          <!-- Error State -->
+          <div *ngIf="errorMessage && !isLoading" class="error-container">
+            <mat-icon color="warn">error</mat-icon>
+            <p>{{ errorMessage }}</p>
+            <button mat-button (click)="loadServiceFlows()" color="primary">
+              <mat-icon>refresh</mat-icon>
+              Retry
+            </button>
+          </div>
+
+          <!-- Service Flows List -->
+          <div *ngIf="!isLoading && !errorMessage" class="flows-section">
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-label>Search service flows</mat-label>
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput
+                     [(ngModel)]="searchTerm"
+                     (input)="applyFilter()"
+                     placeholder="Search by code or name">
+            </mat-form-field>
+
+            <div class="flow-grid" *ngIf="filteredServiceFlows.length > 0">
+              <mat-card *ngFor="let serviceFlow of filteredServiceFlows; trackBy: trackServiceFlow"
+                        class="flow-card"
+                        [class.selected]="selectedServiceCode === serviceFlow.service_code"
+                        (click)="selectServiceFlow(serviceFlow)">
+
+                <mat-card-header>
+                  <mat-card-title>
+                    <span class="service-code">{{ serviceFlow.service_code }}</span>
+                    {{ serviceFlow.service_name }}
+                  </mat-card-title>
+                </mat-card-header>
+
+                <mat-card-content>
+                  <div class="flow-metadata">
+                    <div class="metadata-item">
+                      <mat-icon>description</mat-icon>
+                      <span>{{ serviceFlow.page_count }} pages</span>
+                    </div>
+                    <div class="metadata-item">
+                      <mat-icon>category</mat-icon>
+                      <span>{{ serviceFlow.category_count }} categories</span>
+                    </div>
+                    <div class="metadata-item">
+                      <mat-icon>input</mat-icon>
+                      <span>{{ serviceFlow.field_count }} fields</span>
+                    </div>
+                  </div>
+
+                  <mat-chip-set *ngIf="serviceFlow.is_active">
+                    <mat-chip color="primary" highlighted>Active</mat-chip>
+                  </mat-chip-set>
+                </mat-card-content>
+
+                <mat-card-actions>
+                  <button mat-button color="primary" (click)="loadServiceFlow(serviceFlow, $event)">
+                    <mat-icon>open_in_new</mat-icon>
+                    Load
+                  </button>
+                  <button mat-button (click)="viewFlowDetails(serviceFlow, $event)">
+                    <mat-icon>info</mat-icon>
+                    Details
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            </div>
+
+            <div *ngIf="filteredServiceFlows.length === 0 && !searchTerm" class="no-flows">
+              <mat-icon>dashboard</mat-icon>
+              <h3>No Service Flows Available</h3>
+              <p>No service flows are configured in the system.</p>
+            </div>
+
+            <div *ngIf="filteredServiceFlows.length === 0 && searchTerm" class="no-flows">
+              <mat-icon>search_off</mat-icon>
+              <h3>No Results Found</h3>
+              <p>No service flows match your search criteria.</p>
+              <button mat-button (click)="clearSearch()" color="primary">
+                Clear Search
+              </button>
+            </div>
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="onCancel()">
+      <mat-icon>close</mat-icon>
+      Cancel
+    </button>
+
+    <button mat-button (click)="createNewFlow()" color="accent">
+      <mat-icon>add</mat-icon>
+      Create New Workflow
+    </button>
+
+    <button mat-raised-button
+            color="primary"
+            (click)="onLoadSelected()"
+            [disabled]="!canLoadSelected()">
+      <mat-icon>open_in_new</mat-icon>
+      Open Selected
+    </button>
+  </mat-dialog-actions>
+</div>

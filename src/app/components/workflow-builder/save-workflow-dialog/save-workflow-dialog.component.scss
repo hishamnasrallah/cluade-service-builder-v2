@@ -1,0 +1,60 @@
+.save-workflow-dialog {
+  width: 100%;
+  max-width: 500px;
+}
+
+.dialog-content {
+  padding: 20px;
+  min-height: 300px;
+}
+
+.full-width {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.form-options {
+  margin: 16px 0;
+}
+
+.option-hint {
+  display: block;
+  margin-top: 4px;
+  color: #666;
+  font-size: 12px;
+}
+
+.update-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  margin-top: 16px;
+  color: #856404;
+}
+
+.update-warning mat-icon {
+  color: #ff9800;
+}
+
+mat-dialog-actions {
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+mat-spinner {
+  margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+  .save-workflow-dialog {
+    max-width: 90vw;
+  }
+
+  .dialog-content {
+    padding: 16px;
+  }
+}
