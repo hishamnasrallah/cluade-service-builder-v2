@@ -127,11 +127,17 @@ export class ApiService {
     private configService: ConfigService
   ) {}
 
-  private getApiUrl(endpoint: string): string {
+  private getApiUrl(endpoint: string, useWorkflowApi: boolean = false): string {
     const baseUrl = this.configService.getBaseUrl();
     if (!baseUrl) {
       throw new Error('Base URL not configured. Please configure the API base URL first.');
     }
+
+    // Use workflow-specific endpoints for workflow builder
+    if (useWorkflowApi && endpoint.startsWith('/dynamic/')) {
+      return `${baseUrl}/dynamic/workflow${endpoint.replace('/dynamic', '')}`;
+    }
+
     return `${baseUrl}${endpoint}`;
   }
 
@@ -171,7 +177,7 @@ export class ApiService {
 
   // Service Flow APIs
   getServiceFlows(): Observable<ServiceFlowResponse> {
-    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/service_flow/'))
+    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/service_flow/', true))
       .pipe(
         tap(response => console.log('Loaded service flows:', response)),
         catchError(this.handleError)
