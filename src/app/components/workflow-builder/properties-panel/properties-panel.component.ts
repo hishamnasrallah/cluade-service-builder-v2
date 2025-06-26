@@ -1078,7 +1078,10 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       name_ara: properties.name_ara,
       description: properties.description,
       description_ara: properties.description_ara,
-      active_ind: true
+      active_ind: properties.active_ind !== false,
+      position_x: properties.position?.x || 0,
+      position_y: properties.position?.y || 0,
+      is_expanded: properties.isExpanded || false
     };
 
     // Convert to numbers, ensuring we have valid values
@@ -1107,7 +1110,9 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       description: properties.description,
       code: properties.code,
       is_repeatable: properties.is_repeatable,
-      active_ind: true
+      active_ind: properties.active_ind !== false,
+      relative_position_x: properties.position?.x || 0,
+      relative_position_y: properties.position?.y || 0
     };
 
     // Handle page assignment - many-to-many relationship
@@ -1163,7 +1168,10 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       _is_hidden: properties._is_hidden,
       _is_disabled: properties._is_disabled,
       _lookup: properties.lookup_id || properties._lookup,
-      active_ind: true,
+      active_ind: properties.active_ind !== false,
+      relative_position_x: properties.position?.x || 0,
+      relative_position_y: properties.position?.y || 0,
+      allowed_lookups: properties.allowed_lookups || [],
       ...validationProperties,
 
       // Validation properties
@@ -1251,7 +1259,9 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     return {
       target_field: properties.target_field_id || 0, // Need to get the actual field ID
       condition_logic: properties.condition_logic || [],
-      active_ind: true
+      active_ind: properties.active_ind !== false,
+      position_x: properties.position?.x || 0,
+      position_y: properties.position?.y || 0
     };
   }
 

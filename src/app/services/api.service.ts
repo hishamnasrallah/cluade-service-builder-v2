@@ -17,6 +17,9 @@ export interface Condition {
   target_field: number;
   active_ind: boolean;
   condition_logic: any[];
+  workflow?: number;
+  position_x?: number;
+  position_y?: number;
 }
 
 export interface GroupedServiceFlow {
@@ -219,6 +222,10 @@ export interface Page {
   service: number;
   sequence_number: number;
   applicant_type: number;
+  workflow?: number;
+  position_x?: number;
+  position_y?: number;
+  is_expanded?: boolean;
 }
 
 export interface CategoryResponse {
@@ -237,6 +244,9 @@ export interface Category {
   description?: string;
   code?: string;
   active_ind: boolean;
+  workflow?: number;
+  relative_position_x?: number;
+  relative_position_y?: number;
 }
 
 export interface FieldResponse {
@@ -257,6 +267,9 @@ export interface Field {
   service: number[];
   _parent_field?: number | null;
   _lookup?: number | null;
+  workflow?: number;
+  relative_position_x?: number;
+  relative_position_y?: number;
   _max_length?: number;
   _min_length?: number;
   _regex_pattern?: string;
@@ -957,9 +970,11 @@ export class ApiService {
     const payload: any = {
       name: workflow.name,
       description: workflow.description || '',
-      is_active: true,
-      is_draft: true,
-      metadata: workflow.metadata || {}
+      is_active: workflow.is_active !== false,
+      is_draft: workflow.is_draft !== false,
+      version: workflow.version || 1,
+      metadata: workflow.metadata || {},
+      canvas_state: workflow.canvas_state || {}
     };
 
     // Only add service-related fields if they have values
@@ -1041,11 +1056,25 @@ export class ApiService {
 
 // Save complete workflow in a single transaction
   saveCompleteWorkflow(workflowId: string, data: any): Observable<any> {
-    return this.http.post(
+    console.log('Saving complete workflow with data:', data);
+
+    return this.http.post<any>(
       this.getApiUrl(`/dynamic/workflows/${workflowId}/save_complete_workflow/`),
       data
     ).pipe(
-      tap(response => console.log('Complete workflow saved:', response)),
+      tap(response => console.log('Complete workflow saved response:', response)),
+      map((response: any) => {
+        // Ensure response has the expected structure
+        if (!response.elements || !response.connections) {
+          console.warn('Response missing elements or connections, using sent data');
+          return {
+            ...response,
+            elements: data.elements || [],
+            connections: data.connections || []
+          };
+        }
+        return response;
+      }),
       catchError(this.handleError)
     );
   }

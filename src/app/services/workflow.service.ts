@@ -410,11 +410,56 @@ export class WorkflowService {
 
 // Save using workflow container API
   private saveWorkflowContainer(): Observable<any> {
-    // Ensure all elements have valid positions
+    // Ensure all elements have valid positions and convert to Django format
     const elementsWithValidPositions = this.currentWorkflow.elements.map(element => ({
       ...element,
-      position: element.position || { x: 100, y: 100 }
+      position: element.position || { x: 100, y: 100 },
+      // Add position fields for Django
+      position_x: element.position?.x || 100,
+      position_y: element.position?.y || 100,
+      relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
+      relative_position_y: element.parentId ? (element.position?.y || 0) : undefined
     }));
+
+// Map connections to Django WorkflowConnection format
+    const mappedConnections = this.currentWorkflow.connections.map(conn => {
+      const sourceElement = this.currentWorkflow.elements.find(el => el.id === conn.sourceId);
+      const targetElement = this.currentWorkflow.elements.find(el => el.id === conn.targetId);
+
+      // Get the actual backend ID based on element type
+      const getBackendId = (element: WorkflowElement | undefined): number | string => {
+        if (!element) return 0;
+
+        switch (element.type) {
+          case ElementType.START:
+            return 'start';
+          case ElementType.END:
+            return 'end';
+          case ElementType.PAGE:
+            return element.properties.page_id || 0;
+          case ElementType.CATEGORY:
+            return element.properties.category_id || 0;
+          case ElementType.FIELD:
+            return element.properties._field_id || 0;
+          case ElementType.CONDITION:
+            return element.properties.condition_id || 0;
+          default:
+            return 0;
+        }
+      };
+
+      return {
+        source_type: sourceElement?.type || 'unknown',
+        source_id: getBackendId(sourceElement),
+        target_type: targetElement?.type || 'unknown',
+        target_id: getBackendId(targetElement),
+        connection_metadata: {
+          frontend_source_id: conn.sourceId,
+          frontend_target_id: conn.targetId,
+          id: conn.id
+        }
+      };
+    });
 
     const payload = {
       name: this.currentWorkflow.name,
@@ -428,7 +473,7 @@ export class WorkflowService {
         expandedElementId: this.currentWorkflow.expandedElementId
       },
       elements: elementsWithValidPositions,
-      connections: this.currentWorkflow.connections,
+      connections: mappedConnections,
       deleted_elements: this.deletedElements
     };
 
@@ -613,7 +658,7 @@ export class WorkflowService {
 
   // CRUD operations for individual elements
   private createPage(page: WorkflowElement): Observable<any> {
-    const payload = this.mapPageProperties(page.properties);
+    const payload = this.mapPageProperties(page);
 
     return this.apiService.createPage(payload).pipe(
       map(response => {
@@ -634,7 +679,7 @@ export class WorkflowService {
       return of(null);
     }
 
-    const payload = this.mapPageProperties(page.properties);
+    const payload = this.mapPageProperties(page);
     return this.apiService.updatePage(pageId, payload).pipe(
       catchError(error => {
         console.error('Failed to update page:', error);
@@ -739,16 +784,20 @@ export class WorkflowService {
   }
 
   // Property mapping methods
-  private mapPageProperties(properties: ElementProperties): any {
+  private mapPageProperties(element: WorkflowElement): any {
+    const properties = element.properties;
     return {
-      name: properties.name,
-      name_ara: properties.name_ara,
-      description: properties.description,
-      description_ara: properties.description_ara,
-      service: this.toNumber(properties.service_id || properties.service),
-      sequence_number: this.toNumber(properties.sequence_number_id || properties.sequence_number),
-      applicant_type: this.toNumber(properties.applicant_type_id || properties.applicant_type),
-      active_ind: true
+      name: properties['name'],
+      name_ara: properties['name_ara'],
+      description: properties['description'],
+      description_ara: properties['description_ara'],
+      service: this.toNumber(properties['service_id'] || properties['service']),
+      sequence_number: this.toNumber(properties['sequence_number_id'] || properties['sequence_number']),
+      applicant_type: this.toNumber(properties['applicant_type_id'] || properties['applicant_type']),
+      active_ind: properties['active_ind'] !== false,
+      position_x: element.position?.x || 0,
+      position_y: element.position?.y || 0,
+      is_expanded: element.isExpanded || false
     };
   }
 
@@ -1002,7 +1051,6 @@ export class WorkflowService {
   }
 
   // Load workflow by ID
-// Load workflow by ID
   loadWorkflowById(workflowId: string): Observable<WorkflowData> {
     return this.apiService.getWorkflow(workflowId).pipe(
       map(response => {
@@ -1013,12 +1061,18 @@ export class WorkflowService {
 
         // Check if response already has elements and connections (new format)
         if (response.elements && Array.isArray(response.elements)) {
-          // New format - use elements directly
+          console.log('Loading new format with elements:', response.elements);
+          console.log('Loading connections:', response.connections);
+
+          // New format - use elements directly but ensure proper format
           const workflowData: WorkflowData = {
             id: response.id,
             name: response.name,
             description: response.description,
-            elements: response.elements,
+            elements: response.elements.map((el: any) => ({
+              ...el,
+              position: el.position || { x: el.position_x || 100, y: el.position_y || 100 }
+            })),
             connections: response.connections || [],
             viewMode: response.canvas_state?.viewMode || 'collapsed',
             expandedElementId: response.canvas_state?.expandedElementId,
@@ -1113,9 +1167,14 @@ export class WorkflowService {
 
   // Convert backend response to workflow format
   private convertBackendElementsToWorkflow(response: any, workflowData: WorkflowData): void {
+    // Create ID mapping for connections
+    const idMapping: { [key: string]: string } = {};
+
     // Add start element
+    const startId = 'start';
+    idMapping['start'] = startId;
     workflowData.elements.push({
-      id: 'start',
+      id: startId,
       type: ElementType.START,
       position: { x: 100, y: 100 },
       properties: { name: 'Start' },
@@ -1123,11 +1182,21 @@ export class WorkflowService {
     });
 
     // Convert pages
-    response.pages?.forEach((page: any) => {
+// Convert pages - maintain proper spacing if positions are not saved
+    let defaultXPosition = 350;
+    response.pages?.forEach((page: any, index: number) => {
+      const pageElementId = `page-${page.id}`;
+      idMapping[`page-${page.id}`] = pageElementId;
+      idMapping[page.id.toString()] = pageElementId; // Map backend ID to frontend ID
+
+      // Use saved position or calculate default position with spacing
+      const xPosition = page.position_x || (defaultXPosition + (index * 300));
+      const yPosition = page.position_y || 100;
+
       const pageElement: WorkflowElement = {
-        id: `page-${page.id}`,
+        id: pageElementId,
         type: ElementType.PAGE,
-        position: { x: page.position_x || 350, y: page.position_y || 100 },
+        position: { x: xPosition, y: yPosition },
         properties: {
           page_id: page.id,
           name: page.name,
@@ -1150,14 +1219,21 @@ export class WorkflowService {
       };
       workflowData.elements.push(pageElement);
 
-      // Convert categories
-      const pageCategories = response.categories?.filter((cat: any) =>
-        cat.page?.includes(page.id)
-      );
-
+// Convert categories
+      const pageCategories = response.categories?.filter((cat: any) => {
+        // Handle both array and single value cases
+        if (Array.isArray(cat.page)) {
+          return cat.page.includes(page.id);
+        }
+        return cat.page === page.id;
+      });
       pageCategories?.forEach((category: any) => {
+        const categoryElementId = `category-${category.id}`;
+        idMapping[`category-${category.id}`] = categoryElementId;
+        idMapping[category.id.toString()] = categoryElementId;
+
         const categoryElement: WorkflowElement = {
-          id: `category-${category.id}`,
+          id: categoryElementId,
           type: ElementType.CATEGORY,
           position: {
             x: category.relative_position_x || 0,
@@ -1179,14 +1255,23 @@ export class WorkflowService {
         workflowData.elements.push(categoryElement);
         pageElement.children!.push(categoryElement.id);
 
-        // Convert fields
-        const categoryFields = response.fields?.filter((field: any) =>
-          field.categories?.includes(category.id)
-        );
+// Convert fields
+        const categoryFields = response.fields?.filter((field: any) => {
+          // Handle both _category and categories field names
+          const categories = field._category || field.categories;
+          if (Array.isArray(categories)) {
+            return categories.includes(category.id);
+          }
+          return categories === category.id;
+        });
 
         categoryFields?.forEach((field: any) => {
+          const fieldElementId = `field-${field.id}`;
+          idMapping[`field-${field.id}`] = fieldElementId;
+          idMapping[field.id.toString()] = fieldElementId;
+
           const fieldElement: WorkflowElement = {
-            id: `field-${field.id}`,
+            id: fieldElementId,
             type: ElementType.FIELD,
             position: {
               x: field.relative_position_x || 0,
@@ -1204,8 +1289,12 @@ export class WorkflowService {
 
     // Convert conditions
     response.conditions?.forEach((condition: any) => {
+      const conditionElementId = `condition-${condition.id}`;
+      idMapping[`condition-${condition.id}`] = conditionElementId;
+      idMapping[condition.id.toString()] = conditionElementId;
+
       const conditionElement: WorkflowElement = {
-        id: `condition-${condition.id}`,
+        id: conditionElementId,
         type: ElementType.CONDITION,
         position: { x: condition.position_x || 0, y: condition.position_y || 0 },
         properties: {
@@ -1220,27 +1309,94 @@ export class WorkflowService {
       workflowData.elements.push(conditionElement);
     });
 
-    // Add end element
+// Add end element - position after the last page
+    const endId = 'end';
+    idMapping['end'] = endId;
+
+    // Calculate end position based on number of pages
+    const pageCount = response.pages?.length || 0;
+    const endXPosition = 350 + (pageCount * 300) + 300; // After last page + spacing
+
     workflowData.elements.push({
-      id: 'end',
+      id: endId,
       type: ElementType.END,
-      position: { x: 700, y: 100 },
+      position: { x: endXPosition, y: 100 },
       properties: { name: 'End', action: 'submit' },
       connections: []
     });
 
-    // Convert connections
-    response.connections?.forEach((conn: any) => {
-      const sourceId = conn.source_type === 'start' ? 'start' : `${conn.source_type}-${conn.source_id}`;
-      const targetId = conn.target_type === 'end' ? 'end' : `${conn.target_type}-${conn.target_id}`;
+    // If no connections provided, create default connections
+    if (!response.connections || response.connections.length === 0) {
+      // Create default connections: start -> first page -> ... -> last page -> end
+      const pageElements = workflowData.elements.filter(el => el.type === ElementType.PAGE);
 
-      workflowData.connections.push({
-        id: uuidv4(),
-        sourceId,
-        targetId,
-        ...conn.connection_metadata
+      if (pageElements.length > 0) {
+        // Sort pages by sequence number
+        pageElements.sort((a, b) => {
+          const seqA = a.properties.sequence_number || 0;
+          const seqB = b.properties.sequence_number || 0;
+          return Number(seqA) - Number(seqB);
+        });
+
+        // Connect start to first page
+        workflowData.connections.push({
+          id: uuidv4(),
+          sourceId: startId,
+          targetId: pageElements[0].id
+        });
+
+        // Connect pages in sequence
+        for (let i = 0; i < pageElements.length - 1; i++) {
+          workflowData.connections.push({
+            id: uuidv4(),
+            sourceId: pageElements[i].id,
+            targetId: pageElements[i + 1].id
+          });
+        }
+
+        // Connect last page to end
+        workflowData.connections.push({
+          id: uuidv4(),
+          sourceId: pageElements[pageElements.length - 1].id,
+          targetId: endId
+        });
+      }
+    } else {
+      // Convert existing connections
+      response.connections.forEach((conn: any) => {
+        let sourceId: string;
+        let targetId: string;
+
+        // Map source
+        if (conn.source_type === 'start') {
+          sourceId = startId;
+        } else if (conn.source_type === 'end') {
+          sourceId = endId;
+        } else {
+          sourceId = idMapping[conn.source_id.toString()] ||
+            idMapping[`${conn.source_type}-${conn.source_id}`] ||
+            `${conn.source_type}-${conn.source_id}`;
+        }
+
+        // Map target
+        if (conn.target_type === 'end') {
+          targetId = endId;
+        } else if (conn.target_type === 'start') {
+          targetId = startId;
+        } else {
+          targetId = idMapping[conn.target_id.toString()] ||
+            idMapping[`${conn.target_type}-${conn.target_id}`] ||
+            `${conn.target_type}-${conn.target_id}`;
+        }
+
+        workflowData.connections.push({
+          id: conn.id || uuidv4(),
+          sourceId,
+          targetId,
+          ...(conn.connection_metadata || {})
+        });
       });
-    });
+    }
 
     this.updateAllParentCounts(workflowData);
   }
