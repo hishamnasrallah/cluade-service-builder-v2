@@ -16,7 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {Subject, takeUntil, forkJoin, of, Observable} from 'rxjs';
-import {catchError, map} from 'rxjs/operators';
+import {catchError, debounceTime, map} from 'rxjs/operators';
 
 import {
   canContainChildren,
@@ -94,6 +94,10 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   existingCategories: Category[] = [];
   existingFields: Field[] = [];
 
+  // Add local cache for form values
+  private formCache: { [elementId: string]: any } = {};
+  private currentElementId?: string;
+
   constructor(
     private fb: FormBuilder,
     public apiService: ApiService,
@@ -103,11 +107,34 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Don't auto-load data here, wait for element selection
     console.log('Properties panel initialized');
 
-    // Set up auto-save on form changes
-    // this.setupAutoSave();
+    // Set up real-time updates for name field
+    this.setupRealTimeUpdates();
+  }
+
+  private setupRealTimeUpdates(): void {
+    // Watch for name changes specifically
+    this.propertiesForm.get('name')?.valueChanges
+      .pipe(
+        takeUntil(this.destroy$),
+        debounceTime(300)
+      )
+      .subscribe((name) => {
+        if (this.selectedElement && name !== this.selectedElement.properties.name) {
+          // Update the element name in real-time
+          const update = {
+            id: this.selectedElement.id,
+            properties: {
+              ...this.selectedElement.properties,
+              name: name
+            }
+          };
+
+          // Emit the update to refresh the UI
+          this.elementUpdated.emit(update);
+        }
+      });
   }
 // Hierarchy navigation methods
   // @ts-ignore
@@ -141,7 +168,9 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     this.selectedElementId = item.id;
     this.elementSelected.emit(item.id);
   }
-
+  private clearCache(): void {
+    this.formCache = {};
+  }
   canContainChildren(elementType: ElementType): boolean {
     return canContainChildren(elementType);
   }
@@ -469,6 +498,11 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['selectedElement']) {
+      // Save current form values to cache before switching
+      if (this.currentElementId && this.propertiesForm.valid) {
+        this.formCache[this.currentElementId] = this.propertiesForm.value;
+      }
+
       // Cancel any pending auto-save from previous element
       if (this.autoSaveTimeout) {
         clearTimeout(this.autoSaveTimeout);
@@ -478,31 +512,24 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       // Hide auto-save status when switching elements
       this.showAutoSaveStatus = false;
 
+      // Update current element ID
+      this.currentElementId = this.selectedElement?.id;
+
       // If this is a page element, ensure lookup data is loaded first
       if (this.selectedElement?.type === ElementType.PAGE) {
         this.ensurePageDataLoaded().then(() => {
           this.updateFormForElement();
-
-          // If this is an existing element (has backend IDs), mark as already saved
-          if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
-            this.autoSaveStatus = 'saved';
-          }
         }).catch(error => {
           console.error('Failed to load data before updating form:', error);
-          // Still try to update the form even if data loading fails
           this.updateFormForElement();
         });
       } else {
         // For non-page elements, update form immediately
         this.updateFormForElement();
-
-        // If this is an existing element (has backend IDs), mark as already saved
-        if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
-          this.autoSaveStatus = 'saved';
-        }
       }
     }
   }
+
   private hasBackendId(element: WorkflowElement): boolean {
     switch (element.type) {
       case ElementType.PAGE:
@@ -739,7 +766,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   private updateFormForElement(): void {
     if (!this.selectedElement) {
-      // Clear form if no element selected
       this.propertiesForm.reset();
       this.showAutoSaveStatus = false;
       return;
@@ -756,33 +782,50 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       this.autoSaveTimeout = undefined;
     }
 
-    // Get the current element's properties (ensure we have a clean copy)
-    const properties = JSON.parse(JSON.stringify(this.selectedElement.properties || {})); // Deep copy
+    // Check if we have cached values for this element
+    const cachedValues = this.formCache[this.selectedElement.id];
+    if (cachedValues) {
+      console.log('Restoring from cache for element:', this.selectedElement.id);
 
-    // Completely reset the form first
-    this.propertiesForm.reset();
+      // Update validators first
+      this.updateValidators();
 
-    // Update validators based on element type BEFORE setting values
-    this.updateValidators();
-
-    // Wait for form to fully reset before setting new values
-    setTimeout(() => {
-      // Set common properties with defaults
-      this.propertiesForm.patchValue({
-        name: properties.name || '',
-        description: properties.description || ''
-      });
-
-      // Set element-specific properties
-      this.setElementSpecificProperties(properties);
-
-      // Re-enable auto-save status after form is populated
+      // Restore from cache
       setTimeout(() => {
+        this.propertiesForm.patchValue(cachedValues);
         this.showAutoSaveStatus = true;
         this.autoSaveStatus = 'saved';
-      }, 200);
-    }, 50);
+      }, 50);
+    } else {
+      // Original logic - load from element properties
+      const properties = JSON.parse(JSON.stringify(this.selectedElement.properties || {}));
+
+      // Completely reset the form first
+      this.propertiesForm.reset();
+
+      // Update validators based on element type BEFORE setting values
+      this.updateValidators();
+
+      // Wait for form to fully reset before setting new values
+      setTimeout(() => {
+        // Set common properties with defaults
+        this.propertiesForm.patchValue({
+          name: properties.name || '',
+          description: properties.description || ''
+        });
+
+        // Set element-specific properties
+        this.setElementSpecificProperties(properties);
+
+        // Re-enable auto-save status after form is populated
+        setTimeout(() => {
+          this.showAutoSaveStatus = true;
+          this.autoSaveStatus = 'saved';
+        }, 200);
+      }, 50);
+    }
   }
+
   private setElementSpecificProperties(properties: any): void {
     if (!this.selectedElement) return;
 
@@ -1396,14 +1439,29 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
             cleaned.existingPageId = formValue.existingPageId;
           }
         } else {
-          // Only include properties that have values
-          ['service', 'sequence_number', 'applicant_type', 'name_ara', 'description_ara'].forEach(key => {
+          // Store the actual selected values from dropdowns
+          if (formValue.service !== null && formValue.service !== undefined && formValue.service !== '') {
+            cleaned.service = formValue.service;
+            cleaned.service_id = formValue.service; // Store as service_id as well
+          }
+          if (formValue.sequence_number !== null && formValue.sequence_number !== undefined && formValue.sequence_number !== '') {
+            cleaned.sequence_number = formValue.sequence_number;
+            cleaned.sequence_number_id = formValue.sequence_number; // Store as sequence_number_id as well
+          }
+          if (formValue.applicant_type !== null && formValue.applicant_type !== undefined && formValue.applicant_type !== '') {
+            cleaned.applicant_type = formValue.applicant_type;
+            cleaned.applicant_type_id = formValue.applicant_type; // Store as applicant_type_id as well
+          }
+
+          // Include other page properties
+          ['name_ara', 'description_ara'].forEach(key => {
             if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
               cleaned[key] = formValue[key];
             }
           });
         }
         break;
+
 
       case ElementType.CATEGORY:
         if (formValue.useExisting) {
@@ -1463,11 +1521,15 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   resetForm(): void {
     if (this.selectedElement) {
       console.log('Resetting form for element:', this.selectedElement.id);
+      // Clear cache for this element
+      delete this.formCache[this.selectedElement.id];
       this.updateFormForElement();
       this.snackBar.open('Form reset to saved values', 'Close', { duration: 2000 });
     }
   }
-
+  public clearAllCache(): void {
+    this.clearCache();
+  }
   deleteConnection(): void {
     if (this.selectedConnection) {
       this.connectionUpdated.emit({ action: 'delete', connection: this.selectedConnection });

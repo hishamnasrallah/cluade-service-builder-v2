@@ -811,13 +811,37 @@ export class ApiService {
       );
   }
 
-// PAGE CRUD Operations - Using correct endpoints
   createPage(page: Partial<Page>): Observable<Page> {
-    return this.http.post<Page>(this.getApiUrl('/dynamic/workflow/api/v1/pages/'), page)
+    // Ensure numeric fields are properly typed
+    const payload = {
+      ...page,
+      service: page.service ? this.toNumber(page.service) : null,
+      sequence_number: page.sequence_number ? this.toNumber(page.sequence_number) : null,
+      applicant_type: page.applicant_type ? this.toNumber(page.applicant_type) : null,
+      position_x: page.position_x || 0,
+      position_y: page.position_y || 0,
+      active_ind: page.active_ind !== false
+    };
+
+    return this.http.post<Page>(this.getApiUrl('/dynamic/workflow/api/v1/pages/'), payload)
       .pipe(
         tap(response => console.log('Page created:', response)),
         catchError(this.handleError)
       );
+  }
+
+// Add helper method if not exists
+  private toNumber(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    return null;
   }
 
   updatePage(id: number | null | undefined, page: Partial<Page>): Observable<Page> {
@@ -1237,7 +1261,7 @@ export class ApiService {
 
 // Handle single ID fields that might be arrays
     const singleIdFields = [
-      'id', 'page_id', 'category_id', '_field_id', 'condition_id',
+      'page_id', 'category_id', '_field_id', 'condition_id',
       'service_id', 'sequence_number_id', 'applicant_type_id',
       'field_type_id', 'lookup_id', 'parent_field_id', 'target_field_id'
     ];
@@ -1250,15 +1274,24 @@ export class ApiService {
             val !== null && val !== undefined && val !== ''
           );
           if (validValues.length > 0) {
-            props[field] = validValues[0];
+            props[field] = typeof validValues[0] === 'string' && /^\d+$/.test(validValues[0])
+              ? parseInt(validValues[0], 10)
+              : validValues[0];
           } else {
             delete props[field];
           }
         } else if (props[field] === '' || props[field] === null) {
           delete props[field];
+        } else if (typeof props[field] === 'string' && /^\d+$/.test(props[field])) {
+          props[field] = parseInt(props[field], 10);
         }
       }
     });
+
+// Never send 'id' field for elements
+    if ('id' in props) {
+      delete props.id;
+    }
 
     // Add active_ind if not present
     if (props.active_ind === undefined) {

@@ -411,62 +411,64 @@ export class WorkflowService {
 // Save using workflow container API
   private saveWorkflowContainer(): Observable<any> {
     // Ensure all elements have valid positions and convert to Django format
-    const elementsWithValidPositions = this.currentWorkflow.elements.map(element => ({
-      ...element,
-      position: element.position || { x: 100, y: 100 },
-      // Add position fields for Django
-      position_x: element.position?.x || 100,
-      position_y: element.position?.y || 100,
-      relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
-      relative_position_y: element.parentId ? (element.position?.y || 0) : undefined,
-      // Ensure all properties are included
-      properties: {
-        ...element.properties,
-        // Ensure numeric IDs are properly included
-        page_id: element.properties.page_id ? Number(element.properties.page_id) : undefined,
-        category_id: element.properties.category_id ? Number(element.properties.category_id) : undefined,
-        _field_id: element.properties._field_id ? Number(element.properties._field_id) : undefined,
-        condition_id: element.properties.condition_id ? Number(element.properties.condition_id) : undefined,
-        // Service related IDs
-        service_id: element.properties.service_id ? Number(element.properties.service_id) : undefined,
-        sequence_number_id: element.properties.sequence_number_id ? Number(element.properties.sequence_number_id) : undefined,
-        applicant_type_id: element.properties.applicant_type_id ? Number(element.properties.applicant_type_id) : undefined,
-        field_type_id: element.properties.field_type_id ? Number(element.properties.field_type_id) : undefined,
-        lookup_id: element.properties.lookup_id ? Number(element.properties.lookup_id) : undefined,
-        parent_field_id: element.properties.parent_field_id ? Number(element.properties.parent_field_id) : undefined,
-        // Ensure all validation properties are included
-        _max_length: element.properties['_max_length'],
-        _min_length: element.properties['_min_length'],
-        _regex_pattern: element.properties['_regex_pattern'],
-        _allowed_characters: element.properties['_allowed_characters'],
-        _forbidden_words: element.properties['_forbidden_words'],
-        _value_greater_than: element.properties['_value_greater_than'],
-        _value_less_than: element.properties['_value_less_than'],
-        _integer_only: element.properties['_integer_only'],
-        _positive_only: element.properties['_positive_only'],
-        _precision: element.properties['_precision'],
-        _date_greater_than: element.properties['_date_greater_than'],
-        _date_less_than: element.properties['_date_less_than'],
-        _future_only: element.properties['_future_only'],
-        _past_only: element.properties['_past_only'],
-        _file_types: element.properties['_file_types'],
-        _max_file_size: element.properties['_max_file_size'],
-        _image_max_width: element.properties['_image_max_width'],
-        _image_max_height: element.properties['_image_max_height'],
-        _default_boolean: element.properties['_default_boolean'],
-        _max_selections: element.properties['_max_selections'],
-        _min_selections: element.properties['_min_selections'],
-        _unique: element.properties['_unique'],
-        _default_value: element.properties['_default_value'],
-        _coordinates_format: element.properties['_coordinates_format'],
-        _uuid_format: element.properties['_uuid_format'],
-// Arrays
-        page_ids: element.properties['page_ids'] || [],
-        category_ids: element.properties['category_ids'] || [],
-        service_ids: element.properties['service_ids'] || [],
-        allowed_lookups: element.properties['allowed_lookups'] || []
+    const elementsWithValidPositions = this.currentWorkflow.elements.map(element => {
+      // Base element structure
+      const baseElement = {
+        ...element,
+        position: element.position || { x: 100, y: 100 },
+        position_x: element.position?.x || 100,
+        position_y: element.position?.y || 100,
+        relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
+        relative_position_y: element.parentId ? (element.position?.y || 0) : undefined,
+        is_expanded: element.isExpanded || false,
+        parent_id: element.parentId || null,
+        children: element.children || [],
+        type: element.type
+      };
+
+      // Handle properties based on element type
+      if (element.type === 'start' || element.type === 'end') {
+        // Special elements only need basic properties
+        baseElement.properties = {
+          name: element.properties.name || element.type
+        };
+      } else {
+        // Process properties for other element types
+        const processedProperties = { ...element.properties };
+
+        // List of ID fields that should be numeric
+        const numericIdFields = [
+          'page_id', 'category_id', '_field_id', 'condition_id',
+          'service', 'service_id', 'sequence_number', 'sequence_number_id',
+          'applicant_type', 'applicant_type_id', '_field_type', 'field_type_id',
+          '_lookup', 'lookup_id', '_parent_field', 'parent_field_id',
+          'target_field', 'target_field_id'
+        ];
+
+        // Convert numeric fields
+        numericIdFields.forEach(field => {
+          if (processedProperties[field] !== undefined && processedProperties[field] !== null) {
+            const value = processedProperties[field];
+            if (typeof value === 'string' && /^\d+$/.test(value)) {
+              processedProperties[field] = parseInt(value, 10);
+            } else if (typeof value === 'number') {
+              processedProperties[field] = value;
+            } else if (value === '') {
+              processedProperties[field] = null;
+            }
+          }
+        });
+
+        // Ensure active_ind is always present - USE BRACKET NOTATION
+        if (processedProperties['active_ind'] === undefined) {
+          processedProperties['active_ind'] = true;
+        }
+
+        baseElement.properties = processedProperties;
       }
-    }));
+
+      return baseElement;
+    });
 
 /// Map connections to Django WorkflowConnection format
     const mappedConnections = this.currentWorkflow.connections.map(conn => {
@@ -881,19 +883,21 @@ export class WorkflowService {
   // Property mapping methods
   private mapPageProperties(element: WorkflowElement): any {
     const properties = element.properties;
+
     return {
-      name: element.properties['name'],
-      name_ara: element.properties['name_ara'],
-      description: element.properties['description'],
-      description_ara: element.properties['description_ara'],
-      service: this.toNumber(element.properties['service_id'] || element.properties['service']),
-      sequence_number: this.toNumber(element.properties['sequence_number_id'] || element.properties['sequence_number']),
-      applicant_type: this.toNumber(element.properties['applicant_type_id'] || element.properties['applicant_type']),
-      active_ind: element.properties['active_ind'] !== false,
+      name: properties['name'],
+      name_ara: properties['name_ara'],
+      description: properties['description'],
+      description_ara: properties['description_ara'],
+      service: this.toNumber(properties['service'] || properties['service_id']),
+      sequence_number: this.toNumber(properties['sequence_number'] || properties['sequence_number_id']),
+      applicant_type: this.toNumber(properties['applicant_type'] || properties['applicant_type_id']),
+      active_ind: properties['active_ind'] !== false,
       position_x: element.position?.x || 0,
       position_y: element.position?.y || 0,
       is_expanded: element.isExpanded || false
-    };  }
+    };
+  }
 
   private mapCategoryProperties(category: WorkflowElement): any {
     const parentPage = this.findParentPage(category);

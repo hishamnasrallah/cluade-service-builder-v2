@@ -65,6 +65,7 @@ import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.
 export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('canvas', { static: false }) canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('canvasWrapper', { static: false }) canvasWrapperRef!: ElementRef<HTMLDivElement>;
+  @ViewChild(PropertiesPanelComponent) propertiesPanel?: PropertiesPanelComponent;
 
   workflow: WorkflowData = {
     name: 'New Workflow',
@@ -279,6 +280,9 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   createNewWorkflow(): void {
+    if (this.propertiesPanel) {
+      this.propertiesPanel.clearAllCache();
+    }
     const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
       width: '500px',
       data: {
@@ -343,7 +347,9 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     // Show saving indicator
     this.snackBar.open('Saving workflow...', '', { duration: 0 });
-
+    if (this.propertiesPanel) {
+      this.propertiesPanel.clearAllCache();
+    }
     // Prepare data for saving - ensure all elements have their current positions and all properties
     const elementsWithPositions = this.workflow.elements.map(element => ({
       ...element,
@@ -410,6 +416,9 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     });
   }
   saveAsNewWorkflow(): void {
+    if (this.propertiesPanel) {
+      this.propertiesPanel.clearAllCache();
+    }
     const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
       width: '500px',
       data: {
@@ -1112,7 +1121,20 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   onElementUpdated(update: { id: string; properties: any }): void {
-    // Ensure all numeric fields are properly converted before sending
+    // Update the element immediately in the workflow (no API call)
+    const element = this.workflow.elements.find(el => el.id === update.id);
+    if (element) {
+      // Update element properties
+      element.properties = {
+        ...element.properties,
+        ...update.properties
+      };
+
+      // Trigger change detection to update the UI
+      this.workflow = { ...this.workflow };
+    }
+
+    // Clean properties for future save
     const cleanedProperties = { ...update.properties };
 
     // Convert string IDs to numbers
@@ -1134,6 +1156,8 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         } else if (typeof value === 'number') {
           cleanedProperties[field] = value;
         }
+      } else if (cleanedProperties[field] === '') {
+        cleanedProperties[field] = null;
       }
     });
 
@@ -1160,6 +1184,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
 
+    // Update via workflow service (this will just update local state, no API call)
     this.workflowService.updateElement(update.id, { properties: cleanedProperties });
   }
 
