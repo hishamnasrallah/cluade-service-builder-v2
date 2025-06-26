@@ -344,21 +344,55 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     // Show saving indicator
     this.snackBar.open('Saving workflow...', '', { duration: 0 });
 
-    // Prepare data for saving - ensure all elements have their current positions
+    // Prepare data for saving - ensure all elements have their current positions and all properties
     const elementsWithPositions = this.workflow.elements.map(element => ({
       ...element,
-      position: element.position || { x: 0, y: 0 }
+      position: element.position || { x: 0, y: 0 },
+      position_x: element.position?.x || 0,
+      position_y: element.position?.y || 0,
+      relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
+      relative_position_y: element.parentId ? (element.position?.y || 0) : undefined,
+      is_expanded: element.isExpanded || false,
+      parent_id: element.parentId || null,
+      children: element.children || [],
+      properties: {
+        ...element.properties,
+        // Ensure active_ind is always sent - use bracket notation
+        active_ind: element.properties['active_ind'] !== false
+      }
     }));
 
     const saveData = {
       name: this.workflow.name,
-      description: this.workflow.description,
+      description: this.workflow.description || '',
+      service_id: this.workflow.metadata?.service_id || null,
+      service_code: this.workflow.metadata?.service_code || this.currentServiceCode || null,
+      // is_active and is_draft should be at the root level, not in metadata
+      is_active: true, // Default to true for active workflows
+      is_draft: this.workflow.metadata?.is_draft !== false,
+      version: this.workflow.metadata?.version || '1.0',
+      metadata: {
+        ...this.workflow.metadata,
+        updated_at: new Date().toISOString(),
+        last_saved_by: 'user' // Add user identifier if available
+      },
       elements: elementsWithPositions,
-      connections: this.workflow.connections,
+      connections: this.workflow.connections.map(conn => ({
+        ...conn,
+        id: conn.id || null,
+        source_id: conn.sourceId,
+        target_id: conn.targetId,
+        source_port: conn.sourcePort || null,
+        target_port: conn.targetPort || null
+      })),
       canvas_state: {
-        ...this.canvasState,
-        viewMode: this.workflow.viewMode,
-        expandedElementId: this.workflow.expandedElementId
+        zoom: this.canvasState.zoom || 1,
+        panX: this.canvasState.panX || 0,
+        panY: this.canvasState.panY || 0,
+        viewMode: this.workflow.viewMode || 'collapsed',
+        expandedElementId: this.workflow.expandedElementId || null,
+        selectedElementId: this.selectedElementId || null,
+        canvasSize: this.canvasSize
       }
     };
 
@@ -1078,7 +1112,55 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   onElementUpdated(update: { id: string; properties: any }): void {
-    this.workflowService.updateElement(update.id, { properties: update.properties });
+    // Ensure all numeric fields are properly converted before sending
+    const cleanedProperties = { ...update.properties };
+
+    // Convert string IDs to numbers
+    const numericFields = [
+      'service', 'service_id', 'sequence_number', 'sequence_number_id',
+      'applicant_type', 'applicant_type_id', '_field_type', 'field_type_id',
+      '_lookup', 'lookup_id', 'parent_field_id', '_parent_field',
+      'page_id', 'category_id', '_field_id', 'condition_id',
+      '_sequence', '_max_length', '_min_length', '_value_greater_than',
+      '_value_less_than', '_max_file_size', '_image_max_width',
+      '_image_max_height', '_precision', '_max_selections', '_min_selections'
+    ];
+
+    numericFields.forEach(field => {
+      if (cleanedProperties[field] !== undefined && cleanedProperties[field] !== null && cleanedProperties[field] !== '') {
+        const value = cleanedProperties[field];
+        if (typeof value === 'string' && /^\d+$/.test(value)) {
+          cleanedProperties[field] = parseInt(value, 10);
+        } else if (typeof value === 'number') {
+          cleanedProperties[field] = value;
+        }
+      }
+    });
+
+    // Ensure boolean fields are properly converted
+    const booleanFields = [
+      '_mandatory', '_is_hidden', '_is_disabled', 'is_repeatable',
+      '_integer_only', '_positive_only', '_future_only', '_past_only',
+      '_default_boolean', '_unique', '_coordinates_format', '_uuid_format',
+      'useExisting', 'is_hidden_page', 'active_ind'
+    ];
+
+    booleanFields.forEach(field => {
+      if (cleanedProperties[field] !== undefined) {
+        cleanedProperties[field] = cleanedProperties[field] === true;
+      }
+    });
+
+    // Ensure array fields are arrays
+    const arrayFields = ['page_ids', 'category_ids', 'service_ids', 'allowed_lookups'];
+
+    arrayFields.forEach(field => {
+      if (cleanedProperties[field] !== undefined && !Array.isArray(cleanedProperties[field])) {
+        cleanedProperties[field] = cleanedProperties[field] ? [cleanedProperties[field]] : [];
+      }
+    });
+
+    this.workflowService.updateElement(update.id, { properties: cleanedProperties });
   }
 
   onConnectionUpdated(update: any): void {

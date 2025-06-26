@@ -968,21 +968,40 @@ export class ApiService {
   // WORKFLOW CRUD Operations
   createWorkflow(workflow: any): Observable<any> {
     const payload: any = {
-      name: workflow.name,
+      name: workflow.name || 'Untitled Workflow',
       description: workflow.description || '',
       is_active: workflow.is_active !== false,
       is_draft: workflow.is_draft !== false,
       version: workflow.version || 1,
-      metadata: workflow.metadata || {},
-      canvas_state: workflow.canvas_state || {}
+      metadata: {
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        created_by: 'user', // Add actual user if available
+        ...(workflow.metadata || {})
+      },
+      canvas_state: {
+        zoom: 1,
+        panX: 100,
+        panY: 100,
+        viewMode: 'collapsed',
+        ...(workflow.canvas_state || {})
+      }
     };
 
-    // Only add service-related fields if they have values
-    if (workflow.service_id) {
-      payload.service = workflow.service_id;
+    // Add service-related fields with proper type conversion
+    if (workflow.service_id !== undefined && workflow.service_id !== null) {
+      payload.service = typeof workflow.service_id === 'string' ? parseInt(workflow.service_id, 10) : workflow.service_id;
     }
     if (workflow.service_code) {
       payload.service_code = workflow.service_code;
+    }
+
+    // Add elements and connections if provided
+    if (workflow.elements) {
+      payload.elements = workflow.elements;
+    }
+    if (workflow.connections) {
+      payload.connections = workflow.connections;
     }
 
     console.log('Creating workflow with payload:', payload);
@@ -1056,11 +1075,62 @@ export class ApiService {
 
 // Save complete workflow in a single transaction
   saveCompleteWorkflow(workflowId: string, data: any): Observable<any> {
-    console.log('Saving complete workflow with data:', data);
+    // Ensure all data is properly formatted before sending
+    const cleanedData = {
+      ...data,
+      workflow_id: workflowId,
+      elements: data.elements.map((element: any) => ({
+        ...element,
+        // Ensure frontend_id is preserved for mapping
+        frontend_id: element.id,
+        // Add backend_id if available
+        backend_id: this.getBackendId(element),
+        // Ensure all position data is included
+        position_x: element.position_x || element.position?.x || 0,
+        position_y: element.position_y || element.position?.y || 0,
+        relative_position_x: element.relative_position_x !== undefined ? element.relative_position_x : (element.parentId ? (element.position?.x || 0) : null),
+        relative_position_y: element.relative_position_y !== undefined ? element.relative_position_y : (element.parentId ? (element.position?.y || 0) : null),
+        is_expanded: element.is_expanded || element.isExpanded || false,
+        parent_id: element.parent_id || element.parentId || null,
+        children: element.children || [],
+        type: element.type,
+        properties: this.cleanElementProperties(element)
+      })),
+      connections: data.connections.map((conn: any) => ({
+        ...conn,
+        frontend_id: conn.id,
+        source_id: conn.source_id || conn.sourceId,
+        target_id: conn.target_id || conn.targetId,
+        source_port: conn.source_port || conn.sourcePort || null,
+        target_port: conn.target_port || conn.targetPort || null,
+        connection_metadata: {
+          ...(conn.connection_metadata || {}),
+          frontend_source_id: conn.sourceId,
+          frontend_target_id: conn.targetId
+        }
+      })),
+      canvas_state: {
+        zoom: data.canvas_state?.zoom || 1,
+        panX: data.canvas_state?.panX || 0,
+        panY: data.canvas_state?.panY || 0,
+        viewMode: data.canvas_state?.viewMode || 'collapsed',
+        expandedElementId: data.canvas_state?.expandedElementId || null,
+        selectedElementId: data.canvas_state?.selectedElementId || null,
+        canvasSize: data.canvas_state?.canvasSize || { width: 5000, height: 5000 }
+      },
+      deleted_elements: data.deleted_elements || {
+        pages: [],
+        categories: [],
+        fields: [],
+        conditions: []
+      }
+    };
+
+    console.log('Saving complete workflow with cleaned data:', cleanedData);
 
     return this.http.post<any>(
       this.getApiUrl(`/dynamic/workflows/${workflowId}/save_complete_workflow/`),
-      data
+      cleanedData
     ).pipe(
       tap(response => console.log('Complete workflow saved response:', response)),
       map((response: any) => {
@@ -1077,6 +1147,125 @@ export class ApiService {
       }),
       catchError(this.handleError)
     );
+
+  }
+  private getBackendId(element: any): number | string | null {
+    if (!element) return null;
+
+    switch (element.type) {
+      case 'start':
+        return 'start';
+      case 'end':
+        return 'end';
+      case 'page':
+        return element.properties?.page_id || null;
+      case 'category':
+        return element.properties?.category_id || null;
+      case 'field':
+        return element.properties?._field_id || null;
+      case 'condition':
+        return element.properties?.condition_id || null;
+      default:
+        return null;
+    }
+  }
+
+  private cleanElementProperties(element: any): any {
+    const props = { ...(element.properties || {}) };
+
+    // Convert string numbers to actual numbers
+    const numericFields = [
+      'page_id', 'category_id', '_field_id', 'condition_id',
+      'service', 'service_id', 'sequence_number', 'sequence_number_id',
+      'applicant_type', 'applicant_type_id', '_field_type', 'field_type_id',
+      '_lookup', 'lookup_id', 'parent_field_id', '_parent_field',
+      '_sequence', '_max_length', '_min_length', '_value_greater_than',
+      '_value_less_than', '_max_file_size', '_image_max_width',
+      '_image_max_height', '_precision', '_max_selections', '_min_selections',
+      'target_field_id'
+    ];
+
+    numericFields.forEach(field => {
+      if (props[field] !== undefined && props[field] !== null && props[field] !== '') {
+        if (typeof props[field] === 'string' && /^\d+$/.test(props[field])) {
+          props[field] = parseInt(props[field], 10);
+        }
+      }
+    });
+
+    // Ensure boolean fields are boolean
+    const booleanFields = [
+      '_mandatory', '_is_hidden', '_is_disabled', 'is_repeatable',
+      '_integer_only', '_positive_only', '_future_only', '_past_only',
+      '_default_boolean', '_unique', '_coordinates_format', '_uuid_format',
+      'is_hidden_page', 'active_ind'
+    ];
+
+    booleanFields.forEach(field => {
+      if (props[field] !== undefined) {
+        props[field] = props[field] === true || props[field] === 'true' || props[field] === 1;
+      }
+    });
+
+    // Ensure array fields are arrays
+    const arrayFields = [
+      'page_ids', 'category_ids', 'service_ids', 'allowed_lookups',
+      '_category', 'service', 'page'
+    ];
+
+    arrayFields.forEach(field => {
+      if (props[field] !== undefined) {
+        if (!Array.isArray(props[field])) {
+          props[field] = props[field] ? [props[field]] : [];
+        }
+        // Convert array elements to numbers if they are numeric strings
+        props[field] = props[field]
+          .filter((val: any) => val !== null && val !== undefined && val !== '')
+          .map((val: any) => {
+            if (typeof val === 'string' && /^\d+$/.test(val)) {
+              return parseInt(val, 10);
+            }
+            return val;
+          });
+
+        // Remove the field if it's an empty array and it's an ID field
+        if (props[field].length === 0 && (field === 'id' || field.endsWith('_id'))) {
+          delete props[field];
+        }
+      }
+    });
+
+// Handle single ID fields that might be arrays
+    const singleIdFields = [
+      'id', 'page_id', 'category_id', '_field_id', 'condition_id',
+      'service_id', 'sequence_number_id', 'applicant_type_id',
+      'field_type_id', 'lookup_id', 'parent_field_id', 'target_field_id'
+    ];
+
+    singleIdFields.forEach(field => {
+      if (props[field] !== undefined) {
+        if (Array.isArray(props[field])) {
+          // If it's an array, take the first valid value
+          const validValues = props[field].filter((val: any) =>
+            val !== null && val !== undefined && val !== ''
+          );
+          if (validValues.length > 0) {
+            props[field] = validValues[0];
+          } else {
+            delete props[field];
+          }
+        } else if (props[field] === '' || props[field] === null) {
+          delete props[field];
+        }
+      }
+    });
+
+    // Add active_ind if not present
+    if (props.active_ind === undefined) {
+      props.active_ind = true;
+    }
+
+    return props;
   }
 
 // Clone workflow

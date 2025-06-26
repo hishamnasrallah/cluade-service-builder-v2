@@ -216,7 +216,7 @@ export class WorkflowService {
         }
         break;
       case ElementType.FIELD:
-        if (element.properties._field_id) {
+        if (element.properties['_field_id']) {
           this.deletedElements.fields.push(element.properties._field_id);
         }
         break;
@@ -418,17 +418,64 @@ export class WorkflowService {
       position_x: element.position?.x || 100,
       position_y: element.position?.y || 100,
       relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
-      relative_position_y: element.parentId ? (element.position?.y || 0) : undefined
+      relative_position_y: element.parentId ? (element.position?.y || 0) : undefined,
+      // Ensure all properties are included
+      properties: {
+        ...element.properties,
+        // Ensure numeric IDs are properly included
+        page_id: element.properties.page_id ? Number(element.properties.page_id) : undefined,
+        category_id: element.properties.category_id ? Number(element.properties.category_id) : undefined,
+        _field_id: element.properties._field_id ? Number(element.properties._field_id) : undefined,
+        condition_id: element.properties.condition_id ? Number(element.properties.condition_id) : undefined,
+        // Service related IDs
+        service_id: element.properties.service_id ? Number(element.properties.service_id) : undefined,
+        sequence_number_id: element.properties.sequence_number_id ? Number(element.properties.sequence_number_id) : undefined,
+        applicant_type_id: element.properties.applicant_type_id ? Number(element.properties.applicant_type_id) : undefined,
+        field_type_id: element.properties.field_type_id ? Number(element.properties.field_type_id) : undefined,
+        lookup_id: element.properties.lookup_id ? Number(element.properties.lookup_id) : undefined,
+        parent_field_id: element.properties.parent_field_id ? Number(element.properties.parent_field_id) : undefined,
+        // Ensure all validation properties are included
+        _max_length: element.properties['_max_length'],
+        _min_length: element.properties['_min_length'],
+        _regex_pattern: element.properties['_regex_pattern'],
+        _allowed_characters: element.properties['_allowed_characters'],
+        _forbidden_words: element.properties['_forbidden_words'],
+        _value_greater_than: element.properties['_value_greater_than'],
+        _value_less_than: element.properties['_value_less_than'],
+        _integer_only: element.properties['_integer_only'],
+        _positive_only: element.properties['_positive_only'],
+        _precision: element.properties['_precision'],
+        _date_greater_than: element.properties['_date_greater_than'],
+        _date_less_than: element.properties['_date_less_than'],
+        _future_only: element.properties['_future_only'],
+        _past_only: element.properties['_past_only'],
+        _file_types: element.properties['_file_types'],
+        _max_file_size: element.properties['_max_file_size'],
+        _image_max_width: element.properties['_image_max_width'],
+        _image_max_height: element.properties['_image_max_height'],
+        _default_boolean: element.properties['_default_boolean'],
+        _max_selections: element.properties['_max_selections'],
+        _min_selections: element.properties['_min_selections'],
+        _unique: element.properties['_unique'],
+        _default_value: element.properties['_default_value'],
+        _coordinates_format: element.properties['_coordinates_format'],
+        _uuid_format: element.properties['_uuid_format'],
+// Arrays
+        page_ids: element.properties['page_ids'] || [],
+        category_ids: element.properties['category_ids'] || [],
+        service_ids: element.properties['service_ids'] || [],
+        allowed_lookups: element.properties['allowed_lookups'] || []
+      }
     }));
 
-// Map connections to Django WorkflowConnection format
+/// Map connections to Django WorkflowConnection format
     const mappedConnections = this.currentWorkflow.connections.map(conn => {
       const sourceElement = this.currentWorkflow.elements.find(el => el.id === conn.sourceId);
       const targetElement = this.currentWorkflow.elements.find(el => el.id === conn.targetId);
 
       // Get the actual backend ID based on element type
-      const getBackendId = (element: WorkflowElement | undefined): number | string => {
-        if (!element) return 0;
+      const getBackendId = (element: WorkflowElement | undefined): number | string | null => {
+        if (!element) return null;
 
         switch (element.type) {
           case ElementType.START:
@@ -436,31 +483,36 @@ export class WorkflowService {
           case ElementType.END:
             return 'end';
           case ElementType.PAGE:
-            return element.properties.page_id || 0;
+            return element.properties['page_id'] || null;
           case ElementType.CATEGORY:
-            return element.properties.category_id || 0;
+            return element.properties['category_id'] || null;
           case ElementType.FIELD:
-            return element.properties._field_id || 0;
+            return element.properties['_field_id'] || null;
           case ElementType.CONDITION:
-            return element.properties.condition_id || 0;
+            return element.properties['condition_id'] || null;
           default:
-            return 0;
+            return null;
         }
       };
 
+      const sourceBackendId = getBackendId(sourceElement);
+      const targetBackendId = getBackendId(targetElement);
+
       return {
         source_type: sourceElement?.type || 'unknown',
-        source_id: getBackendId(sourceElement),
+        source_id: sourceBackendId,
         target_type: targetElement?.type || 'unknown',
-        target_id: getBackendId(targetElement),
+        target_id: targetBackendId,
         connection_metadata: {
           frontend_source_id: conn.sourceId,
           frontend_target_id: conn.targetId,
           id: conn.id
         }
       };
-    });
-
+    }).filter(conn =>
+      // Only include connections where both elements exist
+      conn.source_id !== null && conn.target_id !== null
+    );
     const payload = {
       name: this.currentWorkflow.name,
       description: this.currentWorkflow.description,
@@ -479,7 +531,11 @@ export class WorkflowService {
 
     console.log('Saving workflow with payload:', payload);
 
-    return this.apiService.saveCompleteWorkflow(this.workflowId!, payload).pipe(
+// Validate and clean payload before sending
+    const cleanedPayload = this.validateAndCleanPayload(payload);
+    console.log('Cleaned payload:', cleanedPayload);
+
+    return this.apiService.saveCompleteWorkflow(this.workflowId!, cleanedPayload).pipe(
       tap(response => {
         console.log('Workflow saved successfully:', response);
         this.updateLocalIds(response);
@@ -502,7 +558,46 @@ export class WorkflowService {
       })
     );
   }
+  private validateAndCleanPayload(payload: any): any {
+    const cleaned = JSON.parse(JSON.stringify(payload)); // Deep clone
 
+    // Clean elements
+    if (cleaned.elements) {
+      cleaned.elements = cleaned.elements.map((element: any) => {
+        // Ensure no ID field is an empty array
+        Object.keys(element.properties || {}).forEach(key => {
+          if (key === 'id' || key.endsWith('_id')) {
+            if (Array.isArray(element.properties[key])) {
+              if (element.properties[key].length === 0) {
+                delete element.properties[key];
+              } else {
+                element.properties[key] = element.properties[key][0];
+              }
+            }
+          }
+        });
+        return element;
+      });
+    }
+
+    // Clean connections
+    if (cleaned.connections) {
+      cleaned.connections = cleaned.connections.filter((conn: any) => {
+        // Ensure source_id and target_id are not arrays
+        if (Array.isArray(conn.source_id)) {
+          conn.source_id = conn.source_id[0] || null;
+        }
+        if (Array.isArray(conn.target_id)) {
+          conn.target_id = conn.target_id[0] || null;
+        }
+
+        // Only include connections with valid IDs
+        return conn.source_id !== null && conn.target_id !== null;
+      });
+    }
+
+    return cleaned;
+  }
   // Legacy save method (individual elements)
   private saveWorkflowLegacy(): Observable<any> {
     if (!this.currentServiceCode) {
@@ -787,32 +882,34 @@ export class WorkflowService {
   private mapPageProperties(element: WorkflowElement): any {
     const properties = element.properties;
     return {
-      name: properties['name'],
-      name_ara: properties['name_ara'],
-      description: properties['description'],
-      description_ara: properties['description_ara'],
-      service: this.toNumber(properties['service_id'] || properties['service']),
-      sequence_number: this.toNumber(properties['sequence_number_id'] || properties['sequence_number']),
-      applicant_type: this.toNumber(properties['applicant_type_id'] || properties['applicant_type']),
-      active_ind: properties['active_ind'] !== false,
+      name: element.properties['name'],
+      name_ara: element.properties['name_ara'],
+      description: element.properties['description'],
+      description_ara: element.properties['description_ara'],
+      service: this.toNumber(element.properties['service_id'] || element.properties['service']),
+      sequence_number: this.toNumber(element.properties['sequence_number_id'] || element.properties['sequence_number']),
+      applicant_type: this.toNumber(element.properties['applicant_type_id'] || element.properties['applicant_type']),
+      active_ind: element.properties['active_ind'] !== false,
       position_x: element.position?.x || 0,
       position_y: element.position?.y || 0,
       is_expanded: element.isExpanded || false
-    };
-  }
+    };  }
 
   private mapCategoryProperties(category: WorkflowElement): any {
     const parentPage = this.findParentPage(category);
-    const pageId = parentPage?.properties.page_id;
+    const pageId = parentPage?.properties['page_id'];
 
     return {
-      name: category.properties.name,
-      name_ara: category.properties.name_ara,
-      description: category.properties.description,
-      code: category.properties.code,
-      is_repeatable: category.properties.is_repeatable,
-      page: pageId ? [pageId] : category.properties.page_ids || [],
-      active_ind: true
+      name: category.properties['name'],
+      name_ara: category.properties['name_ara'],
+      description: category.properties['description'],
+      code: category.properties['code'],
+      is_repeatable: category.properties['is_repeatable'],
+      page: pageId ? [pageId] : category.properties['page_ids'] || [],
+      active_ind: category.properties['active_ind'] !== false,
+      relative_position_x: category.position?.x || 0,
+      relative_position_y: category.position?.y || 0,
+      workflow: this.workflowId ? this.toNumber(this.workflowId) : undefined
     };
   }
 
@@ -820,24 +917,29 @@ export class WorkflowService {
     const parentCategory = this.currentWorkflow.elements.find(el => el.id === field.parentId);
     const categoryId = parentCategory?.properties.category_id;
     const parentPage = this.findParentPage(field);
-    const serviceId = parentPage?.properties.service_id;
+    const serviceId = parentPage?.properties.service_id || parentPage?.properties.service;
 
     const mapped: any = {
-      _field_name: field.properties._field_name,
-      _field_display_name: field.properties._field_display_name,
-      _field_display_name_ara: field.properties._field_display_name_ara,
-      _field_type: this.toNumber(field.properties.field_type_id || field.properties._field_type),
-      _sequence: field.properties._sequence,
-      _mandatory: field.properties._mandatory,
-      _is_hidden: field.properties._is_hidden,
-      _is_disabled: field.properties._is_disabled,
-      _lookup: this.toNumberOrNull(field.properties.lookup_id || field.properties._lookup),
-      _category: categoryId ? [categoryId] : field.properties.category_ids || [],
-      service: serviceId ? [serviceId] : field.properties.service_ids || [],
-      active_ind: true
+      _field_name: field.properties['_field_name'],
+      _field_display_name: field.properties['_field_display_name'],
+      _field_display_name_ara: field.properties['_field_display_name_ara'],
+      _field_type: this.toNumber(field.properties['field_type_id'] || field.properties['_field_type']),
+      _sequence: field.properties['_sequence'] !== undefined ? this.toNumber(field.properties['_sequence']) : undefined,
+      _mandatory: field.properties['_mandatory'] === true,
+      _is_hidden: field.properties['_is_hidden'] === true,
+      _is_disabled: field.properties['_is_disabled'] === true,
+      _lookup: this.toNumberOrNull(field.properties['lookup_id'] || field.properties['_lookup']),
+      _parent_field: this.toNumberOrNull(field.properties['parent_field_id'] || field.properties['_parent_field']),
+      _category: categoryId ? [this.toNumber(categoryId)] : (field.properties['category_ids'] || []).map((id: any) => this.toNumber(id)),
+      service: serviceId ? [this.toNumber(serviceId)] : (field.properties['service_ids'] || []).map((id: any) => this.toNumber(id)),
+      active_ind: field.properties['active_ind'] !== false,
+      allowed_lookups: field.properties['allowed_lookups'] || [],
+      relative_position_x: field.position?.x || 0,
+      relative_position_y: field.position?.y || 0,
+      workflow: this.workflowId ? this.toNumber(this.workflowId) : undefined
     };
 
-    // Add validation properties
+// Add validation properties
     const validationProps = [
       '_max_length', '_min_length', '_regex_pattern', '_allowed_characters',
       '_forbidden_words', '_value_greater_than', '_value_less_than',
@@ -858,24 +960,27 @@ export class WorkflowService {
   }
 
   private mapConditionProperties(condition: WorkflowElement): any {
-    let targetFieldId = this.toNumber(condition.properties.target_field_id);
+    let targetFieldId = this.toNumber(condition.properties['target_field_id']);
 
-    if (!targetFieldId && condition.properties.target_field) {
+    if (!targetFieldId && condition.properties['target_field']) {
       const targetField = this.currentWorkflow.elements.find(el =>
         el.type === ElementType.FIELD &&
-        (el.properties._field_name === condition.properties.target_field ||
-          el.properties.name === condition.properties.target_field)
+        (el.properties['_field_name'] === condition.properties['target_field'] ||
+          el.properties['name'] === condition.properties['target_field'])
       );
 
-      if (targetField?.properties._field_id) {
-        targetFieldId = targetField.properties._field_id;
+      if (targetField?.properties['_field_id']) {
+        targetFieldId = targetField.properties['_field_id'];
       }
     }
 
     return {
       target_field: targetFieldId,
-      condition_logic: condition.properties.condition_logic || [],
-      active_ind: true
+      condition_logic: condition.properties['condition_logic'] || [],
+      active_ind: condition.properties['active_ind'] !== false,
+      position_x: condition.position?.x || 0,
+      position_y: condition.position?.y || 0,
+      workflow: this.workflowId ? this.toNumber(this.workflowId) : undefined
     };
   }
 
@@ -1404,46 +1509,47 @@ export class WorkflowService {
   // Map field from backend
   private mapFieldFromBackend(field: any): ElementProperties {
     return {
-      _field_id: field.id,
-      name: field._field_display_name || field._field_name,
-      _field_name: field._field_name,
-      _field_display_name: field._field_display_name,
-      _field_display_name_ara: field._field_display_name_ara,
-      _field_type: field._field_type,
-      field_type_id: field.field_type_id,
-      field_type_name: field.field_type_name,
-      _mandatory: field._mandatory,
-      _is_hidden: field._is_hidden,
-      _is_disabled: field._is_disabled,
-      _sequence: field._sequence,
-      _lookup: field._lookup,
-      lookup_id: field.lookup_id,
-      lookup_name: field.lookup_name,
-      _max_length: field._max_length,
-      _min_length: field._min_length,
-      _regex_pattern: field._regex_pattern,
-      _allowed_characters: field._allowed_characters,
-      _forbidden_words: field._forbidden_words,
-      _value_greater_than: field._value_greater_than,
-      _value_less_than: field._value_less_than,
-      _integer_only: field._integer_only,
-      _positive_only: field._positive_only,
-      _precision: field._precision,
-      _date_greater_than: field._date_greater_than,
-      _date_less_than: field._date_less_than,
-      _future_only: field._future_only,
-      _past_only: field._past_only,
-      _file_types: field._file_types,
-      _max_file_size: field._max_file_size,
-      _image_max_width: field._image_max_width,
-      _image_max_height: field._image_max_height,
-      _default_boolean: field._default_boolean,
-      _max_selections: field._max_selections,
-      _min_selections: field._min_selections,
-      _unique: field._unique,
-      _default_value: field._default_value,
-      _coordinates_format: field._coordinates_format,
-      _uuid_format: field._uuid_format
+      '_field_id': field.id,
+      'name': field._field_display_name || field._field_name,
+      '_field_name': field._field_name,
+      '_field_display_name': field._field_display_name,
+      '_field_display_name_ara': field._field_display_name_ara,
+      '_field_type': field._field_type,
+      'field_type_id': field.field_type_id,
+      'field_type_name': field.field_type_name,
+      '_mandatory': field._mandatory,
+      '_is_hidden': field._is_hidden,
+      '_is_disabled': field._is_disabled,
+      '_sequence': field._sequence,
+      '_lookup': field._lookup,
+      'lookup_id': field.lookup_id,
+      'lookup_name': field.lookup_name,
+      '_max_length': field._max_length,
+      '_min_length': field._min_length,
+      '_regex_pattern': field._regex_pattern,
+      '_allowed_characters': field._allowed_characters,
+      '_forbidden_words': field._forbidden_words,
+      '_value_greater_than': field._value_greater_than,
+      '_value_less_than': field._value_less_than,
+      '_integer_only': field._integer_only,
+      '_positive_only': field._positive_only,
+      '_precision': field._precision,
+      '_date_greater_than': field._date_greater_than,
+      '_date_less_than': field._date_less_than,
+      '_future_only': field._future_only,
+      '_past_only': field._past_only,
+      '_file_types': field._file_types,
+      '_max_file_size': field._max_file_size,
+      '_image_max_width': field._image_max_width,
+      '_image_max_height': field._image_max_height,
+      '_default_boolean': field._default_boolean,
+      '_max_selections': field._max_selections,
+      '_min_selections': field._min_selections,
+      '_unique': field._unique,
+      '_default_value': field._default_value,
+      '_coordinates_format': field._coordinates_format,
+      '_uuid_format': field._uuid_format,
+      'active_ind': field.active_ind !== false
     };
   }
 
@@ -1494,6 +1600,18 @@ export class WorkflowService {
           if (!field) return;
 
           const fieldElement = this.createFieldElement(field, fieldIndex, categoryElement.id, category.id);
+
+          // Ensure field element has all required properties
+          fieldElement.properties = {
+            ...fieldElement.properties,
+            // Map service and category arrays
+            service_ids: field.service || field.services || [serviceId].filter(Boolean),
+            category_ids: field._category || field.categories || [category.id].filter(Boolean),
+            // Ensure all IDs are properly set
+            service: field.service || [serviceId].filter(Boolean),
+            _category: field._category || [category.id].filter(Boolean)
+          };
+
           workflowData.elements.push(fieldElement);
           categoryElement.children!.push(fieldElement.id);
 
@@ -1630,54 +1748,54 @@ export class WorkflowService {
       position: { x: 0, y: 0 },
       properties: {
         name: field.display_name || field._field_display_name || field.name || field._field_name || `Field ${fieldIndex + 1}`,
-        _field_name: field._field_name || field.name,
-        _field_display_name: field._field_display_name || field.display_name,
-        _field_display_name_ara: field._field_display_name_ara || field.display_name_ara,
-        _field_type: field.field_type_id || fieldTypeId || field._field_type || field.field_type,
-        field_type_id: field.field_type_id,
-        field_type_name: field.field_type_name,
-        field_type_code: field.field_type_code,
-        _field_id: field._field_id || field.field_id || field.id,
-        _mandatory: field._mandatory !== undefined ? field._mandatory : (field.mandatory || false),
-        _is_hidden: field._is_hidden !== undefined ? field._is_hidden : (field.is_hidden || false),
-        _is_disabled: field._is_disabled !== undefined ? field._is_disabled : (field.is_disabled || false),
-        _lookup: field.lookup_id || lookupId || field._lookup || field.lookup,
-        lookup_id: field.lookup_id,
-        lookup_name: field.lookup_name,
-        lookup_code: field.lookup_code,
-        _sequence: field._sequence || field.sequence || fieldIndex,
-        _parent_field: field.parent_field_id || field._parent_field,
-        parent_field_id: field.parent_field_id,
-        parent_field_name: field.parent_field_name,
-        _max_length: field._max_length !== undefined ? field._max_length : field.max_length,
-        _min_length: field._min_length !== undefined ? field._min_length : field.min_length,
-        _regex_pattern: field._regex_pattern || field.regex_pattern,
-        _allowed_characters: field._allowed_characters || field.allowed_characters,
-        _forbidden_words: field._forbidden_words || field.forbidden_words,
-        _value_greater_than: field._value_greater_than !== undefined ? field._value_greater_than : field.value_greater_than,
-        _value_less_than: field._value_less_than !== undefined ? field._value_less_than : field.value_less_than,
-        _integer_only: field._integer_only !== undefined ? field._integer_only : field.integer_only,
-        _positive_only: field._positive_only !== undefined ? field._positive_only : field.positive_only,
-        _precision: field._precision !== undefined ? field._precision : field.precision,
-        _date_greater_than: field._date_greater_than || field.date_greater_than,
-        _date_less_than: field._date_less_than || field.date_less_than,
-        _future_only: field._future_only !== undefined ? field._future_only : field.future_only,
-        _past_only: field._past_only !== undefined ? field._past_only : field.past_only,
-        _file_types: field._file_types || field.file_types,
-        _max_file_size: field._max_file_size !== undefined ? field._max_file_size : field.max_file_size,
-        _image_max_width: field._image_max_width !== undefined ? field._image_max_width : field.image_max_width,
-        _image_max_height: field._image_max_height !== undefined ? field._image_max_height : field.image_max_height,
-        _default_boolean: field._default_boolean !== undefined ? field._default_boolean : field.default_boolean,
-        _max_selections: field._max_selections !== undefined ? field._max_selections : field.max_selections,
-        _min_selections: field._min_selections !== undefined ? field._min_selections : field.min_selections,
-        _unique: field._unique !== undefined ? field._unique : field.unique,
-        _default_value: field._default_value || field.default_value,
-        _coordinates_format: field._coordinates_format !== undefined ? field._coordinates_format : field.coordinates_format,
-        _uuid_format: field._uuid_format !== undefined ? field._uuid_format : field.uuid_format,
-        allowed_lookups: field.allowed_lookups || [],
-        service_ids: field.service || field.services || [],
-        category_ids: field._category || field.categories || [categoryId],
-        active_ind: field.active_ind !== false
+        '_field_name': field._field_name || field.name,
+        '_field_display_name': field._field_display_name || field.display_name,
+        '_field_display_name_ara': field._field_display_name_ara || field.display_name_ara,
+        '_field_type': field.field_type_id || fieldTypeId || field._field_type || field.field_type,
+        'field_type_id': field.field_type_id,
+        'field_type_name': field.field_type_name,
+        'field_type_code': field.field_type_code,
+        '_field_id': field._field_id || field.field_id || field.id,
+        '_mandatory': field._mandatory !== undefined ? field._mandatory : (field.mandatory || false),
+        '_is_hidden': field._is_hidden !== undefined ? field._is_hidden : (field.is_hidden || false),
+        '_is_disabled': field._is_disabled !== undefined ? field._is_disabled : (field.is_disabled || false),
+        '_lookup': field.lookup_id || lookupId || field._lookup || field.lookup,
+        'lookup_id': field.lookup_id,
+        'lookup_name': field.lookup_name,
+        'lookup_code': field.lookup_code,
+        '_sequence': field._sequence || field.sequence || fieldIndex,
+        '_parent_field': field.parent_field_id || field._parent_field,
+        'parent_field_id': field.parent_field_id,
+        'parent_field_name': field.parent_field_name,
+        '_max_length': field._max_length !== undefined ? field._max_length : field.max_length,
+        '_min_length': field._min_length !== undefined ? field._min_length : field.min_length,
+        '_regex_pattern': field._regex_pattern || field.regex_pattern,
+        '_allowed_characters': field._allowed_characters || field.allowed_characters,
+        '_forbidden_words': field._forbidden_words || field.forbidden_words,
+        '_value_greater_than': field._value_greater_than !== undefined ? field._value_greater_than : field.value_greater_than,
+        '_value_less_than': field._value_less_than !== undefined ? field._value_less_than : field.value_less_than,
+        '_integer_only': field._integer_only !== undefined ? field._integer_only : field.integer_only,
+        '_positive_only': field._positive_only !== undefined ? field._positive_only : field.positive_only,
+        '_precision': field._precision !== undefined ? field._precision : field.precision,
+        '_date_greater_than': field._date_greater_than || field.date_greater_than,
+        '_date_less_than': field._date_less_than || field.date_less_than,
+        '_future_only': field._future_only !== undefined ? field._future_only : field.future_only,
+        '_past_only': field._past_only !== undefined ? field._past_only : field.past_only,
+        '_file_types': field._file_types || field.file_types,
+        '_max_file_size': field._max_file_size !== undefined ? field._max_file_size : field.max_file_size,
+        '_image_max_width': field._image_max_width !== undefined ? field._image_max_width : field.image_max_width,
+        '_image_max_height': field._image_max_height !== undefined ? field._image_max_height : field.image_max_height,
+        '_default_boolean': field._default_boolean !== undefined ? field._default_boolean : field.default_boolean,
+        '_max_selections': field._max_selections !== undefined ? field._max_selections : field.max_selections,
+        '_min_selections': field._min_selections !== undefined ? field._min_selections : field.min_selections,
+        '_unique': field._unique !== undefined ? field._unique : field.unique,
+        '_default_value': field._default_value || field.default_value,
+        '_coordinates_format': field._coordinates_format !== undefined ? field._coordinates_format : field.coordinates_format,
+        '_uuid_format': field._uuid_format !== undefined ? field._uuid_format : field.uuid_format,
+        'allowed_lookups': field.allowed_lookups || [],
+        'service_ids': field.service || field.services || [],
+        'category_ids': field._category || field.categories || [categoryId],
+        'active_ind': field.active_ind !== false
       },
       connections: [],
       parentId: categoryElementId
