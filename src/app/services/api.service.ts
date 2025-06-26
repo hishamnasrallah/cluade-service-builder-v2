@@ -127,14 +127,14 @@ export class ApiService {
     private configService: ConfigService
   ) {}
 
-  private getApiUrl(endpoint: string, useWorkflowApi: boolean = false): string {
+  private getApiUrl(endpoint: string, useWorkflowApi: boolean = true): string {
     const baseUrl = this.configService.getBaseUrl();
     if (!baseUrl) {
       throw new Error('Base URL not configured. Please configure the API base URL first.');
     }
 
-    // Use workflow-specific endpoints for workflow builder
-    if (useWorkflowApi && endpoint.startsWith('/dynamic/')) {
+    // Always use workflow-specific endpoints for workflow builder operations
+    if (endpoint.startsWith('/dynamic/')) {
       return `${baseUrl}/dynamic/workflow${endpoint.replace('/dynamic', '')}`;
     }
 
@@ -175,9 +175,9 @@ export class ApiService {
     return throwError(() => ({ ...error, message: errorMessage }));
   };
 
-  // Service Flow APIs
+  // Service Flow APIs - Now using workflow-specific endpoint
   getServiceFlows(): Observable<ServiceFlowResponse> {
-    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/service_flow/', true))
+    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/service_flow/'))
       .pipe(
         tap(response => console.log('Loaded service flows:', response)),
         catchError(this.handleError)
@@ -533,12 +533,18 @@ export class ApiService {
   }
 
 
-  // Applicant Type lookup
+// Applicant Type lookup - handle different possible names
   getApplicantTypes(): Observable<LookupResponse> {
-    return this.getLookups('Applicant Type');
+    return this.getLookups('Service Applicant Type').pipe(
+      catchError((error) => {
+        console.warn('Service Applicant Type lookup failed, trying Applicant Type:', error);
+        // Fallback to "Applicant Type" if "Service Applicant Type" fails
+        return this.getLookups('Applicant Type');
+      })
+    );
   }
 
-  // Field Type APIs
+  // Field Type APIs - Using workflow endpoints
   getFieldTypes(): Observable<FieldTypeResponse> {
     return this.http.get<FieldTypeResponse>(this.getApiUrl('/dynamic/api/v1/field-types/'))
       .pipe(
@@ -547,7 +553,7 @@ export class ApiService {
       );
   }
 
-  // Page APIs
+  // Page APIs - Using workflow endpoints
   getPages(): Observable<PageResponse> {
     return this.http.get<PageResponse>(this.getApiUrl('/dynamic/api/v1/pages/'))
       .pipe(
@@ -556,7 +562,7 @@ export class ApiService {
       );
   }
 
-  // Category APIs
+  // Category APIs - Using workflow endpoints
   getCategories(): Observable<CategoryResponse> {
     return this.http.get<CategoryResponse>(this.getApiUrl('/dynamic/api/v1/categories/'))
       .pipe(
@@ -565,7 +571,7 @@ export class ApiService {
       );
   }
 
-  // Field APIs
+  // Field APIs - Using workflow endpoints
   getFields(): Observable<FieldResponse> {
     return this.http.get<FieldResponse>(this.getApiUrl('/dynamic/api/v1/fields/'))
       .pipe(
@@ -591,8 +597,7 @@ export class ApiService {
         catchError(this.handleError)
       );
   }
-  // PAGE CRUD Operations
-  // PAGE CRUD Operations
+// PAGE CRUD Operations - Using workflow endpoints
   createPage(page: Partial<Page>): Observable<Page> {
     return this.http.post<Page>(this.getApiUrl('/dynamic/api/v1/pages/'), page)
       .pipe(
@@ -741,6 +746,82 @@ export class ApiService {
       tap(response => console.log('Condition test result:', response)),
       catchError(this.handleError)
     );
+  }
+  // WORKFLOW CRUD Operations
+  createWorkflow(workflow: any): Observable<any> {
+    const payload = {
+      name: workflow.name,
+      description: workflow.description,
+      service_id: workflow.service_id,
+      service_code: workflow.service_code,
+      metadata: workflow.metadata,
+      is_active: true
+    };
+
+    return this.http.post(this.getApiUrl('/dynamic/workflows/'), payload)
+      .pipe(
+        tap(response => console.log('Workflow created:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  updateWorkflow(workflowId: string, workflow: any): Observable<any> {
+    const payload = {
+      name: workflow.name,
+      description: workflow.description,
+      service_id: workflow.service_id,
+      service_code: workflow.service_code,
+      metadata: workflow.metadata,
+      is_active: workflow.is_active !== false
+    };
+
+    return this.http.patch(this.getApiUrl(`/dynamic/workflows/${workflowId}/`), payload)
+      .pipe(
+        tap(response => console.log('Workflow updated:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  deleteWorkflow(workflowId: string): Observable<void> {
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/workflows/${workflowId}/`))
+      .pipe(
+        tap(() => console.log('Workflow deleted:', workflowId)),
+        catchError(this.handleError)
+      );
+  }
+
+  getWorkflows(): Observable<any> {
+    return this.http.get(this.getApiUrl('/dynamic/workflows/'))
+      .pipe(
+        tap(response => console.log('Loaded workflows:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  getWorkflow(workflowId: string): Observable<any> {
+    return this.http.get(this.getApiUrl(`/dynamic/workflows/${workflowId}/`))
+      .pipe(
+        tap(response => console.log('Loaded workflow:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+// Export workflow as service flow format
+  exportWorkflow(workflowId: string): Observable<ServiceFlow> {
+    return this.http.get<ServiceFlow>(this.getApiUrl(`/dynamic/workflows/${workflowId}/export/`))
+      .pipe(
+        tap(response => console.log('Exported workflow:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+// Import service flow to workflow
+  importWorkflow(serviceFlow: ServiceFlow): Observable<any> {
+    return this.http.post(this.getApiUrl('/dynamic/workflows/import/'), serviceFlow)
+      .pipe(
+        tap(response => console.log('Imported workflow:', response)),
+        catchError(this.handleError)
+      );
   }
 }
 

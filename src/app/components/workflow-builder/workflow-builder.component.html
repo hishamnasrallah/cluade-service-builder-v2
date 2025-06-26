@@ -55,8 +55,23 @@
       <mat-icon>folder_open</mat-icon>
     </button>
 
-    <button mat-icon-button (click)="saveWorkflow()" title="Save">
+    <!-- Add these buttons to the toolbar after the existing save button -->
+    <button mat-icon-button (click)="saveWorkflow()"
+            [matTooltip]="workflow.id ? 'Update Workflow' : 'Save Workflow'">
       <mat-icon>save</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="saveAsNewWorkflow()"
+            title="Save as New Workflow"
+            *ngIf="workflow.id">
+      <mat-icon>save_as</mat-icon>
+    </button>
+
+    <button mat-icon-button (click)="deleteWorkflow()"
+            title="Delete Workflow"
+            *ngIf="workflow.id"
+            color="warn">
+      <mat-icon>delete</mat-icon>
     </button>
 
     <button mat-icon-button (click)="exportServiceFlow()" title="Export" [disabled]="!currentServiceCode">

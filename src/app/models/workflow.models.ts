@@ -52,12 +52,24 @@ export interface ElementProperties {
   page_id?: number;
   is_hidden_page?: boolean;
 
-  // Category properties
+  // NEW: Explicit foreign key fields from workflow API
+  service_id?: number;
+  service_code?: string;
+  service_name?: string;
+  sequence_number_id?: number;
+  sequence_number_code?: string;
+  sequence_number_name?: string;
+  applicant_type_id?: number;
+  applicant_type_code?: string;
+  applicant_type_name?: string;
+
+// Category properties
   existingCategoryId?: number;
   category_id?: number;
   code?: string;
   is_repeatable?: boolean;
   fields?: FieldElementProperties[];
+  page_ids?: number[];  // Many-to-many relationship
 
   // Field properties (using underscore prefix to match API)
   existingFieldId?: number;
@@ -71,6 +83,19 @@ export interface ElementProperties {
   _is_hidden?: boolean;
   _is_disabled?: boolean;
   _lookup?: number | string;
+
+  // NEW: Explicit foreign key fields from workflow API
+  field_type_id?: number;
+  field_type_name?: string;
+  field_type_code?: string;
+  lookup_id?: number;
+  lookup_name?: string;
+  lookup_code?: string;
+  parent_field_id?: number;
+  parent_field_name?: string;
+  service_ids?: number[];    // Many-to-many relationship
+  category_ids?: number[];   // Many-to-many relationship
+
 
   // Condition properties
   condition_id?: number;

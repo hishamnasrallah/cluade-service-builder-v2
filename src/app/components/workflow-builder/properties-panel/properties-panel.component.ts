@@ -198,7 +198,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     name: any
   ): number | null {
     if (!lookupArray || lookupArray.length === 0) {
-      console.warn('Lookup array is empty, returning ID if numeric:', id);
+      console.warn('Lookup array is empty, checking provided values:', { id, code, name });
       // If we have a numeric ID and no lookup data yet, return the ID
       if (id && (typeof id === 'number' || (/^\d+$/.test(id) && id.length > 2))) {
         return typeof id === 'string' ? parseInt(id, 10) : id;
@@ -206,7 +206,19 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       return null;
     }
 
-    // First try to match by code (important for sequence_number which comes as "01", "02", etc.)
+    // First try to match by ID (since workflow API provides explicit IDs)
+    if (id !== null && id !== undefined) {
+      const numericId = typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id;
+      if (typeof numericId === 'number') {
+        const foundById = lookupArray.find(item => item.id === numericId);
+        if (foundById) {
+          console.log('Found by ID:', id, '-> ID:', foundById.id);
+          return foundById.id;
+        }
+      }
+    }
+
+    // Then try to match by code (important for sequence_number)
     if (code) {
       const foundByCode = lookupArray.find(item =>
         item.code && item.code.toLowerCase() === code.toString().toLowerCase()
@@ -217,27 +229,22 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       }
     }
 
-    // Then try to match by ID
-    if (id !== null && id !== undefined) {
-      const numericId = typeof id === 'string' && /^\d+$/.test(id) && id.length > 2 ? parseInt(id, 10) : id;
-      if (typeof numericId === 'number') {
-        const foundById = lookupArray.find(item => item.id === numericId);
-        if (foundById) return foundById.id;
-        // If not found but we have a numeric ID, return it anyway
-        // (the lookup data might be incomplete)
-        return numericId;
-      }
-    }
-
     // Finally try to match by name
     if (name) {
       const foundByName = lookupArray.find(item =>
         item.name && item.name.toLowerCase() === name.toString().toLowerCase()
       );
-      if (foundByName) return foundByName.id;
+      if (foundByName) {
+        console.log('Found by name:', name, '-> ID:', foundByName.id);
+        return foundByName.id;
+      }
     }
 
     console.warn('Could not find lookup value for:', { id, code, name, availableItems: lookupArray });
+    // If we have a numeric ID, return it anyway (the lookup might be incomplete)
+    if (id && typeof id === 'number') {
+      return id;
+    }
     return null;
   }
 
@@ -789,31 +796,31 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           applicantTypes: this.applicantTypes.length
         });
 
-        // Extract and map values with better handling
+        // The workflow API now provides explicit foreign key fields
         let mappedSequenceNumber: number | string = '';
         let mappedApplicantType: number | string = '';
         let mappedService: number | string = '';
 
-        // Handle sequence_number
-        if (properties.sequence_number !== undefined && properties.sequence_number !== null) {
-          if (typeof properties.sequence_number === 'number') {
-            mappedSequenceNumber = properties.sequence_number;
-          } else if (typeof properties.sequence_number === 'string' && /^\d+$/.test(properties.sequence_number)) {
-            mappedSequenceNumber = parseInt(properties.sequence_number, 10);
-          } else {
-            // Try to find in lookup
-            const found = this.findLookupValue(
-              this.flowSteps,
-              properties.sequence_number,
-              properties.sequence_number_code,
-              properties.sequence_number_name
-            );
-            mappedSequenceNumber = found !== null ? found : properties.sequence_number;
-          }
+        // Handle sequence_number - prefer explicit ID from workflow API
+        if (properties.sequence_number_id !== undefined && properties.sequence_number_id !== null) {
+          mappedSequenceNumber = properties.sequence_number_id;
+        } else if (properties.sequence_number !== undefined && properties.sequence_number !== null) {
+          // Fallback to old format
+          const found = this.findLookupValue(
+            this.flowSteps,
+            properties.sequence_number,
+            properties.sequence_number_code,
+            properties.sequence_number_name
+          );
+          mappedSequenceNumber = found !== null ? found : properties.sequence_number;
         }
 
-        // Handle applicant_type
-        if (properties.applicant_type !== undefined && properties.applicant_type !== null) {
+        // Handle applicant_type - prefer explicit ID from workflow API
+// Handle applicant_type - prefer explicit ID from workflow API
+        if (properties.applicant_type_id !== undefined && properties.applicant_type_id !== null) {
+          mappedApplicantType = properties.applicant_type_id;
+        } else if (properties.applicant_type !== undefined && properties.applicant_type !== null) {
+          // Fallback to old format
           if (typeof properties.applicant_type === 'number') {
             mappedApplicantType = properties.applicant_type;
           } else if (typeof properties.applicant_type === 'string' && /^\d+$/.test(properties.applicant_type)) {
@@ -830,22 +837,17 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           }
         }
 
-        // Handle service
-        if (properties.service !== undefined && properties.service !== null) {
-          if (typeof properties.service === 'number') {
-            mappedService = properties.service;
-          } else if (typeof properties.service === 'string' && /^\d+$/.test(properties.service)) {
-            mappedService = parseInt(properties.service, 10);
-          } else {
-            // Try to find in lookup
-            const found = this.findLookupValue(
-              this.services,
-              properties.service,
-              properties.service_code,
-              properties.service_name
-            );
-            mappedService = found !== null ? found : properties.service;
-          }
+        // Handle service - prefer explicit ID from workflow API
+        if (properties.service_id !== undefined && properties.service_id !== null) {
+          mappedService = properties.service_id;
+        } else if (properties.service !== undefined && properties.service !== null) {
+          const found = this.findLookupValue(
+            this.services,
+            properties.service,
+            properties.service_code,
+            properties.service_name
+          );
+          mappedService = found !== null ? found : properties.service;
         }
 
         console.log('Mapped values:', {
@@ -854,25 +856,16 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           service: mappedService
         });
 
-        // Set form values
+        // Set form values with the properly mapped values
         this.propertiesForm.patchValue({
           useExisting: false,
           existingPageId: '',
-          service: properties.service || '',
-          sequence_number: properties.sequence_number || properties.sequence_number_code || '',
-          applicant_type: properties.applicant_type || '',
+          service: mappedService || properties.service || '',
+          sequence_number: mappedSequenceNumber || properties.sequence_number || '',
+          applicant_type: mappedApplicantType || properties.applicant_type || '',
           name_ara: properties.name_ara || '',
           description_ara: properties.description_ara || ''
         });
-
-        // Force change detection after a short delay
-        setTimeout(() => {
-          this.propertiesForm.patchValue({
-            service: mappedService,
-            sequence_number: mappedSequenceNumber,
-            applicant_type: mappedApplicantType
-          });
-        }, 100);
 
         break;
       case ElementType.CATEGORY:
@@ -1088,12 +1081,24 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       active_ind: true
     };
 
-    // Handle page assignment
+    // Handle page assignment - many-to-many relationship
+    const pageIds: number[] = [];
+
+    // Check if page_ids array is already provided
+    if (properties.page_ids && Array.isArray(properties.page_ids)) {
+      pageIds.push(...properties.page_ids);
+    }
+
+    // Also check parent assignment
     if (this.selectedElement?.parentId) {
       const parentPage = this.workflow.elements.find(el => el.id === this.selectedElement!.parentId);
-      if (parentPage?.properties.page_id) {
-        mapped.page = [parentPage.properties.page_id];
+      if (parentPage?.properties.page_id && !pageIds.includes(parentPage.properties.page_id)) {
+        pageIds.push(parentPage.properties.page_id);
       }
+    }
+
+    if (pageIds.length > 0) {
+      mapped.page = pageIds;
     }
 
     return mapped;
@@ -1104,12 +1109,12 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       _field_name: properties._field_name,
       _field_display_name: properties._field_display_name,
       _field_display_name_ara: properties._field_display_name_ara,
-      _field_type: properties._field_type,
+      _field_type: properties.field_type_id || properties._field_type,
       _sequence: properties._sequence,
       _mandatory: properties._mandatory,
       _is_hidden: properties._is_hidden,
       _is_disabled: properties._is_disabled,
-      _lookup: properties._lookup,
+      _lookup: properties.lookup_id || properties._lookup,
       active_ind: true,
 
       // Validation properties
@@ -1140,20 +1145,57 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       _uuid_format: properties._uuid_format
     };
 
-    // Handle category assignment
+// Handle category assignment - many-to-many relationship
+    const categoryIds: number[] = [];
+
+    // Check if category_ids array is already provided
+    if (properties.category_ids && Array.isArray(properties.category_ids)) {
+      categoryIds.push(...properties.category_ids);
+    }
+
+    // Also check parent assignment
     if (this.selectedElement?.parentId) {
       const parentCategory = this.workflow.elements.find(el => el.id === this.selectedElement!.parentId);
-      if (parentCategory?.properties.category_id) {
-        mapped._category = [parentCategory.properties.category_id];
+      if (parentCategory?.properties.category_id && !categoryIds.includes(parentCategory.properties.category_id)) {
+        categoryIds.push(parentCategory.properties.category_id);
+      }
+    }
+
+    if (categoryIds.length > 0) {
+      mapped._category = categoryIds;
+    }
+
+    // Handle service assignment - many-to-many relationship
+    if (properties.service_ids && Array.isArray(properties.service_ids)) {
+      mapped.service = properties.service_ids;
+    } else {
+      // Get service from parent page
+      const page = this.findParentPage();
+      if (page?.properties.service_id) {
+        mapped.service = [page.properties.service_id];
       }
     }
 
     // Handle parent field
-    if (properties._parent_field) {
-      mapped._parent_field = properties._parent_field;
+    if (properties.parent_field_id || properties._parent_field) {
+      mapped._parent_field = properties.parent_field_id || properties._parent_field;
     }
 
     return mapped;
+  }
+
+  private findParentPage(): WorkflowElement | undefined {
+    if (!this.selectedElement) return undefined;
+
+    let current = this.selectedElement;
+    while (current.parentId) {
+      const parent = this.workflow.elements.find(el => el.id === current.parentId);
+      if (!parent) break;
+      if (parent.type === ElementType.PAGE) return parent;
+      current = parent;
+    }
+
+    return undefined;
   }
 
   private mapConditionProperties(properties: any): Partial<Condition> {

@@ -34,6 +34,13 @@ import {
   ServiceFlowSelectionResult,
   ServiceFlowSelectorDialogComponent
 } from './workflow-selector-dialog/workflow-selector-dialog.component';
+import {SaveWorkflowDialogComponent, SaveWorkflowResult} from './save-workflow-dialog/save-workflow-dialog.component';
+import {ConfirmDialogComponent} from '../shared/confirm-dialog/confirm-dialog.component';
+import { Router } from '@angular/router';
+import {MatTooltip} from '@angular/material/tooltip';
+
+
+
 @Component({
   selector: 'app-workflow-builder',
   standalone: true,
@@ -49,7 +56,8 @@ import {
     WorkflowElementComponent,
     PropertiesPanelComponent,
     ElementPaletteComponent,
-    MinimapComponent
+    MinimapComponent,
+    MatTooltip
   ],
   templateUrl:'workflow-builder.component.html',
   styleUrl: 'workflow-builder.component.scss'
@@ -88,7 +96,8 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     private workflowService: WorkflowService,
     private apiService: ApiService,
     private snackBar: MatSnackBar,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -762,12 +771,48 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
   // Workflow Operations
   saveWorkflow(): void {
+    // Show saving indicator
+    this.snackBar.open('Saving workflow...', '', { duration: 0 });
+
     this.workflowService.saveWorkflow().subscribe({
       next: (result) => {
+        this.snackBar.dismiss();
         this.snackBar.open('Workflow saved successfully', 'Close', { duration: 3000 });
       },
       error: (error) => {
-        this.snackBar.open('Error saving workflow', 'Close', { duration: 3000 });
+        this.snackBar.dismiss();
+        this.snackBar.open(`Error saving workflow: ${error.message}`, 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  deleteWorkflow(): void {
+    const confirmDialog = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Delete Workflow',
+        message: `Are you sure you want to delete all elements in this workflow? This action cannot be undone.`,
+        confirmText: 'Delete All',
+        cancelText: 'Cancel'
+      }
+    });
+
+    confirmDialog.afterClosed().subscribe(result => {
+      if (result) {
+        this.snackBar.open('Deleting workflow...', '', { duration: 0 });
+
+        this.workflowService.deleteWorkflow().subscribe({
+          next: () => {
+            this.snackBar.dismiss();
+            this.snackBar.open('Workflow deleted successfully', 'Close', { duration: 3000 });
+            // Create a new workflow instead of navigating
+            this.createNewWorkflow();
+          },
+          error: (error) => {
+            this.snackBar.dismiss();
+            this.snackBar.open(`Error deleting workflow: ${error.message}`, 'Close', { duration: 5000 });
+          }
+        });
       }
     });
   }
@@ -864,5 +909,47 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     // Default z-index
     return 10;
+  }
+
+  saveAsNewWorkflow(): void {
+    const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
+      width: '500px',
+      data: {
+        name: `${this.workflow.name} (Copy)`,
+        description: this.workflow.description,
+        serviceId: this.workflow.metadata?.service_id,
+        isUpdate: false
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: SaveWorkflowResult) => {
+      if (result) {
+        // Create a copy of the current workflow
+        const workflowCopy = {
+          ...this.workflow,
+          id: undefined, // Remove ID to create new
+          name: result.name,
+          description: result.description,
+          metadata: {
+            ...this.workflow.metadata,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        };
+
+        // Load the copy as current workflow
+        this.workflowService.loadWorkflow(workflowCopy);
+
+        // Save as new
+        this.workflowService.saveWorkflow().subscribe({
+          next: (response) => {
+            this.snackBar.open('Workflow saved as new', 'Close', { duration: 3000 });
+          },
+          error: (error) => {
+            this.snackBar.open(`Error saving workflow: ${error.message}`, 'Close', { duration: 5000 });
+          }
+        });
+      }
+    });
   }
 }
