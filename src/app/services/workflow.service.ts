@@ -340,32 +340,65 @@ export class WorkflowService {
     this.updateWorkflow();
   }
 
-  // Auto-organize elements
+// Auto-organize elements
   autoOrganizeElements(): void {
     const elements = this.currentWorkflow.elements;
     const topLevelElements = elements.filter(el => !el.parentId);
 
-    const typeOrder: Record<ElementType, number> = {
-      [ElementType.START]: 0,
-      [ElementType.PAGE]: 1,
-      [ElementType.CATEGORY]: 2,
-      [ElementType.FIELD]: 3,
-      [ElementType.CONDITION]: 4,
-      [ElementType.END]: 5
-    };
+    // Group elements by type
+    const startElements = topLevelElements.filter(el => el.type === ElementType.START);
+    const pageElements = topLevelElements.filter(el => el.type === ElementType.PAGE);
+    const conditionElements = topLevelElements.filter(el => el.type === ElementType.CONDITION);
+    const endElements = topLevelElements.filter(el => el.type === ElementType.END);
 
-    topLevelElements.sort((a, b) => (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0));
+    let currentX = 100;
+    const horizontalSpacing = 350;
+    const verticalSpacing = 200;
 
-    let xPosition = 100;
-    const spacing = 300;
+    // Position start element
+    startElements.forEach(element => {
+      element.position = { x: currentX, y: 100 };
+    });
 
-    topLevelElements.forEach(element => {
-      element.position = { x: xPosition, y: 100 };
-      xPosition += spacing;
+    if (startElements.length > 0) {
+      currentX += horizontalSpacing;
+    }
+
+    // Position pages
+    pageElements.forEach((page, index) => {
+      const yOffset = index % 2 === 0 ? 0 : verticalSpacing; // Alternate rows
+      page.position = { x: currentX, y: 100 + yOffset };
+
+      // Reset child positions relative to parent
+      if (page.children) {
+        page.children.forEach((childId, childIndex) => {
+          const child = elements.find(el => el.id === childId);
+          if (child) {
+            child.position = { x: 0, y: 0 }; // Children use relative positioning
+          }
+        });
+      }
+
+      currentX += horizontalSpacing;
+    });
+
+    // Position conditions below pages
+    const conditionStartX = 350; // Start after start element
+    conditionElements.forEach((condition, index) => {
+      condition.position = {
+        x: conditionStartX + (index * 150),
+        y: 350 // Below pages
+      };
+    });
+
+    // Position end element
+    endElements.forEach(element => {
+      element.position = { x: currentX, y: 100 };
     });
 
     this.updateWorkflow();
   }
+
 
   // Save workflow (with container support)
   saveWorkflow(): Observable<any> {
@@ -375,22 +408,31 @@ export class WorkflowService {
     return this.saveWorkflowLegacy();
   }
 
-  // Save using workflow container API
+// Save using workflow container API
   private saveWorkflowContainer(): Observable<any> {
+    // Ensure all elements have valid positions
+    const elementsWithValidPositions = this.currentWorkflow.elements.map(element => ({
+      ...element,
+      position: element.position || { x: 100, y: 100 }
+    }));
+
     const payload = {
       name: this.currentWorkflow.name,
       description: this.currentWorkflow.description,
       metadata: this.currentWorkflow.metadata,
       canvas_state: {
         zoom: 1,
-        panX: 0,
-        panY: 0,
-        viewMode: this.currentWorkflow.viewMode
+        panX: 100,
+        panY: 100,
+        viewMode: this.currentWorkflow.viewMode,
+        expandedElementId: this.currentWorkflow.expandedElementId
       },
-      elements: this.currentWorkflow.elements,
+      elements: elementsWithValidPositions,
       connections: this.currentWorkflow.connections,
       deleted_elements: this.deletedElements
     };
+
+    console.log('Saving workflow with payload:', payload);
 
     return this.apiService.saveCompleteWorkflow(this.workflowId!, payload).pipe(
       tap(response => {
@@ -827,7 +869,23 @@ export class WorkflowService {
   }
 
   // Update local IDs after save
+// Update local IDs after save
   private updateLocalIds(response: any): void {
+    // If response contains the complete workflow, update from that
+    if (response.elements && Array.isArray(response.elements)) {
+      // Update the entire workflow with the response
+      this.currentWorkflow.elements = response.elements;
+      this.currentWorkflow.connections = response.connections || [];
+
+      if (response.canvas_state) {
+        this.currentWorkflow.viewMode = response.canvas_state.viewMode || 'collapsed';
+        this.currentWorkflow.expandedElementId = response.canvas_state.expandedElementId;
+      }
+
+      return;
+    }
+
+    // Legacy format - update individual IDs
     const idMapping = new Map<string, number>();
 
     response.pages?.forEach((page: any) => {
@@ -870,7 +928,6 @@ export class WorkflowService {
       }
     });
   }
-
   // Clear deleted elements tracking
   private clearDeletedElements(): void {
     this.deletedElements = {
@@ -945,37 +1002,73 @@ export class WorkflowService {
   }
 
   // Load workflow by ID
+// Load workflow by ID
   loadWorkflowById(workflowId: string): Observable<WorkflowData> {
     return this.apiService.getWorkflow(workflowId).pipe(
       map(response => {
+        console.log('Loading workflow response:', response);
+
         this.workflowId = response.id;
         this.currentServiceCode = response.service_code;
 
-        const workflowData: WorkflowData = {
-          id: response.id,
-          name: response.name,
-          description: response.description,
-          elements: [],
-          connections: [],
-          viewMode: response.canvas_state?.viewMode || 'collapsed',
-          metadata: {
-            ...response.metadata,
-            workflow_id: response.id,
-            created_at: response.created_at,
-            updated_at: response.updated_at,
-            is_existing: true
-          }
-        };
+        // Check if response already has elements and connections (new format)
+        if (response.elements && Array.isArray(response.elements)) {
+          // New format - use elements directly
+          const workflowData: WorkflowData = {
+            id: response.id,
+            name: response.name,
+            description: response.description,
+            elements: response.elements,
+            connections: response.connections || [],
+            viewMode: response.canvas_state?.viewMode || 'collapsed',
+            expandedElementId: response.canvas_state?.expandedElementId,
+            metadata: {
+              ...response.metadata,
+              workflow_id: response.id,
+              service_code: response.service_code,
+              service_id: response.service,
+              created_at: response.created_at,
+              updated_at: response.updated_at,
+              is_existing: true,
+              is_draft: response.is_draft,
+              version: response.version
+            }
+          };
 
-        this.convertBackendElementsToWorkflow(response, workflowData);
-        this.currentWorkflow = workflowData;
-        this.updateWorkflow();
+          // Update parent counts for all elements
+          this.updateAllParentCounts(workflowData);
 
-        return workflowData;
+          this.currentWorkflow = workflowData;
+          this.updateWorkflow();
+
+          return workflowData;
+        } else {
+          // Legacy format - convert from separate arrays
+          const workflowData: WorkflowData = {
+            id: response.id,
+            name: response.name,
+            description: response.description,
+            elements: [],
+            connections: [],
+            viewMode: response.canvas_state?.viewMode || 'collapsed',
+            metadata: {
+              ...response.metadata,
+              workflow_id: response.id,
+              created_at: response.created_at,
+              updated_at: response.updated_at,
+              is_existing: true
+            }
+          };
+
+          this.convertBackendElementsToWorkflow(response, workflowData);
+          this.currentWorkflow = workflowData;
+          this.updateWorkflow();
+
+          return workflowData;
+        }
       })
     );
   }
-
   // Load service flow from API
   loadServiceFlowFromApi(serviceCode: string): Observable<WorkflowData> {
     return this.apiService.getServiceFlow(serviceCode).pipe(

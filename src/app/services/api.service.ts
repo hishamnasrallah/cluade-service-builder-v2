@@ -319,15 +319,22 @@ export class ApiService {
       throw new Error('Base URL not configured. Please configure the API base URL first.');
     }
 
-    // Special handling for workflow container endpoints
+    // Remove leading slash if present
+    endpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+
+    // Handle workflow container endpoints (workflows)
     if (endpoint.startsWith('/dynamic/workflows/')) {
       return `${baseUrl}${endpoint}`;
     }
 
-    // Use workflow-specific endpoints for all workflow builder operations
-    if (useWorkflowApi && endpoint.startsWith('/dynamic/')) {
-      const cleanEndpoint = endpoint.replace('/dynamic/', '/');
-      return `${baseUrl}/dynamic/workflow${cleanEndpoint}`;
+    // Handle workflow service flow endpoint
+    if (endpoint.startsWith('/dynamic/workflow/')) {
+      return `${baseUrl}${endpoint}`;
+    }
+
+    // Handle legacy dynamic endpoints - convert to dynamic
+    if (endpoint.startsWith('/dynamic/')) {
+      endpoint = endpoint.replace('/dynamic/', '/dynamic/');
     }
 
     return `${baseUrl}${endpoint}`;
@@ -367,14 +374,15 @@ export class ApiService {
     return throwError(() => ({ ...error, message: errorMessage }));
   };
 
-  // Service Flow APIs - Now using workflow-specific endpoint
+// Service Flow APIs - Using correct endpoint
   getServiceFlows(): Observable<ServiceFlowResponse> {
-    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/service_flow/'))
+    return this.http.get<ServiceFlowResponse>(this.getApiUrl('/dynamic/workflow/service_flow/'))
       .pipe(
         tap(response => console.log('Loaded service flows:', response)),
         catchError(this.handleError)
       );
   }
+
 
   getServiceFlow(serviceCode: string): Observable<ServiceFlow> {
     return this.getServiceFlows().pipe(
@@ -735,41 +743,42 @@ export class ApiService {
     );
   }
 
-  // Field Type APIs - Using workflow endpoints
+// Field Type APIs - Using correct endpoint
   getFieldTypes(): Observable<FieldTypeResponse> {
-    return this.http.get<FieldTypeResponse>(this.getApiUrl('/dynamic/api/v1/field-types/'))
+    return this.http.get<FieldTypeResponse>(this.getApiUrl('/dynamic/workflow/api/v1/field-types/'))
       .pipe(
         tap(response => console.log('Loaded field types:', response)),
         catchError(this.handleError)
       );
   }
 
-  // Page APIs - Using workflow endpoints
+// Page APIs - Using correct endpoints
   getPages(): Observable<PageResponse> {
-    return this.http.get<PageResponse>(this.getApiUrl('/dynamic/api/v1/pages/'))
+    return this.http.get<PageResponse>(this.getApiUrl('/dynamic/workflow/api/v1/pages/'))
       .pipe(
         tap(response => console.log('Loaded pages:', response)),
         catchError(this.handleError)
       );
   }
 
-  // Category APIs - Using workflow endpoints
+// Category APIs - Using correct endpoints
   getCategories(): Observable<CategoryResponse> {
-    return this.http.get<CategoryResponse>(this.getApiUrl('/dynamic/api/v1/categories/'))
+    return this.http.get<CategoryResponse>(this.getApiUrl('/dynamic/workflow/api/v1/categories/'))
       .pipe(
         tap(response => console.log('Loaded categories:', response)),
         catchError(this.handleError)
       );
   }
 
-  // Field APIs - Using workflow endpoints
+// Field APIs - Using correct endpoints
   getFields(): Observable<FieldResponse> {
-    return this.http.get<FieldResponse>(this.getApiUrl('/dynamic/api/v1/fields/'))
+    return this.http.get<FieldResponse>(this.getApiUrl('/dynamic/workflow/api/v1/fields/'))
       .pipe(
         tap(response => console.log('Loaded fields:', response)),
         catchError(this.handleError)
       );
   }
+
 
   // Utility methods
   isConfigured(): boolean {
@@ -789,9 +798,9 @@ export class ApiService {
       );
   }
 
-  // PAGE CRUD Operations - Using workflow endpoints
+// PAGE CRUD Operations - Using correct endpoints
   createPage(page: Partial<Page>): Observable<Page> {
-    return this.http.post<Page>(this.getApiUrl('/dynamic/api/v1/pages/'), page)
+    return this.http.post<Page>(this.getApiUrl('/dynamic/workflow/api/v1/pages/'), page)
       .pipe(
         tap(response => console.log('Page created:', response)),
         catchError(this.handleError)
@@ -802,7 +811,7 @@ export class ApiService {
     if (!id) {
       return throwError(() => new Error('Page ID is required'));
     }
-    return this.http.patch<Page>(this.getApiUrl(`/dynamic/api/v1/pages/${id}/`), page)
+    return this.http.patch<Page>(this.getApiUrl(`/dynamic/workflow/api/v1/pages/${id}/`), page)
       .pipe(
         tap(response => console.log('Page updated:', response)),
         catchError(this.handleError)
@@ -810,16 +819,17 @@ export class ApiService {
   }
 
   deletePage(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/pages/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/workflow/api/v1/pages/${id}/`))
       .pipe(
         tap(() => console.log('Page deleted:', id)),
         catchError(this.handleError)
       );
   }
 
+
   // CATEGORY CRUD Operations
   createCategory(category: Partial<Category>): Observable<Category> {
-    return this.http.post<Category>(this.getApiUrl('/dynamic/api/v1/categories/'), category)
+    return this.http.post<Category>(this.getApiUrl('/dynamic/workflow/api/v1/categories/'), category)
       .pipe(
         tap(response => console.log('Category created:', response)),
         catchError(this.handleError)
@@ -827,7 +837,7 @@ export class ApiService {
   }
 
   updateCategory(id: number, category: Partial<Category>): Observable<Category> {
-    return this.http.patch<Category>(this.getApiUrl(`/dynamic/api/v1/categories/${id}/`), category)
+    return this.http.patch<Category>(this.getApiUrl(`/dynamic/workflow/api/v1/categories/${id}/`), category)
       .pipe(
         tap(response => console.log('Category updated:', response)),
         catchError(this.handleError)
@@ -835,7 +845,7 @@ export class ApiService {
   }
 
   deleteCategory(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/categories/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/workflow/api/v1/categories/${id}/`))
       .pipe(
         tap(() => console.log('Category deleted:', id)),
         catchError(this.handleError)
@@ -844,7 +854,7 @@ export class ApiService {
 
   addPagesToCategory(categoryId: number, pageIds: number[]): Observable<Category> {
     return this.http.post<Category>(
-      this.getApiUrl(`/dynamic/api/v1/categories/${categoryId}/add_pages/`),
+      this.getApiUrl(`/dynamic/workflow/api/v1/categories/${categoryId}/add_pages/`),
       { page_ids: pageIds }
     ).pipe(
       tap(response => console.log('Pages added to category:', response)),
@@ -852,9 +862,9 @@ export class ApiService {
     );
   }
 
-  // FIELD CRUD Operations
+// FIELD CRUD Operations
   createField(field: Partial<Field>): Observable<Field> {
-    return this.http.post<Field>(this.getApiUrl('/dynamic/api/v1/fields/'), field)
+    return this.http.post<Field>(this.getApiUrl('/dynamic/workflow/api/v1/fields/'), field)
       .pipe(
         tap(response => console.log('Field created:', response)),
         catchError(this.handleError)
@@ -862,7 +872,7 @@ export class ApiService {
   }
 
   updateField(id: number, field: Partial<Field>): Observable<Field> {
-    return this.http.patch<Field>(this.getApiUrl(`/dynamic/api/v1/fields/${id}/`), field)
+    return this.http.patch<Field>(this.getApiUrl(`/dynamic/workflow/api/v1/fields/${id}/`), field)
       .pipe(
         tap(response => console.log('Field updated:', response)),
         catchError(this.handleError)
@@ -870,16 +880,16 @@ export class ApiService {
   }
 
   deleteField(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/fields/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/workflow/api/v1/fields/${id}/`))
       .pipe(
         tap(() => console.log('Field deleted:', id)),
         catchError(this.handleError)
       );
   }
 
-  // CONDITION CRUD Operations
+// CONDITION CRUD Operations
   createCondition(condition: Partial<Condition>): Observable<Condition> {
-    return this.http.post<Condition>(this.getApiUrl('/dynamic/api/v1/conditions/'), condition)
+    return this.http.post<Condition>(this.getApiUrl('/dynamic/workflow/api/v1/conditions/'), condition)
       .pipe(
         tap(response => console.log('Condition created:', response)),
         catchError(this.handleError)
@@ -887,7 +897,7 @@ export class ApiService {
   }
 
   updateCondition(id: number, condition: Partial<Condition>): Observable<Condition> {
-    return this.http.patch<Condition>(this.getApiUrl(`/dynamic/api/v1/conditions/${id}/`), condition)
+    return this.http.patch<Condition>(this.getApiUrl(`/dynamic/workflow/api/v1/conditions/${id}/`), condition)
       .pipe(
         tap(response => console.log('Condition updated:', response)),
         catchError(this.handleError)
@@ -895,13 +905,12 @@ export class ApiService {
   }
 
   deleteCondition(id: number): Observable<void> {
-    return this.http.delete<void>(this.getApiUrl(`/dynamic/api/v1/conditions/${id}/`))
+    return this.http.delete<void>(this.getApiUrl(`/dynamic/workflow/api/v1/conditions/${id}/`))
       .pipe(
         tap(() => console.log('Condition deleted:', id)),
         catchError(this.handleError)
       );
   }
-
   // Bulk operations
   bulkUpdateFields(fieldIds: number[], action: string): Observable<any> {
     return this.http.post(this.getApiUrl('/dynamic/api/v1/fields/bulk_update/'), {
@@ -944,7 +953,6 @@ export class ApiService {
   }
 
   // WORKFLOW CRUD Operations
-  // WORKFLOW CRUD Operations
   createWorkflow(workflow: any): Observable<any> {
     const payload: any = {
       name: workflow.name,
@@ -970,7 +978,6 @@ export class ApiService {
         catchError(this.handleError)
       );
   }
-
   updateWorkflow(workflowId: string, workflow: any): Observable<any> {
     const payload = {
       name: workflow.name,
@@ -1006,6 +1013,7 @@ export class ApiService {
   }
 
   getWorkflow(workflowId: string): Observable<any> {
+    console.log('Getting workflow with ID:', workflowId); // Add debug log
     return this.http.get(this.getApiUrl(`/dynamic/workflows/${workflowId}/`))
       .pipe(
         tap(response => console.log('Loaded workflow:', response)),
@@ -1013,7 +1021,7 @@ export class ApiService {
       );
   }
 
-  // Export workflow as service flow format
+// Export workflow as service flow format
   exportWorkflow(workflowId: string): Observable<ServiceFlow> {
     return this.http.get<ServiceFlow>(this.getApiUrl(`/dynamic/workflows/${workflowId}/export/`))
       .pipe(
@@ -1022,7 +1030,7 @@ export class ApiService {
       );
   }
 
-  // Import service flow to workflow
+// Import service flow to workflow
   importWorkflow(serviceFlow: ServiceFlow): Observable<any> {
     return this.http.post(this.getApiUrl('/dynamic/workflows/import/'), serviceFlow)
       .pipe(
@@ -1031,9 +1039,7 @@ export class ApiService {
       );
   }
 
-  // NEW METHODS ADDED FROM UPDATE
-
-  // Save complete workflow in a single transaction
+// Save complete workflow in a single transaction
   saveCompleteWorkflow(workflowId: string, data: any): Observable<any> {
     return this.http.post(
       this.getApiUrl(`/dynamic/workflows/${workflowId}/save_complete_workflow/`),
@@ -1044,7 +1050,7 @@ export class ApiService {
     );
   }
 
-  // Clone workflow
+// Clone workflow
   cloneWorkflow(workflowId: string, data: any): Observable<any> {
     return this.http.post(
       this.getApiUrl(`/dynamic/workflows/${workflowId}/clone/`),
@@ -1055,20 +1061,81 @@ export class ApiService {
     );
   }
 
+
   // Import service flow to create workflow
   importServiceFlowAsWorkflow(serviceFlow: ServiceFlow, workflowName: string): Observable<any> {
     const payload = {
-      service_flow: serviceFlow,
-      workflow_name: workflowName
+      workflow_name: workflowName,
+      description: `Imported from service flow ${serviceFlow.service_code}`,
+      service_flow: serviceFlow
     };
 
-    return this.http.post(this.getApiUrl('/dynamic/workflows/import/'), payload)
+    return this.http.post(this.getApiUrl('/dynamic/workflows/import_service_flow/'), payload)
       .pipe(
         tap(response => console.log('Service flow imported as workflow:', response)),
         catchError(this.handleError)
       );
   }
 
+// Activate workflow
+  activateWorkflow(workflowId: string, deactivateOthers: boolean = false): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/workflows/${workflowId}/activate/`),
+      { deactivate_others: deactivateOthers }
+    ).pipe(
+      tap(response => console.log('Workflow activated:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+// Deactivate workflow
+  deactivateWorkflow(workflowId: string): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/workflows/${workflowId}/deactivate/`),
+      {}
+    ).pipe(
+      tap(response => console.log('Workflow deactivated:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+// Get workflow statistics
+  getWorkflowStatistics(): Observable<any> {
+    return this.http.get(this.getApiUrl('/dynamic/workflows/statistics/'))
+      .pipe(
+        tap(response => console.log('Workflow statistics:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+// Validate workflow
+  validateWorkflow(workflowId: string): Observable<any> {
+    return this.http.get(this.getApiUrl(`/dynamic/workflows/${workflowId}/validate/`))
+      .pipe(
+        tap(response => console.log('Workflow validation:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+// Check for duplicate fields
+  checkDuplicateFields(workflowId: string): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/workflows/${workflowId}/duplicate_check/`),
+      {}
+    ).pipe(
+      tap(response => console.log('Duplicate check result:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+// Preview workflow structure
+  previewWorkflow(workflowId: string): Observable<any> {
+    return this.http.get(this.getApiUrl(`/dynamic/workflows/${workflowId}/preview/`))
+      .pipe(
+        tap(response => console.log('Workflow preview:', response)),
+        catchError(this.handleError)
+      );
+  }
   // Load service flow and create/update workflow
   loadServiceFlowAsWorkflow(serviceCode: string, workflowName?: string): Observable<any> {
     return this.getServiceFlow(serviceCode).pipe(
@@ -1089,6 +1156,61 @@ export class ApiService {
           })
         );
       })
+    );
+  }
+
+  // FORM UTILITY APIs
+  getFormSchema(pageId: number): Observable<any> {
+    return this.http.get(this.getApiUrl(`/dynamic/api/v1/form-schema/${pageId}/`))
+      .pipe(
+        tap(response => console.log('Form schema loaded:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  submitForm(pageId: number, formData: any): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/api/v1/form-submission/${pageId}/`),
+      { form_data: formData }
+    ).pipe(
+      tap(response => console.log('Form submission result:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+  validateSingleField(fieldId: number, value: any): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/api/v1/field-validation/${fieldId}/`),
+      { value }
+    ).pipe(
+      tap(response => console.log('Field validation result:', response)),
+      catchError(this.handleError)
+    );
+  }
+
+  getFormStatistics(): Observable<any> {
+    return this.http.get(this.getApiUrl('/dynamic/api/v1/form-statistics/'))
+      .pipe(
+        tap(response => console.log('Form statistics:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  exportFormConfiguration(pageId: number): Observable<any> {
+    return this.http.get(this.getApiUrl(`/dynamic/api/v1/form-export/${pageId}/`))
+      .pipe(
+        tap(response => console.log('Form configuration exported:', response)),
+        catchError(this.handleError)
+      );
+  }
+
+  importFormConfiguration(formConfig: any): Observable<any> {
+    return this.http.post(
+      this.getApiUrl('/dynamic/api/v1/form-import/'),
+      { form_config: formConfig }
+    ).pipe(
+      tap(response => console.log('Form configuration imported:', response)),
+      catchError(this.handleError)
     );
   }
 

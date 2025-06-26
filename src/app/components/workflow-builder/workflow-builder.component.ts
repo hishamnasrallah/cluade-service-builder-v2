@@ -208,37 +208,47 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   private loadWorkflowById(workflowId: string): void {
     this.snackBar.open('Loading workflow...', '', { duration: 2000 });
 
+    // First get the workflow data directly to access canvas state
     this.apiService.getWorkflow(workflowId).subscribe({
-      next: (workflowData) => {
-        // Convert the API response to WorkflowData format
-        const workflow: WorkflowData = {
-          id: workflowData.id,
-          name: workflowData.name,
-          description: workflowData.description,
-          elements: workflowData.elements || [],
-          connections: workflowData.connections || [],
-          viewMode: 'collapsed',
-          metadata: {
-            ...workflowData.metadata,
-            service_code: workflowData.service_code,
-            service_id: workflowData.service_id,
-            is_draft: workflowData.is_draft,
-            created_at: workflowData.created_at,
-            updated_at: workflowData.updated_at
+      next: (response) => {
+        console.log('Raw workflow response:', response);
+
+        // Load the workflow using the service
+        this.workflowService.loadWorkflowById(workflowId).subscribe({
+          next: (workflowData) => {
+            this.workflowId = workflowData.id;
+            this.currentServiceCode = workflowData.metadata?.service_code;
+            this.selectedElementId = undefined;
+            this.selectedConnectionId = undefined;
+
+            // Restore canvas state if available
+            if (response.canvas_state) {
+              this.canvasState = {
+                zoom: response.canvas_state.zoom || 1,
+                panX: response.canvas_state.panX || 100,
+                panY: response.canvas_state.panY || 100
+              };
+              console.log('Restored canvas state:', this.canvasState);
+            } else {
+              // If no canvas state, auto-organize for better layout
+              setTimeout(() => {
+                this.autoOrganize();
+              }, 100);
+            }
+
+            // Update route
+            this.router.navigate(['/workflow-builder', { workflowId }]);
+
+            this.snackBar.open('Workflow loaded successfully!', 'Close', {
+              duration: 3000
+            });
+          },
+          error: (error) => {
+            console.error('Error loading workflow:', error);
+            this.snackBar.open(`Failed to load workflow: ${error.message}`, 'Close', {
+              duration: 5000
+            });
           }
-        };
-
-        this.workflowService.loadWorkflow(workflow);
-        this.workflowId = workflow.id;
-        this.currentServiceCode = workflow.metadata?.service_code;
-        this.selectedElementId = undefined;
-        this.selectedConnectionId = undefined;
-
-        // Update route
-        this.router.navigate(['/workflow-builder', { workflowId }]);
-
-        this.snackBar.open('Workflow loaded successfully!', 'Close', {
-          duration: 3000
         });
       },
       error: (error) => {
@@ -334,12 +344,25 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     // Show saving indicator
     this.snackBar.open('Saving workflow...', '', { duration: 0 });
 
-    // Prepare data for saving
+    // Prepare data for saving - ensure all elements have their current positions
+    const elementsWithPositions = this.workflow.elements.map(element => ({
+      ...element,
+      position: element.position || { x: 0, y: 0 }
+    }));
+
     const saveData = {
-      elements: this.workflow.elements,
+      name: this.workflow.name,
+      description: this.workflow.description,
+      elements: elementsWithPositions,
       connections: this.workflow.connections,
-      canvas_state: this.canvasState
+      canvas_state: {
+        ...this.canvasState,
+        viewMode: this.workflow.viewMode,
+        expandedElementId: this.workflow.expandedElementId
+      }
     };
+
+    console.log('Saving workflow with data:', saveData);
 
     this.apiService.saveCompleteWorkflow(this.workflowId, saveData).subscribe({
       next: (result) => {
@@ -352,7 +375,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
   }
-
   saveAsNewWorkflow(): void {
     const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
       width: '500px',
