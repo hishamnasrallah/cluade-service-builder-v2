@@ -430,8 +430,11 @@ export class WorkflowService {
             sequenceNumberData.code = sequenceNumberValue.code || null;
             sequenceNumberData.name = sequenceNumberValue.name || null;
           } else {
-            // It's just an ID or code
-            if (typeof sequenceNumberValue === 'number' || /^\d+$/.test(sequenceNumberValue)) {
+            // For sequence_number, it's typically a code like "01", "02"
+            if (typeof sequenceNumberValue === 'string' && !(/^\d+$/.test(sequenceNumberValue) && sequenceNumberValue.length > 2)) {
+              // It's a code (like "01", "02") not an ID
+              sequenceNumberData.code = sequenceNumberValue;
+            } else if (typeof sequenceNumberValue === 'number' || /^\d+$/.test(sequenceNumberValue)) {
               sequenceNumberData.id = Number(sequenceNumberValue);
             } else {
               sequenceNumberData.code = sequenceNumberValue;
@@ -474,7 +477,7 @@ export class WorkflowService {
             name_ara: page.name_ara,
             description: page.description,
             description_ara: page.description_ara,
-            sequence_number: sequenceNumberData.id,
+            sequence_number: sequenceNumberData.id || undefined,
             sequence_number_code: sequenceNumberData.code,
             sequence_number_name: sequenceNumberData.name,
             page_id: page.page_id,
@@ -482,7 +485,7 @@ export class WorkflowService {
             categoryCount: 0,
             fieldCount: 0,
             service: serviceIdFromPage || serviceId || serviceFlow.service_code,
-            applicant_type: applicantTypeData.id,
+            applicant_type: applicantTypeData.id || undefined,
             applicant_type_code: applicantTypeData.code,
             applicant_type_name: applicantTypeData.name,
             active_ind: true

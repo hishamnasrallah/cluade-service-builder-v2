@@ -144,16 +144,22 @@
                         <mat-error>Service is required</mat-error>
                       </mat-form-field>
 
-                      <mat-form-field appearance="outline" class="full-width">
+                      <!-- Show text input if no flow steps are available -->
+                      <mat-form-field appearance="outline" class="full-width" *ngIf="flowSteps.length === 0">
+                        <mat-label>Sequence Number</mat-label>
+                        <input matInput formControlName="sequence_number" required placeholder="e.g., 01, 02, 03">
+                        <mat-hint>Enter sequence number (e.g., 01, 02, 03)</mat-hint>
+                        <mat-error>Sequence number is required</mat-error>
+                      </mat-form-field>
+
+                      <!-- Show select dropdown if flow steps are available -->
+                      <mat-form-field appearance="outline" class="full-width" *ngIf="flowSteps.length > 0">
                         <mat-label>Sequence Number</mat-label>
                         <mat-select formControlName="sequence_number"
                                     [compareWith]="compareByValue"
                                     (openedChange)="onFlowStepDropdownOpen($event)">
                           <mat-option *ngFor="let step of flowSteps" [value]="step.id">
                             {{ step.name }} ({{ step.name_ara }})
-                          </mat-option>
-                          <mat-option *ngIf="flowSteps.length === 0" [value]="" disabled>
-                            {{ isLoading ? 'Loading flow steps...' : 'No flow steps available' }}
                           </mat-option>
                         </mat-select>
                         <mat-error>Sequence number is required</mat-error>

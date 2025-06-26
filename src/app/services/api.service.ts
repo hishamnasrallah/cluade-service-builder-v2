@@ -510,10 +510,22 @@ export class ApiService {
     return this.getLookups('Service');
   }
 
-  // Flow Step lookup
+// Flow Step lookup - handle gracefully if not available
   getFlowSteps(): Observable<LookupResponse> {
-    return this.getLookups('Flow Step');
+    return this.getLookups('Flow Step').pipe(
+      catchError((error) => {
+        console.warn('Flow Step lookup not available:', error);
+        // Return empty result
+        return of({
+          count: 0,
+          next: null,
+          previous: null,
+          results: []
+        });
+      })
+    );
   }
+
 
   // Applicant Type lookup
   getApplicantTypes(): Observable<LookupResponse> {

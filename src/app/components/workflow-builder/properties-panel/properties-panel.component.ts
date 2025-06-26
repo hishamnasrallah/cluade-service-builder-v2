@@ -177,15 +177,19 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   // Compare function for mat-select to properly compare values
   compareByValue(value1: any, value2: any): boolean {
     // Handle null/undefined
-    if (!value1 || !value2) {
-      return value1 === value2;
-    }
-    // Convert to numbers if possible for comparison
+    if (!value1 && !value2) return true;
+    if (!value1 || !value2) return false;
+
+    // Convert both to numbers if possible for comparison
     const v1 = typeof value1 === 'string' && /^\d+$/.test(value1) ? parseInt(value1, 10) : value1;
     const v2 = typeof value2 === 'string' && /^\d+$/.test(value2) ? parseInt(value2, 10) : value2;
-    return v1 === v2;
-  }
 
+    // Direct comparison
+    if (v1 === v2) return true;
+
+    // Try string comparison as fallback
+    return value1.toString() === value2.toString();
+  }
   // Find the correct lookup ID by matching ID, code, or name
   private findLookupValue(
     lookupArray: LookupItem[],
@@ -193,21 +197,36 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     code: any,
     name: any
   ): number | null {
-    if (!lookupArray || lookupArray.length === 0) return null;
-
-    // First try to match by ID
-    if (id) {
-      const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
-      const foundById = lookupArray.find(item => item.id === numericId);
-      if (foundById) return foundById.id;
+    if (!lookupArray || lookupArray.length === 0) {
+      console.warn('Lookup array is empty, returning ID if numeric:', id);
+      // If we have a numeric ID and no lookup data yet, return the ID
+      if (id && (typeof id === 'number' || (/^\d+$/.test(id) && id.length > 2))) {
+        return typeof id === 'string' ? parseInt(id, 10) : id;
+      }
+      return null;
     }
 
-    // Then try to match by code
+    // First try to match by code (important for sequence_number which comes as "01", "02", etc.)
     if (code) {
       const foundByCode = lookupArray.find(item =>
         item.code && item.code.toLowerCase() === code.toString().toLowerCase()
       );
-      if (foundByCode) return foundByCode.id;
+      if (foundByCode) {
+        console.log('Found by code:', code, '-> ID:', foundByCode.id);
+        return foundByCode.id;
+      }
+    }
+
+    // Then try to match by ID
+    if (id !== null && id !== undefined) {
+      const numericId = typeof id === 'string' && /^\d+$/.test(id) && id.length > 2 ? parseInt(id, 10) : id;
+      if (typeof numericId === 'number') {
+        const foundById = lookupArray.find(item => item.id === numericId);
+        if (foundById) return foundById.id;
+        // If not found but we have a numeric ID, return it anyway
+        // (the lookup data might be incomplete)
+        return numericId;
+      }
     }
 
     // Finally try to match by name
@@ -361,6 +380,15 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
     return Promise.resolve();
   }
+  private ensurePageDataLoaded(): Promise<void> {
+    // Always load lookup data for pages
+    if (this.services.length === 0 || this.flowSteps.length === 0 || this.applicantTypes.length === 0) {
+      console.log('Loading page lookup data...');
+      return this.loadLookupDataAsync();
+    }
+    return Promise.resolve();
+  }
+
   private async loadLookupDataAsync(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.apiService.isConfigured()) {
@@ -443,19 +471,29 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       // Hide auto-save status when switching elements
       this.showAutoSaveStatus = false;
 
-      // Ensure data is loaded before updating form
-      this.ensureDataLoaded().then(() => {
+      // If this is a page element, ensure lookup data is loaded first
+      if (this.selectedElement?.type === ElementType.PAGE) {
+        this.ensurePageDataLoaded().then(() => {
+          this.updateFormForElement();
+
+          // If this is an existing element (has backend IDs), mark as already saved
+          if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
+            this.autoSaveStatus = 'saved';
+          }
+        }).catch(error => {
+          console.error('Failed to load data before updating form:', error);
+          // Still try to update the form even if data loading fails
+          this.updateFormForElement();
+        });
+      } else {
+        // For non-page elements, update form immediately
         this.updateFormForElement();
 
         // If this is an existing element (has backend IDs), mark as already saved
         if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
           this.autoSaveStatus = 'saved';
         }
-      }).catch(error => {
-        console.error('Failed to load data before updating form:', error);
-        // Still try to update the form even if data loading fails
-        this.updateFormForElement();
-      });
+      }
     }
   }
   private hasBackendId(element: WorkflowElement): boolean {
@@ -743,115 +781,100 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
     switch (this.selectedElement.type) {
       case ElementType.PAGE:
-        // Check if this is an existing page
-        const isExistingPage = !!properties.page_id && properties.page_id !== 'new';
-
-        // Extract and map values
-        let mappedSequenceNumber: number | null = null;
-        let mappedApplicantType: number | null = null;
-        let mappedService: number | null = null;
-
-        // Map sequence number
-        mappedSequenceNumber = this.findLookupValue(
-          this.flowSteps,
-          properties.sequence_number,
-          properties.sequence_number_code,
-          properties.sequence_number_name
-        );
-
-        // Map applicant type
-        mappedApplicantType = this.findLookupValue(
-          this.applicantTypes,
-          properties.applicant_type,
-          properties.applicant_type_code,
-          properties.applicant_type_name
-        );
-
-        // Map service
-        mappedService = this.findLookupValue(
-          this.services,
-          properties.service,
-          properties.service_code,
-          properties.service_name
-        );
-
-        console.log('Mapped page properties:', {
-          original: {
-            sequence_number: properties.sequence_number,
-            applicant_type: properties.applicant_type,
-            service: properties.service
-          },
-          mapped: {
-            sequence_number: mappedSequenceNumber,
-            applicant_type: mappedApplicantType,
-            service: mappedService
-          },
-          lookupCounts: {
-            flowSteps: this.flowSteps.length,
-            applicantTypes: this.applicantTypes.length,
-            services: this.services.length
-          }
+        // Log the properties to debug
+        console.log('Setting page properties:', properties);
+        console.log('Available lookups:', {
+          services: this.services.length,
+          flowSteps: this.flowSteps.length,
+          applicantTypes: this.applicantTypes.length
         });
 
-        this.propertiesForm.patchValue({
-          useExisting: false,
-          existingPageId: '',
-          service: mappedService || '',
-          sequence_number: mappedSequenceNumber || '',
-          applicant_type: mappedApplicantType || '',
-          name_ara: properties.name_ara || '',
-          description_ara: properties.description_ara || ''
-        });
+        // Extract and map values with better handling
+        let mappedSequenceNumber: number | string = '';
+        let mappedApplicantType: number | string = '';
+        let mappedService: number | string = '';
 
-        // Ensure dropdowns have data loaded
-        if (this.flowSteps.length === 0 || this.applicantTypes.length === 0 || this.services.length === 0) {
-          this.ensureDataLoaded().then(() => {
-            // Re-map after data is loaded
-            const remappedSequence = this.findLookupValue(
+        // Handle sequence_number
+        if (properties.sequence_number !== undefined && properties.sequence_number !== null) {
+          if (typeof properties.sequence_number === 'number') {
+            mappedSequenceNumber = properties.sequence_number;
+          } else if (typeof properties.sequence_number === 'string' && /^\d+$/.test(properties.sequence_number)) {
+            mappedSequenceNumber = parseInt(properties.sequence_number, 10);
+          } else {
+            // Try to find in lookup
+            const found = this.findLookupValue(
               this.flowSteps,
               properties.sequence_number,
               properties.sequence_number_code,
               properties.sequence_number_name
             );
+            mappedSequenceNumber = found !== null ? found : properties.sequence_number;
+          }
+        }
 
-            const remappedApplicant = this.findLookupValue(
+        // Handle applicant_type
+        if (properties.applicant_type !== undefined && properties.applicant_type !== null) {
+          if (typeof properties.applicant_type === 'number') {
+            mappedApplicantType = properties.applicant_type;
+          } else if (typeof properties.applicant_type === 'string' && /^\d+$/.test(properties.applicant_type)) {
+            mappedApplicantType = parseInt(properties.applicant_type, 10);
+          } else {
+            // Try to find in lookup
+            const found = this.findLookupValue(
               this.applicantTypes,
               properties.applicant_type,
               properties.applicant_type_code,
               properties.applicant_type_name
             );
+            mappedApplicantType = found !== null ? found : properties.applicant_type;
+          }
+        }
 
-            const remappedService = this.findLookupValue(
+        // Handle service
+        if (properties.service !== undefined && properties.service !== null) {
+          if (typeof properties.service === 'number') {
+            mappedService = properties.service;
+          } else if (typeof properties.service === 'string' && /^\d+$/.test(properties.service)) {
+            mappedService = parseInt(properties.service, 10);
+          } else {
+            // Try to find in lookup
+            const found = this.findLookupValue(
               this.services,
               properties.service,
               properties.service_code,
               properties.service_name
             );
-
-            // Re-patch the form values after data is loaded
-            this.propertiesForm.patchValue({
-              service: remappedService || '',
-              sequence_number: remappedSequence || '',
-              applicant_type: remappedApplicant || ''
-            });
-
-            console.log('Remapped after data load:', {
-              sequence_number: remappedSequence,
-              applicant_type: remappedApplicant,
-              service: remappedService
-            });
-          });
+            mappedService = found !== null ? found : properties.service;
+          }
         }
 
-        // Force change detection for mat-select
+        console.log('Mapped values:', {
+          sequence_number: mappedSequenceNumber,
+          applicant_type: mappedApplicantType,
+          service: mappedService
+        });
+
+        // Set form values
+        this.propertiesForm.patchValue({
+          useExisting: false,
+          existingPageId: '',
+          service: properties.service || '',
+          sequence_number: properties.sequence_number || properties.sequence_number_code || '',
+          applicant_type: properties.applicant_type || '',
+          name_ara: properties.name_ara || '',
+          description_ara: properties.description_ara || ''
+        });
+
+        // Force change detection after a short delay
         setTimeout(() => {
-          this.propertiesForm.get('sequence_number')?.updateValueAndValidity();
-          this.propertiesForm.get('applicant_type')?.updateValueAndValidity();
-          this.propertiesForm.get('service')?.updateValueAndValidity();
+          this.propertiesForm.patchValue({
+            service: mappedService,
+            sequence_number: mappedSequenceNumber,
+            applicant_type: mappedApplicantType
+          });
         }, 100);
 
         break;
-
       case ElementType.CATEGORY:
         this.propertiesForm.patchValue({
           useExisting: properties.useExisting || false,
