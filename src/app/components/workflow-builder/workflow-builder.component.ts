@@ -1,14 +1,16 @@
-// workflow-builder.component.ts - Updated template section for hierarchy
+// workflow-builder.component.ts - Complete corrected version
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -34,12 +36,8 @@ import {
   ServiceFlowSelectionResult,
   ServiceFlowSelectorDialogComponent
 } from './workflow-selector-dialog/workflow-selector-dialog.component';
-import {SaveWorkflowDialogComponent, SaveWorkflowResult} from './save-workflow-dialog/save-workflow-dialog.component';
-import {ConfirmDialogComponent} from '../shared/confirm-dialog/confirm-dialog.component';
-import { Router } from '@angular/router';
-import {MatTooltip} from '@angular/material/tooltip';
-
-
+import { SaveWorkflowDialogComponent, SaveWorkflowResult } from './save-workflow-dialog/save-workflow-dialog.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-workflow-builder',
@@ -53,24 +51,33 @@ import {MatTooltip} from '@angular/material/tooltip';
     MatSidenavModule,
     MatDividerModule,
     MatButtonToggleModule,
+    MatTooltipModule,
+    MatSnackBarModule,
+    MatDialogModule,
     WorkflowElementComponent,
     PropertiesPanelComponent,
     ElementPaletteComponent,
-    MinimapComponent,
-    MatTooltip
+    MinimapComponent
   ],
-  templateUrl:'workflow-builder.component.html',
-  styleUrl: 'workflow-builder.component.scss'
+  templateUrl: './workflow-builder.component.html',
+  styleUrl: './workflow-builder.component.scss'
 })
 export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('canvas', { static: false }) canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('canvasWrapper', { static: false }) canvasWrapperRef!: ElementRef<HTMLDivElement>;
 
-  workflow: WorkflowData = { name: 'New Workflow', elements: [], connections: [], viewMode: 'collapsed' };
+  workflow: WorkflowData = {
+    name: 'New Workflow',
+    elements: [],
+    connections: [],
+    viewMode: 'collapsed',
+    metadata: {}
+  };
   selectedElementId?: string;
   selectedConnectionId?: string;
   availableElements = ELEMENT_CONFIGS;
   currentServiceCode?: string;
+  workflowId?: string; // Track current workflow ID
 
   canvasState: CanvasState = {
     zoom: 1,
@@ -98,30 +105,36 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     private snackBar: MatSnackBar,
     private dialog: MatDialog,
     private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
+    // Subscribe to workflow changes
     this.workflowService.workflow$
       .pipe(takeUntil(this.destroy$))
       .subscribe(workflow => {
         this.workflow = workflow;
+        this.workflowId = workflow.id;
+        this.currentServiceCode = workflow.metadata?.service_code;
       });
 
-    // Track current service code
-    this.currentServiceCode = this.workflowService.getCurrentServiceCode();
-
-    // Show service flow selector on startup if API is configured
-    if (this.apiService.isConfigured()) {
-      setTimeout(() => {
-        this.showServiceFlowSelector();
-      }, 500);
-    }
+    // Check if we have a workflow ID in the route
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
+      if (params['workflowId']) {
+        this.loadWorkflowById(params['workflowId']);
+      } else {
+        // Show selector if no workflow loaded and API is configured
+        if (this.apiService.isConfigured()) {
+          setTimeout(() => {
+            this.showServiceFlowSelector();
+          }, 500);
+        }
+      }
+    });
   }
 
   ngAfterViewInit(): void {
-    // Canvas is already initialized
     this.setupKeyboardListeners();
-
   }
 
   ngOnDestroy(): void {
@@ -155,6 +168,321 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   // Handle element expansion toggle
   onElementExpandToggled(elementId: string): void {
     this.workflowService.toggleElementExpansion(elementId);
+  }
+
+  showServiceFlowSelector(): void {
+    if (!this.apiService.isConfigured()) {
+      this.snackBar.open('API not configured. Please configure the base URL first.', 'Close', {
+        duration: 5000
+      });
+      return;
+    }
+
+    const dialogRef = this.dialog.open(ServiceFlowSelectorDialogComponent, {
+      width: '90vw',
+      maxWidth: '900px',
+      height: '80vh',
+      disableClose: false,
+      data: {}
+    });
+
+    dialogRef.afterClosed().subscribe((result: ServiceFlowSelectionResult) => {
+      if (result) {
+        this.handleServiceFlowSelection(result);
+      }
+    });
+  }
+
+  private handleServiceFlowSelection(result: ServiceFlowSelectionResult): void {
+    if (result.action === 'create') {
+      this.createNewWorkflow();
+    } else if (result.action === 'load' && result.serviceCode) {
+      // Load service flow and create/update workflow
+      this.loadServiceFlowFromApi(result.serviceCode, result.serviceName || 'Service Flow');
+    } else if (result.action === 'load-workflow' && result.workflowId) {
+      // Load existing workflow
+      this.loadWorkflowById(result.workflowId);
+    }
+  }
+
+  private loadWorkflowById(workflowId: string): void {
+    this.snackBar.open('Loading workflow...', '', { duration: 2000 });
+
+    this.apiService.getWorkflow(workflowId).subscribe({
+      next: (workflowData) => {
+        // Convert the API response to WorkflowData format
+        const workflow: WorkflowData = {
+          id: workflowData.id,
+          name: workflowData.name,
+          description: workflowData.description,
+          elements: workflowData.elements || [],
+          connections: workflowData.connections || [],
+          viewMode: 'collapsed',
+          metadata: {
+            ...workflowData.metadata,
+            service_code: workflowData.service_code,
+            service_id: workflowData.service_id,
+            is_draft: workflowData.is_draft,
+            created_at: workflowData.created_at,
+            updated_at: workflowData.updated_at
+          }
+        };
+
+        this.workflowService.loadWorkflow(workflow);
+        this.workflowId = workflow.id;
+        this.currentServiceCode = workflow.metadata?.service_code;
+        this.selectedElementId = undefined;
+        this.selectedConnectionId = undefined;
+
+        // Update route
+        this.router.navigate(['/workflow-builder', { workflowId }]);
+
+        this.snackBar.open('Workflow loaded successfully!', 'Close', {
+          duration: 3000
+        });
+      },
+      error: (error) => {
+        console.error('Error loading workflow:', error);
+        this.snackBar.open(`Failed to load workflow: ${error.message}`, 'Close', {
+          duration: 5000
+        });
+      }
+    });
+  }
+
+  private loadServiceFlowFromApi(serviceCode: string, serviceName: string): void {
+    this.snackBar.open(`Loading ${serviceName}...`, '', { duration: 2000 });
+
+    // Use new API that creates/updates workflow
+    this.apiService.loadServiceFlowAsWorkflow(serviceCode, serviceName).subscribe({
+      next: (workflow) => {
+        // Load the created/updated workflow
+        this.loadWorkflowById(workflow.id);
+      },
+      error: (error) => {
+        console.error('Error loading service flow:', error);
+        this.snackBar.open(`Failed to load ${serviceName}: ${error.message}`, 'Close', {
+          duration: 5000
+        });
+      }
+    });
+  }
+
+  createNewWorkflow(): void {
+    const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
+      width: '500px',
+      data: {
+        name: `New Workflow ${new Date().toLocaleDateString()}`,
+        isUpdate: false
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: SaveWorkflowResult) => {
+      if (result) {
+        const newWorkflow: WorkflowData = {
+          name: result.name,
+          description: result.description,
+          elements: [],
+          connections: [],
+          viewMode: 'collapsed',
+          metadata: {
+            service_id: result.serviceId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            version: '1.0'
+          }
+        };
+
+        // Create workflow via API
+        this.apiService.createWorkflow({
+          name: result.name,
+          description: result.description,
+          service_id: result.serviceId,
+          metadata: newWorkflow.metadata
+        }).subscribe({
+          next: (createdWorkflow) => {
+            newWorkflow.id = createdWorkflow.id;
+            this.workflowService.loadWorkflow(newWorkflow);
+            this.workflowId = createdWorkflow.id;
+            this.currentServiceCode = createdWorkflow.service_code;
+            this.selectedElementId = undefined;
+            this.selectedConnectionId = undefined;
+            this.resetZoom();
+
+            // Update route
+            if (createdWorkflow.id) {
+              this.router.navigate(['/workflow-builder', { workflowId: createdWorkflow.id }]);
+            }
+
+            this.snackBar.open('New workflow created', 'Close', { duration: 2000 });
+          },
+          error: (error) => {
+            this.snackBar.open('Failed to create workflow', 'Close', { duration: 5000 });
+          }
+        });
+      }
+    });
+  }
+
+  saveWorkflow(): void {
+    if (!this.workflowId) {
+      // If no workflow ID, need to create new
+      this.saveAsNewWorkflow();
+      return;
+    }
+
+    // Show saving indicator
+    this.snackBar.open('Saving workflow...', '', { duration: 0 });
+
+    // Prepare data for saving
+    const saveData = {
+      elements: this.workflow.elements,
+      connections: this.workflow.connections,
+      canvas_state: this.canvasState
+    };
+
+    this.apiService.saveCompleteWorkflow(this.workflowId, saveData).subscribe({
+      next: (result) => {
+        this.snackBar.dismiss();
+        this.snackBar.open('Workflow saved successfully', 'Close', { duration: 3000 });
+      },
+      error: (error) => {
+        this.snackBar.dismiss();
+        this.snackBar.open(`Error saving workflow: ${error.message}`, 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  saveAsNewWorkflow(): void {
+    const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
+      width: '500px',
+      data: {
+        name: `${this.workflow.name} (Copy)`,
+        description: this.workflow.description,
+        serviceId: this.workflow.metadata?.service_id,
+        isUpdate: false
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: SaveWorkflowResult) => {
+      if (result) {
+        // Clone the workflow
+        if (this.workflowId) {
+          this.apiService.cloneWorkflow(this.workflowId, {
+            name: result.name,
+            description: result.description
+          }).subscribe({
+            next: (clonedWorkflow) => {
+              this.loadWorkflowById(clonedWorkflow.id);
+              this.snackBar.open('Workflow cloned successfully', 'Close', { duration: 3000 });
+            },
+            error: (error) => {
+              this.snackBar.open(`Error cloning workflow: ${error.message}`, 'Close', { duration: 5000 });
+            }
+          });
+        } else {
+          // Create new workflow
+          this.createNewWorkflow();
+        }
+      }
+    });
+  }
+
+  deleteWorkflow(): void {
+    if (!this.workflowId) {
+      // Just clear local workflow
+      this.workflowService.createNewWorkflow('New Workflow');
+      return;
+    }
+
+    const confirmDialog = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      data: {
+        title: 'Delete Workflow',
+        message: `Are you sure you want to delete "${this.workflow.name}"? This action cannot be undone.`,
+        confirmText: 'Delete',
+        cancelText: 'Cancel'
+      }
+    });
+
+    confirmDialog.afterClosed().subscribe(result => {
+      if (result && this.workflowId) {
+        this.snackBar.open('Deleting workflow...', '', { duration: 0 });
+
+        this.apiService.deleteWorkflow(this.workflowId).subscribe({
+          next: () => {
+            this.snackBar.dismiss();
+            this.snackBar.open('Workflow deleted successfully', 'Close', { duration: 3000 });
+
+            // Navigate to workflow list or create new
+            this.router.navigate(['/workflow-builder']);
+            this.workflowService.createNewWorkflow('New Workflow');
+            this.workflowId = undefined;
+            setTimeout(() => {
+              this.showServiceFlowSelector();
+            }, 500);
+          },
+          error: (error) => {
+            this.snackBar.dismiss();
+            this.snackBar.open(`Error deleting workflow: ${error.message}`, 'Close', { duration: 5000 });
+          }
+        });
+      }
+    });
+  }
+
+  // Update the workflow status display
+  getWorkflowStatus(): string {
+    if (this.workflowId) {
+      if (this.workflow.metadata?.is_draft) {
+        return 'Draft';
+      }
+      return `v${this.workflow.metadata?.version || '1.0'}`;
+    } else if (this.currentServiceCode) {
+      return `Service ${this.currentServiceCode}`;
+    }
+    return 'Local Only';
+  }
+
+  // Add version control
+  createNewVersion(): void {
+    if (!this.workflowId) {
+      this.snackBar.open('Save workflow first before creating versions', 'Close', { duration: 3000 });
+      return;
+    }
+
+    this.apiService.cloneWorkflow(this.workflowId, {
+      name: `${this.workflow.name} v${parseInt(this.workflow.metadata?.version || '1') + 1}`
+    }).subscribe({
+      next: (workflow) => {
+        this.loadWorkflowById(workflow.id);
+        this.snackBar.open('New version created', 'Close', { duration: 3000 });
+      },
+      error: (error) => {
+        this.snackBar.open(`Error creating version: ${error.message}`, 'Close', { duration: 5000 });
+      }
+    });
+  }
+
+  // Add publish/unpublish workflow
+  toggleWorkflowStatus(): void {
+    if (!this.workflowId) return;
+
+    const newStatus = !this.workflow.metadata?.is_draft;
+    const statusText = newStatus ? 'draft' : 'published';
+
+    this.apiService.updateWorkflow(this.workflowId, { is_draft: newStatus }).subscribe({
+      next: (updated) => {
+        this.workflow.metadata = {
+          ...this.workflow.metadata,
+          is_draft: newStatus
+        };
+        this.snackBar.open(`Workflow marked as ${statusText}`, 'Close', { duration: 3000 });
+      },
+      error: (error) => {
+        this.snackBar.open(`Error updating workflow status: ${error.message}`, 'Close', { duration: 5000 });
+      }
+    });
   }
 
   // Modified to handle dropping into expanded containers
@@ -217,92 +545,37 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
     }
   }
-// Helper to get valid child types
+
+  // Helper to get valid child types
   private getValidChildTypes(parentType: ElementType): ElementType[] {
-    switch (parentType) {
-      case ElementType.PAGE:
-        return [ElementType.CATEGORY];
-      case ElementType.CATEGORY:
-        return [ElementType.FIELD];
-      default:
-        return [];
-    }
+    return getValidChildTypes(parentType);
   }
 
-  // Canvas Transform
-  getCanvasTransform(): string {
-    return `translate(${this.canvasState.panX}px, ${this.canvasState.panY}px) scale(${this.canvasState.zoom})`;
-  }
-
-  // ... rest of the existing methods remain the same ...
-
-  showServiceFlowSelector(): void {
-    if (!this.apiService.isConfigured()) {
-      this.snackBar.open('API not configured. Please configure the base URL first.', 'Close', {
-        duration: 5000
-      });
+  // Export service flow
+  exportServiceFlow(): void {
+    if (!this.workflowId) {
+      this.snackBar.open('Save workflow first before exporting', 'Close', { duration: 3000 });
       return;
     }
 
-    const dialogRef = this.dialog.open(ServiceFlowSelectorDialogComponent, {
-      width: '90vw',
-      maxWidth: '900px',
-      height: '80vh',
-      disableClose: false,
-      data: {}
-    });
+    this.apiService.exportWorkflow(this.workflowId).subscribe({
+      next: (serviceFlow) => {
+        const dataStr = JSON.stringify({ service_flow: [serviceFlow] }, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
 
-    dialogRef.afterClosed().subscribe((result: ServiceFlowSelectionResult) => {
-      if (result) {
-        this.handleServiceFlowSelection(result);
-      }
-    });
-  }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `service-flow-${this.currentServiceCode || 'export'}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-  private handleServiceFlowSelection(result: ServiceFlowSelectionResult): void {
-    if (result.action === 'create') {
-      this.createNewWorkflow();
-    } else if (result.action === 'load' && result.serviceCode) {
-      // Pass additional metadata when loading
-      this.loadServiceFlowFromApi(result.serviceCode, result.serviceName || 'Service Flow', result);
-    }
-  }
-  private loadServiceFlowFromApi(serviceCode: string, serviceName: string, result: ServiceFlowSelectionResult): void {
-    this.snackBar.open(`Loading ${serviceName}...`, '', { duration: 2000 });
-
-    this.workflowService.loadServiceFlowFromApi(serviceCode).subscribe({
-      next: (workflow) => {
-        this.currentServiceCode = serviceCode;
-        this.selectedElementId = undefined;
-        this.selectedConnectionId = undefined;
-
-        // Reset view to collapsed
-        this.workflowService.setViewMode('collapsed');
-
-        // Center the view on the workflow
-        this.resetZoom();
-
-        this.snackBar.open(`${serviceName} loaded successfully!`, 'Close', {
-          duration: 3000
-        });
+        this.snackBar.open('Service flow exported', 'Close', { duration: 3000 });
       },
       error: (error) => {
-        console.error('Error loading service flow:', error);
-        this.snackBar.open(`Failed to load ${serviceName}: ${error.message}`, 'Close', {
-          duration: 5000
-        });
+        this.snackBar.open('Failed to export service flow', 'Close', { duration: 3000 });
       }
     });
-  }
-
-  createNewWorkflow(): void {
-    const newName = `New Workflow ${new Date().toLocaleDateString()}`;
-    this.workflowService.createNewWorkflow(newName);
-    this.currentServiceCode = undefined;
-    this.selectedElementId = undefined;
-    this.selectedConnectionId = undefined;
-    this.resetZoom();
-    this.snackBar.open('New workflow created', 'Close', { duration: 2000 });
   }
 
   autoOrganize(): void {
@@ -311,32 +584,23 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.snackBar.open('Elements auto-organized', 'Close', { duration: 2000 });
   }
 
-  exportServiceFlow(): void {
-    if (!this.currentServiceCode) {
-      this.snackBar.open('No service flow loaded to export', 'Close', { duration: 3000 });
-      return;
-    }
+  getElementCount(type: string): number {
+    return this.workflow.elements.filter(el => el.type === type).length;
+  }
 
-    const serviceFlow = this.workflowService.convertWorkflowToServiceFlow();
-    if (serviceFlow) {
-      const dataStr = JSON.stringify({ service_flow: [serviceFlow] }, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(dataBlob);
-      link.download = `service-flow-${this.currentServiceCode}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      this.snackBar.open('Service flow exported', 'Close', { duration: 3000 });
+  validateWorkflow(): void {
+    const validation = this.workflowService.validateWorkflow();
+    if (validation.isValid) {
+      this.snackBar.open('Workflow is valid', 'Close', { duration: 3000 });
     } else {
-      this.snackBar.open('Failed to export service flow', 'Close', { duration: 3000 });
+      const message = 'Validation errors: ' + validation.errors.join(', ');
+      this.snackBar.open(message, 'Close', { duration: 5000 });
     }
   }
 
-  getElementCount(type: string): number {
-    return this.workflow.elements.filter(el => el.type === type).length;
+  // Canvas Transform
+  getCanvasTransform(): string {
+    return `translate(${this.canvasState.panX}px, ${this.canvasState.panY}px) scale(${this.canvasState.zoom})`;
   }
 
   // Convert screen coordinates to canvas coordinates
@@ -442,6 +706,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       this.selectedConnectionId = undefined;
     }
   }
+
   onCanvasWheel(event: WheelEvent): void {
     event.preventDefault();
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -549,6 +814,7 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     }
   }
+
   // Element Management
   selectElement(elementId: string): void {
     this.selectedElementId = elementId;
@@ -618,7 +884,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     this.connectingFrom = undefined;
     this.tempConnection = undefined;
   }
-
 
   selectConnection(connectionId: string, event?: MouseEvent): void {
     this.selectedConnectionId = connectionId;
@@ -712,14 +977,12 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     return { x: connectionX, y: connectionY, side };
   }
 
-
   private getElementDimensions(element: WorkflowElement): { width: number; height: number } {
     const dims = ELEMENT_DIMENSIONS[element.type];
     if (!dims) return { width: 100, height: 60 };
 
     return element.isExpanded ? dims.expanded : dims.collapsed;
   }
-
 
   private createCurvedPath(x1: number, y1: number, x2: number, y2: number): string {
     const dx = x2 - x1;
@@ -767,64 +1030,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
 
     return `M ${x1} ${y1} C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${x2} ${y2}`;
-  }
-
-  // Workflow Operations
-  saveWorkflow(): void {
-    // Show saving indicator
-    this.snackBar.open('Saving workflow...', '', { duration: 0 });
-
-    this.workflowService.saveWorkflow().subscribe({
-      next: (result) => {
-        this.snackBar.dismiss();
-        this.snackBar.open('Workflow saved successfully', 'Close', { duration: 3000 });
-      },
-      error: (error) => {
-        this.snackBar.dismiss();
-        this.snackBar.open(`Error saving workflow: ${error.message}`, 'Close', { duration: 5000 });
-      }
-    });
-  }
-
-  deleteWorkflow(): void {
-    const confirmDialog = this.dialog.open(ConfirmDialogComponent, {
-      width: '400px',
-      data: {
-        title: 'Delete Workflow',
-        message: `Are you sure you want to delete all elements in this workflow? This action cannot be undone.`,
-        confirmText: 'Delete All',
-        cancelText: 'Cancel'
-      }
-    });
-
-    confirmDialog.afterClosed().subscribe(result => {
-      if (result) {
-        this.snackBar.open('Deleting workflow...', '', { duration: 0 });
-
-        this.workflowService.deleteWorkflow().subscribe({
-          next: () => {
-            this.snackBar.dismiss();
-            this.snackBar.open('Workflow deleted successfully', 'Close', { duration: 3000 });
-            // Create a new workflow instead of navigating
-            this.createNewWorkflow();
-          },
-          error: (error) => {
-            this.snackBar.dismiss();
-            this.snackBar.open(`Error deleting workflow: ${error.message}`, 'Close', { duration: 5000 });
-          }
-        });
-      }
-    });
-  }
-
-  validateWorkflow(): void {
-    const validation = this.workflowService.validateWorkflow();
-    if (validation.isValid) {
-      this.snackBar.open('Workflow is valid', 'Close', { duration: 3000 });
-    } else {
-      const message = 'Validation errors: ' + validation.errors.join(', ');
-      this.snackBar.open(message, 'Close', { duration: 5000 });
-    }
   }
 
   // Helper Methods
@@ -909,59 +1114,5 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     // Default z-index
     return 10;
-  }
-
-  saveAsNewWorkflow(): void {
-    const dialogRef = this.dialog.open(SaveWorkflowDialogComponent, {
-      width: '500px',
-      data: {
-        name: `${this.workflow.name} (Copy)`,
-        description: this.workflow.description,
-        serviceId: this.workflow.metadata?.service_id,
-        isUpdate: false
-      }
-    });
-
-    dialogRef.afterClosed().subscribe((result: SaveWorkflowResult) => {
-      if (result) {
-        // Create a copy of the current workflow
-        const workflowCopy = {
-          ...this.workflow,
-          id: undefined, // Remove ID to create new
-          name: result.name,
-          description: result.description,
-          metadata: {
-            ...this.workflow.metadata,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        };
-
-        // Load the copy as current workflow
-        this.workflowService.loadWorkflow(workflowCopy);
-
-        // Save as new
-        this.workflowService.saveWorkflow().subscribe({
-          next: (response) => {
-            this.snackBar.open('Workflow saved as new', 'Close', { duration: 3000 });
-          },
-          error: (error) => {
-            this.snackBar.open(`Error saving workflow: ${error.message}`, 'Close', { duration: 5000 });
-          }
-        });
-      }
-    });
-  }
-
-  getWorkflowStatus(): string {
-    if (!this.currentServiceCode) {
-      return 'Local Only';
-    }
-
-    if (this.workflow.metadata?.is_existing) {
-      return `Service ${this.currentServiceCode} (Existing)`;
-    }
-
-    return `Service ${this.currentServiceCode} (New)`;
   }
 }

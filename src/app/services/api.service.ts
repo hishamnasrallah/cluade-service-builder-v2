@@ -1,8 +1,8 @@
 // services/api.service.ts - Updated for real service flow API
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams, HttpErrorResponse } from '@angular/common/http';
-import {Observable, of, throwError} from 'rxjs';
-import { catchError, tap, map } from 'rxjs/operators';
+import { Observable, of, throwError } from 'rxjs';
+import { catchError, tap, map, switchMap } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 import { WorkflowData } from '../models/workflow.models';
 
@@ -10,6 +10,7 @@ import { WorkflowData } from '../models/workflow.models';
 export interface ServiceFlowResponse {
   service_flow: ServiceFlow[] | GroupedServiceFlow[];
 }
+
 // Add Condition interface
 export interface Condition {
   id?: number;
@@ -17,10 +18,12 @@ export interface Condition {
   active_ind: boolean;
   condition_logic: any[];
 }
+
 export interface GroupedServiceFlow {
   service_code: string;
   pages: ServiceFlowPage[];
 }
+
 export interface ServiceFlow {
   service_code: string;
   pages: ServiceFlowPage[];
@@ -158,8 +161,6 @@ export interface ServiceFlowPage {
   active_ind?: boolean;
 }
 
-
-
 export interface VisibilityCondition {
   id?: number;
   condition_logic: ConditionLogicItem[];
@@ -182,7 +183,126 @@ export interface ServiceFlowSummary {
   is_active: boolean;
 }
 
-// ... existing interfaces for other APIs (LookupResponse, etc.) remain the same ...
+// Lookup Response interfaces
+export interface LookupResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: LookupItem[];
+}
+
+export interface LookupItem {
+  id: number;
+  parent_lookup?: number;
+  type: number;
+  name: string;
+  name_ara: string;
+  code: string;
+  icon?: string | null;
+  active_ind: boolean;
+}
+
+export interface PageResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Page[];
+}
+
+export interface Page {
+  id?: number;
+  name: string;
+  name_ara?: string;
+  description?: string;
+  description_ara?: string;
+  active_ind: boolean;
+  service: number;
+  sequence_number: number;
+  applicant_type: number;
+}
+
+export interface CategoryResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Category[];
+}
+
+export interface Category {
+  id?: number;
+  name: string;
+  name_ara?: string;
+  page: number[];
+  is_repeatable: boolean;
+  description?: string;
+  code?: string;
+  active_ind: boolean;
+}
+
+export interface FieldResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Field[];
+}
+
+export interface Field {
+  id?: number;
+  _field_name: string;
+  _sequence?: number;
+  _field_display_name: string;
+  _field_display_name_ara?: string;
+  _field_type: number;
+  _category: number[];
+  service: number[];
+  _parent_field?: number | null;
+  _lookup?: number | null;
+  _max_length?: number;
+  _min_length?: number;
+  _regex_pattern?: string;
+  _allowed_characters?: string;
+  _forbidden_words?: string;
+  _value_greater_than?: number;
+  _value_less_than?: number;
+  _integer_only?: boolean;
+  _positive_only?: boolean;
+  _date_greater_than?: string;
+  _date_less_than?: string;
+  _future_only?: boolean;
+  _past_only?: boolean;
+  _default_boolean?: boolean;
+  _file_types?: string;
+  _max_file_size?: number;
+  _image_max_width?: number;
+  _image_max_height?: number;
+  _max_selections?: number;
+  _min_selections?: number;
+  _precision?: number;
+  _unique?: boolean;
+  _default_value?: string;
+  _coordinates_format?: boolean;
+  _uuid_format?: boolean;
+  _is_hidden: boolean;
+  _is_disabled: boolean;
+  _mandatory: boolean;
+  active_ind: boolean;
+  allowed_lookups: any[];
+}
+
+export interface FieldTypeResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: FieldType[];
+}
+
+export interface FieldType {
+  id: number;
+  name: string;
+  name_ara: string;
+  code: string;
+  active_ind: boolean;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -281,6 +401,7 @@ export class ApiService {
       catchError(this.handleError)
     );
   }
+
   // Convert service flows to workflow summaries for the selector
   getServiceFlowSummaries(): Observable<ServiceFlowSummary[]> {
     return this.getServiceFlows().pipe(
@@ -313,7 +434,6 @@ export class ApiService {
   }
 
   // Convert service flow to workflow data format
-
   private getServiceIdFromCode(serviceCode: string): Observable<number | undefined> {
     return this.getServices().pipe(
       map(response => {
@@ -394,7 +514,8 @@ export class ApiService {
               applicant_type: applicantTypeId || '',
               page_id: page.page_id,
               is_hidden_page: page.is_hidden_page
-            },            connections: []
+            },
+            connections: []
           });
 
           // Connect to previous element
@@ -567,7 +688,6 @@ export class ApiService {
       })
     );
   }
-  // ... existing methods for other APIs (getLookups, getPages, etc.) remain the same ...
 
   // Lookup APIs
   getLookups(name: string): Observable<LookupResponse> {
@@ -584,7 +704,7 @@ export class ApiService {
     return this.getLookups('Service');
   }
 
-// Flow Step lookup - handle gracefully if not available
+  // Flow Step lookup - handle gracefully if not available
   getFlowSteps(): Observable<LookupResponse> {
     return this.getLookups('Flow Step').pipe(
       catchError((error) => {
@@ -600,8 +720,7 @@ export class ApiService {
     );
   }
 
-
-// Applicant Type lookup - handle different possible names
+  // Applicant Type lookup - handle different possible names
   getApplicantTypes(): Observable<LookupResponse> {
     return this.getLookups('Service Applicant Type').pipe(
       catchError((error) => {
@@ -665,7 +784,8 @@ export class ApiService {
         catchError(this.handleError)
       );
   }
-// PAGE CRUD Operations - Using workflow endpoints
+
+  // PAGE CRUD Operations - Using workflow endpoints
   createPage(page: Partial<Page>): Observable<Page> {
     return this.http.post<Page>(this.getApiUrl('/dynamic/api/v1/pages/'), page)
       .pipe(
@@ -690,7 +810,7 @@ export class ApiService {
       );
   }
 
-// CATEGORY CRUD Operations
+  // CATEGORY CRUD Operations
   createCategory(category: Partial<Category>): Observable<Category> {
     return this.http.post<Category>(this.getApiUrl('/dynamic/api/v1/categories/'), category)
       .pipe(
@@ -725,7 +845,7 @@ export class ApiService {
     );
   }
 
-// FIELD CRUD Operations
+  // FIELD CRUD Operations
   createField(field: Partial<Field>): Observable<Field> {
     return this.http.post<Field>(this.getApiUrl('/dynamic/api/v1/fields/'), field)
       .pipe(
@@ -750,7 +870,7 @@ export class ApiService {
       );
   }
 
-// CONDITION CRUD Operations
+  // CONDITION CRUD Operations
   createCondition(condition: Partial<Condition>): Observable<Condition> {
     return this.http.post<Condition>(this.getApiUrl('/dynamic/api/v1/conditions/'), condition)
       .pipe(
@@ -786,7 +906,7 @@ export class ApiService {
     );
   }
 
-// Additional operations
+  // Additional operations
   duplicateField(fieldId: number, newName: string): Observable<Field> {
     return this.http.post<Field>(
       this.getApiUrl(`/dynamic/api/v1/fields/${fieldId}/duplicate/`),
@@ -815,6 +935,7 @@ export class ApiService {
       catchError(this.handleError)
     );
   }
+
   // WORKFLOW CRUD Operations
   createWorkflow(workflow: any): Observable<any> {
     const payload = {
@@ -858,8 +979,9 @@ export class ApiService {
       );
   }
 
-  getWorkflows(): Observable<any> {
-    return this.http.get(this.getApiUrl('/dynamic/workflows/'))
+  getWorkflows(params?: any): Observable<any> {
+    const httpParams = new HttpParams({ fromObject: params || {} });
+    return this.http.get(this.getApiUrl('/dynamic/workflows/'), { params: httpParams })
       .pipe(
         tap(response => console.log('Loaded workflows:', response)),
         catchError(this.handleError)
@@ -874,7 +996,7 @@ export class ApiService {
       );
   }
 
-// Export workflow as service flow format
+  // Export workflow as service flow format
   exportWorkflow(workflowId: string): Observable<ServiceFlow> {
     return this.http.get<ServiceFlow>(this.getApiUrl(`/dynamic/workflows/${workflowId}/export/`))
       .pipe(
@@ -883,7 +1005,7 @@ export class ApiService {
       );
   }
 
-// Import service flow to workflow
+  // Import service flow to workflow
   importWorkflow(serviceFlow: ServiceFlow): Observable<any> {
     return this.http.post(this.getApiUrl('/dynamic/workflows/import/'), serviceFlow)
       .pipe(
@@ -891,125 +1013,189 @@ export class ApiService {
         catchError(this.handleError)
       );
   }
-}
 
-// Keep existing interfaces for other API responses
-export interface LookupResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: LookupItem[];
-}
+  // NEW METHODS ADDED FROM UPDATE
 
-export interface LookupItem {
-  id: number;
-  parent_lookup?: number;
-  type: number;
-  name: string;
-  name_ara: string;
-  code: string;
-  icon?: string | null;
-  active_ind: boolean;
-}
+  // Save complete workflow in a single transaction
+  saveCompleteWorkflow(workflowId: string, data: any): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/workflows/${workflowId}/save_complete_workflow/`),
+      data
+    ).pipe(
+      tap(response => console.log('Complete workflow saved:', response)),
+      catchError(this.handleError)
+    );
+  }
 
-export interface PageResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Page[];
-}
+  // Clone workflow
+  cloneWorkflow(workflowId: string, data: any): Observable<any> {
+    return this.http.post(
+      this.getApiUrl(`/dynamic/workflows/${workflowId}/clone/`),
+      data
+    ).pipe(
+      tap(response => console.log('Workflow cloned:', response)),
+      catchError(this.handleError)
+    );
+  }
 
-export interface Page {
-  id?: number;
-  name: string;
-  name_ara?: string;
-  description?: string;
-  description_ara?: string;
-  active_ind: boolean;
-  service: number;
-  sequence_number: number;
-  applicant_type: number;
-}
+  // Import service flow to create workflow
+  importServiceFlowAsWorkflow(serviceFlow: ServiceFlow, workflowName: string): Observable<any> {
+    const payload = {
+      service_flow: serviceFlow,
+      workflow_name: workflowName
+    };
 
-export interface CategoryResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Category[];
-}
+    return this.http.post(this.getApiUrl('/dynamic/workflows/import/'), payload)
+      .pipe(
+        tap(response => console.log('Service flow imported as workflow:', response)),
+        catchError(this.handleError)
+      );
+  }
 
-export interface Category {
-  id?: number;
-  name: string;
-  name_ara?: string;
-  page: number[];
-  is_repeatable: boolean;
-  description?: string;
-  code?: string;
-  active_ind: boolean;
-}
+  // Load service flow and create/update workflow
+  loadServiceFlowAsWorkflow(serviceCode: string, workflowName?: string): Observable<any> {
+    return this.getServiceFlow(serviceCode).pipe(
+      switchMap(serviceFlow => {
+        // Check if a workflow already exists for this service
+        return this.getWorkflows({ service_code: serviceCode }).pipe(
+          switchMap(response => {
+            const existingWorkflows = response.results || [];
 
-export interface FieldResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Field[];
-}
+            if (existingWorkflows.length > 0) {
+              // Update existing workflow
+              const workflow = existingWorkflows[0];
+              return this.updateWorkflowFromServiceFlow(workflow.id, serviceFlow);
+            } else {
+              // Create new workflow
+              return this.createWorkflowFromServiceFlow(serviceFlow, workflowName);
+            }
+          })
+        );
+      })
+    );
+  }
 
-export interface Field {
-  id?: number;
-  _field_name: string;
-  _sequence?: number;
-  _field_display_name: string;
-  _field_display_name_ara?: string;
-  _field_type: number;
-  _category: number[];
-  service: number[];
-  _parent_field?: number | null;
-  _lookup?: number | null;
-  _max_length?: number;
-  _min_length?: number;
-  _regex_pattern?: string;
-  _allowed_characters?: string;
-  _forbidden_words?: string;
-  _value_greater_than?: number;
-  _value_less_than?: number;
-  _integer_only?: boolean;
-  _positive_only?: boolean;
-  _date_greater_than?: string;
-  _date_less_than?: string;
-  _future_only?: boolean;
-  _past_only?: boolean;
-  _default_boolean?: boolean;
-  _file_types?: string;
-  _max_file_size?: number;
-  _image_max_width?: number;
-  _image_max_height?: number;
-  _max_selections?: number;
-  _min_selections?: number;
-  _precision?: number;
-  _unique?: boolean;
-  _default_value?: string;
-  _coordinates_format?: boolean;
-  _uuid_format?: boolean;
-  _is_hidden: boolean;
-  _is_disabled: boolean;
-  _mandatory: boolean;
-  active_ind: boolean;
-  allowed_lookups: any[];
-}
+  private createWorkflowFromServiceFlow(serviceFlow: ServiceFlow, workflowName?: string): Observable<any> {
+    // First create the workflow container
+    const workflowData = {
+      name: workflowName || `Service Flow - ${serviceFlow.service_code}`,
+      service_code: serviceFlow.service_code,
+      is_draft: false,
+      metadata: {
+        imported_from: 'service_flow',
+        import_date: new Date().toISOString()
+      }
+    };
 
-export interface FieldTypeResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: FieldType[];
-}
+    return this.createWorkflow(workflowData).pipe(
+      switchMap(workflow => {
+        // Then save all elements
+        const completeData = this.convertServiceFlowToWorkflowData(serviceFlow, workflow.id);
+        return this.saveCompleteWorkflow(workflow.id, completeData);
+      })
+    );
+  }
 
-export interface FieldType {
-  id: number;
-  name: string;
-  name_ara: string;
-  code: string;
-  active_ind: boolean;
+  private updateWorkflowFromServiceFlow(workflowId: string, serviceFlow: ServiceFlow): Observable<any> {
+    const completeData = this.convertServiceFlowToWorkflowData(serviceFlow, workflowId);
+    return this.saveCompleteWorkflow(workflowId, completeData);
+  }
+
+  private convertServiceFlowToWorkflowData(serviceFlow: ServiceFlow, workflowId: string): any {
+    const elements: any[] = [];
+    const connections: any[] = [];
+
+    // Add start element
+    elements.push({
+      id: 'start',
+      type: 'start',
+      position: { x: 100, y: 100 },
+      properties: { name: 'Start' }
+    });
+
+    let previousId = 'start';
+    let xPosition = 350;
+
+    // Convert pages
+    serviceFlow.pages.forEach((page, pageIndex) => {
+      const pageId = `page-${page.page_id || pageIndex}`;
+
+      elements.push({
+        id: pageId,
+        type: 'page',
+        position: { x: xPosition, y: 100 },
+        properties: {
+          ...page,
+          page_id: page.page_id
+        }
+      });
+
+      // Connect to previous
+      connections.push({
+        sourceId: previousId,
+        targetId: pageId
+      });
+
+      // Add categories and fields as children
+      if (page.categories) {
+        page.categories.forEach((category, catIndex) => {
+          const categoryId = `category-${category.id || catIndex}`;
+
+          elements.push({
+            id: categoryId,
+            type: 'category',
+            parentId: pageId,
+            position: { x: 0, y: 0 },
+            properties: {
+              ...category,
+              category_id: category.id
+            }
+          });
+
+          if (category.fields) {
+            category.fields.forEach((field, fieldIndex) => {
+              const fieldId = `field-${field.field_id || fieldIndex}`;
+
+              elements.push({
+                id: fieldId,
+                type: 'field',
+                parentId: categoryId,
+                position: { x: 0, y: 0 },
+                properties: {
+                  ...field,
+                  _field_id: field.field_id
+                }
+              });
+            });
+          }
+        });
+      }
+
+      previousId = pageId;
+      xPosition += 300;
+    });
+
+    // Add end element
+    elements.push({
+      id: 'end',
+      type: 'end',
+      position: { x: xPosition, y: 100 },
+      properties: { name: 'End', action: 'submit' }
+    });
+
+    connections.push({
+      sourceId: previousId,
+      targetId: 'end'
+    });
+
+    return {
+      elements,
+      connections,
+      canvas_state: {
+        zoom: 1,
+        panX: 100,
+        panY: 100
+      }
+    };
+  }
 }

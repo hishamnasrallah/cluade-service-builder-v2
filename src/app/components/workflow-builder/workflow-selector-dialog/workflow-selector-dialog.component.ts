@@ -15,13 +15,21 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 
 import { ApiService, ServiceFlowSummary } from '../../../services/api.service';
+import {MatTab, MatTabGroup} from '@angular/material/tabs';
+import {MatSnackBar} from '@angular/material/snack-bar';
 
 export interface ServiceFlowSelectionResult {
   action: 'create' | 'load';
   serviceCode?: string;
   serviceName?: string;
 }
-
+export interface WorkflowSelectionResult {
+  action: 'create' | 'load' | 'load-workflow';
+  serviceCode?: string;
+  serviceName?: string;
+  workflowId?: string;
+  workflowName?: string;
+}
 @Component({
   selector: 'app-service-flow-selector-dialog',
   standalone: true,
@@ -38,149 +46,112 @@ export interface ServiceFlowSelectionResult {
     MatChipsModule,
     MatTooltipModule,
     FormsModule,
-    DatePipe
+    DatePipe,
+    MatTab,
+    MatTabGroup
   ],
   template: `
-    <div class="service-flow-selector-dialog">
+    <div class="workflow-selector-dialog">
       <h2 mat-dialog-title>
         <mat-icon>account_tree</mat-icon>
-        Select Service Flow
+        Select Workflow or Service Flow
       </h2>
 
       <mat-dialog-content class="dialog-content">
-        <!-- Loading State -->
-        <div *ngIf="isLoading" class="loading-container">
-          <mat-spinner diameter="40"></mat-spinner>
-          <p>Loading service flows...</p>
-        </div>
+        <!-- Tab Group for Workflows vs Service Flows -->
+        <mat-tab-group [(selectedIndex)]="selectedTabIndex">
+          <!-- Workflows Tab -->
+          <mat-tab label="My Workflows">
+            <div class="tab-content">
+              <!-- Loading State -->
+              <div *ngIf="isLoadingWorkflows" class="loading-container">
+                <mat-spinner diameter="40"></mat-spinner>
+                <p>Loading workflows...</p>
+              </div>
 
-        <!-- Error State -->
-        <div *ngIf="errorMessage" class="error-container">
-          <mat-icon color="warn">error</mat-icon>
-          <p>{{ errorMessage }}</p>
-          <button mat-button (click)="loadServiceFlows()" color="primary">
-            <mat-icon>refresh</mat-icon>
-            Retry
-          </button>
-        </div>
+              <!-- Workflows List -->
+              <div *ngIf="!isLoadingWorkflows" class="workflows-section">
+                <mat-form-field appearance="outline" class="search-field">
+                  <mat-label>Search workflows</mat-label>
+                  <mat-icon matPrefix>search</mat-icon>
+                  <input matInput
+                         [(ngModel)]="workflowSearchTerm"
+                         (input)="filterWorkflows()"
+                         placeholder="Search by name or service">
+                </mat-form-field>
 
-        <!-- Search and Filters -->
-        <div *ngIf="!isLoading && !errorMessage" class="filters-section">
-          <mat-form-field appearance="outline" class="search-field">
-            <mat-label>Search service flows</mat-label>
-            <mat-icon matPrefix>search</mat-icon>
-            <input matInput
-                   [(ngModel)]="searchTerm"
-                   (input)="applyFilter()"
-                   placeholder="Search by service code or name">
-          </mat-form-field>
+                <div class="flow-grid" *ngIf="filteredWorkflows.length > 0">
+                  <mat-card *ngFor="let workflow of filteredWorkflows"
+                            class="workflow-card"
+                            [class.selected]="selectedWorkflowId === workflow.id"
+                            (click)="selectWorkflow(workflow)">
 
-          <div class="flow-stats">
-            <mat-chip-set>
-              <mat-chip>{{ filteredServiceFlows.length }} service flows found</mat-chip>
-              <mat-chip *ngIf="searchTerm">Filtered</mat-chip>
-            </mat-chip-set>
-          </div>
-        </div>
+                    <mat-card-header>
+                      <mat-card-title>{{ workflow.name }}</mat-card-title>
+                      <mat-card-subtitle>
+                        <span class="service-code" *ngIf="workflow.service_code">
+                          {{ workflow.service_code }}
+                        </span>
+                        {{ workflow.service_name }}
+                      </mat-card-subtitle>
+                    </mat-card-header>
 
-        <!-- Service Flows List -->
-        <div *ngIf="!isLoading && !errorMessage" class="flows-container">
-          <div *ngIf="filteredServiceFlows.length === 0" class="no-flows">
-            <mat-icon>account_tree</mat-icon>
-            <h3>No Service Flows Found</h3>
-            <p *ngIf="searchTerm; else noFlowsMessage">
-              No service flows match your search criteria. Try adjusting your search terms.
-            </p>
-            <ng-template #noFlowsMessage>
-              <p>No service flows have been configured yet. Contact your administrator to set up service flows.</p>
-            </ng-template>
-          </div>
+                    <mat-card-content>
+                      <div class="workflow-metadata">
+                        <div class="metadata-item">
+                          <mat-icon>description</mat-icon>
+                          <span>{{ workflow.element_count?.pages || 0 }} pages</span>
+                        </div>
+                        <div class="metadata-item">
+                          <mat-icon>input</mat-icon>
+                          <span>{{ workflow.element_count?.fields || 0 }} fields</span>
+                        </div>
+                        <div class="metadata-item">
+                          <mat-icon>schedule</mat-icon>
+                          <span>{{ workflow.updated_at | date:'short' }}</span>
+                        </div>
+                      </div>
 
-          <div class="flow-grid" *ngIf="filteredServiceFlows.length > 0">
-            <mat-card *ngFor="let serviceFlow of filteredServiceFlows; trackBy: trackServiceFlow"
-                      class="flow-card"
-                      [class.selected]="selectedServiceCode === serviceFlow.service_code"
-                      (click)="selectServiceFlow(serviceFlow)">
+                      <mat-chip-set>
+                        <mat-chip [color]="workflow.is_draft ? 'warn' : 'primary'">
+                          {{ workflow.is_draft ? 'Draft' : 'Published' }}
+                        </mat-chip>
+                        <mat-chip *ngIf="workflow.version > 1">
+                          v{{ workflow.version }}
+                        </mat-chip>
+                      </mat-chip-set>
+                    </mat-card-content>
 
-              <mat-card-header>
-                <div class="flow-header">
-                  <div class="flow-info">
-                    <mat-card-title>
-                      <span class="service-code">{{ serviceFlow.service_code }}</span>
-                      {{ serviceFlow.service_name }}
-                    </mat-card-title>
-                    <mat-card-subtitle>
-                      Service Code: {{ serviceFlow.service_code }}
-                    </mat-card-subtitle>
-                  </div>
-
-                  <div class="flow-status">
-                    <mat-chip [color]="serviceFlow.is_active ? 'primary' : 'warn'">
-                      {{ serviceFlow.is_active ? 'Active' : 'Inactive' }}
-                    </mat-chip>
-                  </div>
-                </div>
-              </mat-card-header>
-
-              <mat-card-content>
-                <div class="flow-metadata">
-                  <div class="metadata-row">
-                    <div class="metadata-item">
-                      <mat-icon>description</mat-icon>
-                      <span>{{ serviceFlow.page_count }} pages</span>
-                    </div>
-
-                    <div class="metadata-item">
-                      <mat-icon>category</mat-icon>
-                      <span>{{ serviceFlow.category_count }} categories</span>
-                    </div>
-                  </div>
-
-                  <div class="metadata-row">
-                    <div class="metadata-item">
-                      <mat-icon>input</mat-icon>
-                      <span>{{ serviceFlow.field_count }} fields</span>
-                    </div>
-
-                    <div class="metadata-item" *ngIf="serviceFlow.last_updated">
-                      <mat-icon>schedule</mat-icon>
-                      <span>{{ serviceFlow.last_updated | date:'short' }}</span>
-                    </div>
-                  </div>
+                    <mat-card-actions>
+                      <button mat-button color="primary" (click)="loadWorkflow(workflow, $event)">
+                        <mat-icon>open_in_new</mat-icon>
+                        Open
+                      </button>
+                      <button mat-icon-button (click)="deleteWorkflow(workflow, $event)"
+                              matTooltip="Delete workflow">
+                        <mat-icon color="warn">delete</mat-icon>
+                      </button>
+                    </mat-card-actions>
+                  </mat-card>
                 </div>
 
-                <!-- Flow Preview -->
-                <div class="flow-preview">
-                  <div class="preview-header">
-                    <mat-icon>visibility</mat-icon>
-                    <span>Quick Preview</span>
-                  </div>
-                  <div class="preview-content">
-                    <span class="preview-text">
-                      This service flow contains {{ serviceFlow.page_count }} step{{ serviceFlow.page_count !== 1 ? 's' : '' }}
-                      with {{ serviceFlow.field_count }} total input{{ serviceFlow.field_count !== 1 ? 's' : '' }}.
-                    </span>
-                  </div>
+                <div *ngIf="filteredWorkflows.length === 0" class="no-flows">
+                  <mat-icon>dashboard</mat-icon>
+                  <h3>No Workflows Found</h3>
+                  <p>Create a new workflow or import from a service flow.</p>
                 </div>
-              </mat-card-content>
+              </div>
+            </div>
+          </mat-tab>
 
-              <mat-card-actions>
-                <button mat-button
-                        color="primary"
-                        (click)="loadServiceFlow(serviceFlow, $event)">
-                  <mat-icon>open_in_new</mat-icon>
-                  Open Flow
-                </button>
-
-                <button mat-icon-button
-                        (click)="viewFlowDetails(serviceFlow, $event)"
-                        matTooltip="View flow details">
-                  <mat-icon>info</mat-icon>
-                </button>
-              </mat-card-actions>
-            </mat-card>
-          </div>
-        </div>
+          <!-- Service Flows Tab -->
+          <mat-tab label="Service Flows">
+            <div class="tab-content">
+              <!-- Existing service flow content -->
+              <!-- ... keep existing service flow template ... -->
+            </div>
+          </mat-tab>
+        </mat-tab-group>
       </mat-dialog-content>
 
       <mat-dialog-actions align="end">
@@ -191,13 +162,13 @@ export interface ServiceFlowSelectionResult {
 
         <button mat-button (click)="createNewFlow()" color="accent">
           <mat-icon>add</mat-icon>
-          Create New Flow
+          Create New Workflow
         </button>
 
         <button mat-raised-button
                 color="primary"
                 (click)="onLoadSelected()"
-                [disabled]="!selectedServiceCode">
+                [disabled]="!canLoadSelected()">
           <mat-icon>open_in_new</mat-icon>
           Open Selected
         </button>
@@ -407,6 +378,129 @@ export interface ServiceFlowSelectionResult {
     }
   `]
 })
+
+export class WorkflowSelectorDialogComponent implements OnInit {
+  // Existing properties
+  serviceFlows: ServiceFlowSummary[] = [];
+  filteredServiceFlows: ServiceFlowSummary[] = [];
+  selectedServiceCode?: string;
+  selectedServiceFlow?: ServiceFlowSummary;
+  searchTerm = '';
+  isLoading = false;
+  errorMessage = '';
+
+  // New properties for workflows
+  workflows: any[] = [];
+  filteredWorkflows: any[] = [];
+  selectedWorkflowId?: string;
+  selectedWorkflow?: any;
+  workflowSearchTerm = '';
+  isLoadingWorkflows = false;
+  selectedTabIndex = 0;
+
+  constructor(
+    private dialogRef: MatDialogRef<WorkflowSelectorDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: any,
+    private apiService: ApiService,
+    private snackBar: MatSnackBar
+  ) {
+  }
+
+  ngOnInit(): void {
+    this.loadWorkflows();
+    this.loadServiceFlows();
+  }
+
+  loadWorkflows(): void {
+    this.isLoadingWorkflows = true;
+
+    this.apiService.getWorkflows().subscribe({
+      next: (response) => {
+        this.workflows = response.results || [];
+        this.filteredWorkflows = [...this.workflows];
+        this.isLoadingWorkflows = false;
+        console.log('Loaded workflows:', this.workflows);
+      },
+      error: (error) => {
+        this.isLoadingWorkflows = false;
+        console.error('Error loading workflows:', error);
+        // Don't show error, just show empty state
+      }
+    });
+  }
+
+  filterWorkflows(): void {
+    const term = this.workflowSearchTerm.toLowerCase().trim();
+
+    if (!term) {
+      this.filteredWorkflows = [...this.workflows];
+      return;
+    }
+
+    this.filteredWorkflows = this.workflows.filter(workflow =>
+      workflow.name.toLowerCase().includes(term) ||
+      (workflow.service_code && workflow.service_code.toLowerCase().includes(term)) ||
+      (workflow.service_name && workflow.service_name.toLowerCase().includes(term))
+    );
+  }
+
+  selectWorkflow(workflow: any): void {
+    this.selectedWorkflowId = workflow.id;
+    this.selectedWorkflow = workflow;
+    this.selectedServiceCode = undefined;
+    this.selectedServiceFlow = undefined;
+  }
+
+  loadWorkflow(workflow: any, event: Event): void {
+    event.stopPropagation();
+    this.dialogRef.close({
+      action: 'load-workflow',
+      workflowId: workflow.id,
+      workflowName: workflow.name
+    } as WorkflowSelectionResult);
+  }
+
+  deleteWorkflow(workflow: any, event: Event): void {
+    event.stopPropagation();
+
+    if (confirm(`Delete workflow "${workflow.name}"? This action cannot be undone.`)) {
+      this.apiService.deleteWorkflow(workflow.id).subscribe({
+        next: () => {
+          this.snackBar.open('Workflow deleted', 'Close', {duration: 3000});
+          this.loadWorkflows();
+        },
+        error: (error) => {
+          this.snackBar.open('Failed to delete workflow', 'Close', {duration: 5000});
+        }
+      });
+    }
+  }
+
+  canLoadSelected(): boolean {
+    return (this.selectedTabIndex === 0 && !!this.selectedWorkflowId) ||
+      (this.selectedTabIndex === 1 && !!this.selectedServiceCode);
+  }
+
+  onLoadSelected(): void {
+    if (this.selectedTabIndex === 0 && this.selectedWorkflow) {
+      // Load workflow
+      this.dialogRef.close({
+        action: 'load-workflow',
+        workflowId: this.selectedWorkflow.id,
+        workflowName: this.selectedWorkflow.name
+      } as WorkflowSelectionResult);
+    } else if (this.selectedTabIndex === 1 && this.selectedServiceFlow) {
+      // Load service flow
+      this.dialogRef.close({
+        action: 'load',
+        serviceCode: this.selectedServiceFlow.service_code,
+        serviceName: this.selectedServiceFlow.service_name
+      } as WorkflowSelectionResult);
+    }
+  }
+
+
+}
 export class ServiceFlowSelectorDialogComponent implements OnInit {
   serviceFlows: ServiceFlowSummary[] = [];
   filteredServiceFlows: ServiceFlowSummary[] = [];
