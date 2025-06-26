@@ -128,9 +128,12 @@
                     </div>
 
                     <div *ngIf="!propertiesForm.get('useExisting')?.value">
+
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Service</mat-label>
-                        <mat-select formControlName="service" (openedChange)="onServiceDropdownOpen($event)">
+                        <mat-select formControlName="service"
+                                    [compareWith]="compareByValue"
+                                    (openedChange)="onServiceDropdownOpen($event)">
                           <mat-option *ngFor="let service of services" [value]="service.id">
                             {{ service.name }} ({{ service.name_ara }})
                           </mat-option>
@@ -143,7 +146,9 @@
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Sequence Number</mat-label>
-                        <mat-select formControlName="sequence_number" (openedChange)="onFlowStepDropdownOpen($event)">
+                        <mat-select formControlName="sequence_number"
+                                    [compareWith]="compareByValue"
+                                    (openedChange)="onFlowStepDropdownOpen($event)">
                           <mat-option *ngFor="let step of flowSteps" [value]="step.id">
                             {{ step.name }} ({{ step.name_ara }})
                           </mat-option>
@@ -156,7 +161,9 @@
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Applicant Type</mat-label>
-                        <mat-select formControlName="applicant_type" (openedChange)="onApplicantTypeDropdownOpen($event)">
+                        <mat-select formControlName="applicant_type"
+                                    [compareWith]="compareByValue"
+                                    (openedChange)="onApplicantTypeDropdownOpen($event)">
                           <mat-option *ngFor="let type of applicantTypes" [value]="type.id">
                             {{ type.name }} ({{ type.name_ara }})
                           </mat-option>
@@ -166,6 +173,8 @@
                         </mat-select>
                         <mat-error>Applicant type is required</mat-error>
                       </mat-form-field>
+
+
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Name</mat-label>
@@ -198,15 +207,19 @@
 
                     <div *ngIf="propertiesForm.get('useExisting')?.value">
                       <mat-form-field appearance="outline" class="full-width">
-                        <mat-label>Select Existing Category</mat-label>
-                        <mat-select formControlName="existingCategoryId" (selectionChange)="onExistingCategorySelected($event.value)" (openedChange)="onExistingCategoryDropdownOpen($event)">
-                          <mat-option *ngFor="let category of existingCategories" [value]="category.id">
-                            {{ category.name }}
+                        <mat-label>Field Type</mat-label>
+                        <mat-select formControlName="_field_type"
+                                    [compareWith]="compareByValue"
+                                    required
+                                    (openedChange)="onFieldTypeDropdownOpen($event)">
+                          <mat-option *ngFor="let type of fieldTypes" [value]="type.id">
+                            {{ type.name }} ({{ type.name_ara }})
                           </mat-option>
-                          <mat-option *ngIf="existingCategories.length === 0" [value]="" disabled>
-                            No existing categories available
+                          <mat-option *ngIf="fieldTypes.length === 0" [value]="" disabled>
+                            {{ isLoading ? 'Loading field types...' : 'No field types available' }}
                           </mat-option>
                         </mat-select>
+                        <mat-error>Field type is required</mat-error>
                       </mat-form-field>
                     </div>
 

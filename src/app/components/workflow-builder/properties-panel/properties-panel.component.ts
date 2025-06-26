@@ -160,6 +160,69 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     return config?.color || '#999';
   }
 
+  // Helper method to extract ID from object or return the value itself
+  private extractIdValue(value: any): any {
+    if (value && typeof value === 'object' && 'id' in value) {
+      // Ensure the ID is a number if it's numeric
+      const id = value.id;
+      return typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id;
+    }
+    // If value is a string that looks like a number, convert it
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    return value;
+  }
+
+  // Compare function for mat-select to properly compare values
+  compareByValue(value1: any, value2: any): boolean {
+    // Handle null/undefined
+    if (!value1 || !value2) {
+      return value1 === value2;
+    }
+    // Convert to numbers if possible for comparison
+    const v1 = typeof value1 === 'string' && /^\d+$/.test(value1) ? parseInt(value1, 10) : value1;
+    const v2 = typeof value2 === 'string' && /^\d+$/.test(value2) ? parseInt(value2, 10) : value2;
+    return v1 === v2;
+  }
+
+  // Find the correct lookup ID by matching ID, code, or name
+  private findLookupValue(
+    lookupArray: LookupItem[],
+    id: any,
+    code: any,
+    name: any
+  ): number | null {
+    if (!lookupArray || lookupArray.length === 0) return null;
+
+    // First try to match by ID
+    if (id) {
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : id;
+      const foundById = lookupArray.find(item => item.id === numericId);
+      if (foundById) return foundById.id;
+    }
+
+    // Then try to match by code
+    if (code) {
+      const foundByCode = lookupArray.find(item =>
+        item.code && item.code.toLowerCase() === code.toString().toLowerCase()
+      );
+      if (foundByCode) return foundByCode.id;
+    }
+
+    // Finally try to match by name
+    if (name) {
+      const foundByName = lookupArray.find(item =>
+        item.name && item.name.toLowerCase() === name.toString().toLowerCase()
+      );
+      if (foundByName) return foundByName.id;
+    }
+
+    console.warn('Could not find lookup value for:', { id, code, name, availableItems: lookupArray });
+    return null;
+  }
+
+
 // Validation helper methods
   shouldShowTextValidation(): boolean {
     const fieldType = this.propertiesForm.get('_field_type')?.value;
@@ -267,22 +330,30 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   // Ensure data is loaded when needed
   private ensureDataLoaded(): Promise<void> {
-    // Check if we have any data loaded
-    const hasLookupData = this.services.length > 0 || this.flowSteps.length > 0 ||
-      this.applicantTypes.length > 0 || this.fieldTypes.length > 0;
+    // Check if we have the specific data needed for the current element type
+    const needsPageData = this.selectedElement?.type === ElementType.PAGE;
+    const hasRequiredPageData = needsPageData ?
+      (this.services.length > 0 && this.flowSteps.length > 0 && this.applicantTypes.length > 0) : true;
 
-    const hasExistingData = this.existingPages.length > 0 || this.existingCategories.length > 0 ||
-      this.existingFields.length > 0;
+    console.log('Data check:', {
+      elementType: this.selectedElement?.type,
+      needsPageData,
+      hasRequiredPageData,
+      servicesCount: this.services.length,
+      flowStepsCount: this.flowSteps.length,
+      applicantTypesCount: this.applicantTypes.length
+    });
 
-    console.log('Data check:', { hasLookupData, hasExistingData });
-
-    // Always load lookup data for foreign key fields
-    if (!hasLookupData) {
-      console.log('Loading lookup data...');
+    // Always load lookup data if we don't have required data
+    if (!hasRequiredPageData) {
+      console.log('Loading lookup data because required data is missing...');
       return this.loadLookupDataAsync();
     }
 
     // Load existing data if needed
+    const hasExistingData = this.existingPages.length > 0 || this.existingCategories.length > 0 ||
+      this.existingFields.length > 0;
+
     if (!hasExistingData) {
       console.log('Loading existing data...');
       this.loadExistingData();
@@ -374,19 +445,19 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
       // Ensure data is loaded before updating form
       this.ensureDataLoaded().then(() => {
-        // Add a small delay to ensure dropdowns are fully initialized
-        setTimeout(() => {
-          this.updateFormForElement();
+        this.updateFormForElement();
 
-          // If this is an existing element (has backend IDs), mark as already saved
-          if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
-            this.autoSaveStatus = 'saved';
-          }
-        }, 100);
+        // If this is an existing element (has backend IDs), mark as already saved
+        if (this.selectedElement && this.hasBackendId(this.selectedElement)) {
+          this.autoSaveStatus = 'saved';
+        }
+      }).catch(error => {
+        console.error('Failed to load data before updating form:', error);
+        // Still try to update the form even if data loading fails
+        this.updateFormForElement();
       });
     }
   }
-
   private hasBackendId(element: WorkflowElement): boolean {
     switch (element.type) {
       case ElementType.PAGE:
@@ -646,6 +717,9 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     // Completely reset the form first
     this.propertiesForm.reset();
 
+    // Update validators based on element type BEFORE setting values
+    this.updateValidators();
+
     // Wait for form to fully reset before setting new values
     setTimeout(() => {
       // Set common properties with defaults
@@ -657,9 +731,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       // Set element-specific properties
       this.setElementSpecificProperties(properties);
 
-      // Update validators based on element type
-      this.updateValidators();
-
       // Re-enable auto-save status after form is populated
       setTimeout(() => {
         this.showAutoSaveStatus = true;
@@ -667,7 +738,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       }, 200);
     }, 50);
   }
-
   private setElementSpecificProperties(properties: any): void {
     if (!this.selectedElement) return;
 
@@ -676,38 +746,110 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         // Check if this is an existing page
         const isExistingPage = !!properties.page_id && properties.page_id !== 'new';
 
-        // Ensure numeric values for dropdowns
-        let serviceValue = properties.service;
-        if (serviceValue && typeof serviceValue === 'string') {
-          serviceValue = parseInt(serviceValue, 10);
-        }
+        // Extract and map values
+        let mappedSequenceNumber: number | null = null;
+        let mappedApplicantType: number | null = null;
+        let mappedService: number | null = null;
 
-        let sequenceValue = properties.sequence_number;
-        if (sequenceValue && typeof sequenceValue === 'string') {
-          sequenceValue = parseInt(sequenceValue, 10);
-        }
+        // Map sequence number
+        mappedSequenceNumber = this.findLookupValue(
+          this.flowSteps,
+          properties.sequence_number,
+          properties.sequence_number_code,
+          properties.sequence_number_name
+        );
 
-        let applicantValue = properties.applicant_type;
-        if (applicantValue && typeof applicantValue === 'string') {
-          applicantValue = parseInt(applicantValue, 10);
-        }
+        // Map applicant type
+        mappedApplicantType = this.findLookupValue(
+          this.applicantTypes,
+          properties.applicant_type,
+          properties.applicant_type_code,
+          properties.applicant_type_name
+        );
 
-        // Delay setting dropdown values to ensure options are loaded
+        // Map service
+        mappedService = this.findLookupValue(
+          this.services,
+          properties.service,
+          properties.service_code,
+          properties.service_name
+        );
+
+        console.log('Mapped page properties:', {
+          original: {
+            sequence_number: properties.sequence_number,
+            applicant_type: properties.applicant_type,
+            service: properties.service
+          },
+          mapped: {
+            sequence_number: mappedSequenceNumber,
+            applicant_type: mappedApplicantType,
+            service: mappedService
+          },
+          lookupCounts: {
+            flowSteps: this.flowSteps.length,
+            applicantTypes: this.applicantTypes.length,
+            services: this.services.length
+          }
+        });
+
         this.propertiesForm.patchValue({
           useExisting: false,
           existingPageId: '',
+          service: mappedService || '',
+          sequence_number: mappedSequenceNumber || '',
+          applicant_type: mappedApplicantType || '',
           name_ara: properties.name_ara || '',
           description_ara: properties.description_ara || ''
         });
 
-        // Set dropdown values after a delay to ensure options are loaded
-        setTimeout(() => {
-          this.propertiesForm.patchValue({
-            service: serviceValue || '',
-            sequence_number: sequenceValue || '',
-            applicant_type: applicantValue || ''
+        // Ensure dropdowns have data loaded
+        if (this.flowSteps.length === 0 || this.applicantTypes.length === 0 || this.services.length === 0) {
+          this.ensureDataLoaded().then(() => {
+            // Re-map after data is loaded
+            const remappedSequence = this.findLookupValue(
+              this.flowSteps,
+              properties.sequence_number,
+              properties.sequence_number_code,
+              properties.sequence_number_name
+            );
+
+            const remappedApplicant = this.findLookupValue(
+              this.applicantTypes,
+              properties.applicant_type,
+              properties.applicant_type_code,
+              properties.applicant_type_name
+            );
+
+            const remappedService = this.findLookupValue(
+              this.services,
+              properties.service,
+              properties.service_code,
+              properties.service_name
+            );
+
+            // Re-patch the form values after data is loaded
+            this.propertiesForm.patchValue({
+              service: remappedService || '',
+              sequence_number: remappedSequence || '',
+              applicant_type: remappedApplicant || ''
+            });
+
+            console.log('Remapped after data load:', {
+              sequence_number: remappedSequence,
+              applicant_type: remappedApplicant,
+              service: remappedService
+            });
           });
-        }, 500);
+        }
+
+        // Force change detection for mat-select
+        setTimeout(() => {
+          this.propertiesForm.get('sequence_number')?.updateValueAndValidity();
+          this.propertiesForm.get('applicant_type')?.updateValueAndValidity();
+          this.propertiesForm.get('service')?.updateValueAndValidity();
+        }, 100);
+
         break;
 
       case ElementType.CATEGORY:
@@ -752,7 +894,12 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           _image_max_height: properties._image_max_height || '',
           _precision: properties._precision || '',
           _unique: properties._unique || false,
-          _default_value: properties._default_value || ''
+          _default_value: properties._default_value || '',
+          _default_boolean: properties._default_boolean || false,
+          _max_selections: properties._max_selections || '',
+          _min_selections: properties._min_selections || '',
+          _coordinates_format: properties._coordinates_format || false,
+          _uuid_format: properties._uuid_format || false
         });
         break;
 
@@ -772,7 +919,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
     }
   }
-
   private autoSaveProperties(formValue: any): void {
     if (!this.selectedElement) {
       console.log('Auto-save cancelled: No element selected');

@@ -378,6 +378,7 @@ export class WorkflowService {
     );
   }
   // Convert service flow with hierarchy
+// Convert service flow with hierarchy
   private convertServiceFlowToElements(serviceFlow: ServiceFlow, workflowData: WorkflowData, serviceId?: number): void {
     // Add start element
     const startElement: WorkflowElement = {
@@ -404,42 +405,66 @@ export class WorkflowService {
       serviceFlow.pages.forEach((page: any, pageIndex: number) => {
         const pageElementId = `page-${page.page_id || pageIndex}`;
 
-        // Extract IDs from objects if necessary
-// Extract IDs from objects if necessary - handle all possible formats
-        let sequenceNumberId = null;
-        if (page.sequence_number) {
-          if (typeof page.sequence_number === 'object' && page.sequence_number.id) {
-            sequenceNumberId = page.sequence_number.id;
+        // Extract values from the page - could be objects or IDs
+        let sequenceNumberValue = page.sequence_number;
+        let applicantTypeValue = page.applicant_type;
+        let serviceValue = page.service;
+
+        // Store both the raw value and any code/name for lookup matching
+        const sequenceNumberData = {
+          id: null as number | null,
+          code: null as string | null,
+          name: null as string | null
+        };
+
+        const applicantTypeData = {
+          id: null as number | null,
+          code: null as string | null,
+          name: null as string | null
+        };
+
+        // Extract data based on the format
+        if (sequenceNumberValue) {
+          if (typeof sequenceNumberValue === 'object') {
+            sequenceNumberData.id = sequenceNumberValue.id || null;
+            sequenceNumberData.code = sequenceNumberValue.code || null;
+            sequenceNumberData.name = sequenceNumberValue.name || null;
           } else {
-            sequenceNumberId = page.sequence_number;
+            // It's just an ID or code
+            if (typeof sequenceNumberValue === 'number' || /^\d+$/.test(sequenceNumberValue)) {
+              sequenceNumberData.id = Number(sequenceNumberValue);
+            } else {
+              sequenceNumberData.code = sequenceNumberValue;
+            }
           }
         }
 
-        let applicantTypeId = null;
-        if (page.applicant_type) {
-          if (typeof page.applicant_type === 'object' && page.applicant_type.id) {
-            applicantTypeId = page.applicant_type.id;
+        if (applicantTypeValue) {
+          if (typeof applicantTypeValue === 'object') {
+            applicantTypeData.id = applicantTypeValue.id || null;
+            applicantTypeData.code = applicantTypeValue.code || null;
+            applicantTypeData.name = applicantTypeValue.name || null;
           } else {
-            applicantTypeId = page.applicant_type;
+            // It's just an ID or code
+            if (typeof applicantTypeValue === 'number' || /^\d+$/.test(applicantTypeValue)) {
+              applicantTypeData.id = Number(applicantTypeValue);
+            } else {
+              applicantTypeData.code = applicantTypeValue;
+            }
           }
         }
 
-        // Also check if the page has these as direct properties
-        if (!sequenceNumberId && page.sequence_number_id) {
-          sequenceNumberId = page.sequence_number_id;
-        }
-        if (!applicantTypeId && page.applicant_type_id) {
-          applicantTypeId = page.applicant_type_id;
-        }
+        const serviceIdFromPage = this.extractIdFromValue(serviceValue || page.service_id);
 
         console.log('Page data extraction:', {
           service: serviceId,
-          sequence_number_raw: page.sequence_number,
-          sequence_number_id: sequenceNumberId,
-          applicant_type_raw: page.applicant_type,
-          applicant_type_id: applicantTypeId
+          service_from_page: serviceIdFromPage,
+          sequence_number_data: sequenceNumberData,
+          applicant_type_data: applicantTypeData,
+          raw_page: page
         });
-        // Create page element with properly extracted IDs
+
+        // Store the lookup data for later mapping
         const pageElement: WorkflowElement = {
           id: pageElementId,
           type: ElementType.PAGE,
@@ -449,20 +474,23 @@ export class WorkflowService {
             name_ara: page.name_ara,
             description: page.description,
             description_ara: page.description_ara,
-            sequence_number: sequenceNumberId || '',
+            sequence_number: sequenceNumberData.id,
+            sequence_number_code: sequenceNumberData.code,
+            sequence_number_name: sequenceNumberData.name,
             page_id: page.page_id,
             is_hidden_page: page.is_hidden_page || false,
             categoryCount: 0,
             fieldCount: 0,
-            service: serviceId || serviceFlow.service_code,
-            applicant_type: applicantTypeId || '',
+            service: serviceIdFromPage || serviceId || serviceFlow.service_code,
+            applicant_type: applicantTypeData.id,
+            applicant_type_code: applicantTypeData.code,
+            applicant_type_name: applicantTypeData.name,
             active_ind: true
           },
           connections: [],
           children: [],
           isExpanded: false
         };
-
         workflowData.elements.push(pageElement);
 
         // Connect to previous element
@@ -534,7 +562,32 @@ export class WorkflowService {
                     _is_disabled: field.is_disabled || false,
                     _lookup: lookupId,
                     _sequence: field.sequence || fieldIndex,
-                    // ... other field properties
+                    // Add validation properties
+                    _max_length: field.max_length,
+                    _min_length: field.min_length,
+                    _regex_pattern: field.regex_pattern,
+                    _allowed_characters: field.allowed_characters,
+                    _forbidden_words: field.forbidden_words,
+                    _value_greater_than: field.value_greater_than,
+                    _value_less_than: field.value_less_than,
+                    _integer_only: field.integer_only,
+                    _positive_only: field.positive_only,
+                    _precision: field.precision,
+                    _date_greater_than: field.date_greater_than,
+                    _date_less_than: field.date_less_than,
+                    _future_only: field.future_only,
+                    _past_only: field.past_only,
+                    _file_types: field.file_types,
+                    _max_file_size: field.max_file_size,
+                    _image_max_width: field.image_max_width,
+                    _image_max_height: field.image_max_height,
+                    _default_boolean: field.default_boolean,
+                    _max_selections: field.max_selections,
+                    _min_selections: field.min_selections,
+                    _unique: field.unique,
+                    _default_value: field.default_value,
+                    _coordinates_format: field.coordinates_format,
+                    _uuid_format: field.uuid_format,
                     allowed_lookups: field.allowed_lookups,
                     active_ind: true
                   },
@@ -891,6 +944,21 @@ export class WorkflowService {
   getServiceMetadata(): any {
     return this.serviceMetadata;
   }
+
+  // Helper method to extract ID from object or return the value itself
+  private extractIdFromValue(value: any): any {
+    if (value && typeof value === 'object' && 'id' in value) {
+      // Ensure the ID is a number if it's numeric
+      const id = value.id;
+      return typeof id === 'string' && /^\d+$/.test(id) ? parseInt(id, 10) : id;
+    }
+    // If value is a string that looks like a number, convert it
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    return value;
+  }
+
   private addStartElementToWorkflow(workflow: WorkflowData): void {
     const startElement: WorkflowElement = {
       id: uuidv4(),
