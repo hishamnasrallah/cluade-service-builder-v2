@@ -944,15 +944,25 @@ export class ApiService {
   }
 
   // WORKFLOW CRUD Operations
+  // WORKFLOW CRUD Operations
   createWorkflow(workflow: any): Observable<any> {
-    const payload = {
+    const payload: any = {
       name: workflow.name,
-      description: workflow.description,
-      service_id: workflow.service_id,
-      service_code: workflow.service_code,
-      metadata: workflow.metadata,
-      is_active: true
+      description: workflow.description || '',
+      is_active: true,
+      is_draft: true,
+      metadata: workflow.metadata || {}
     };
+
+    // Only add service-related fields if they have values
+    if (workflow.service_id) {
+      payload.service = workflow.service_id;
+    }
+    if (workflow.service_code) {
+      payload.service_code = workflow.service_code;
+    }
+
+    console.log('Creating workflow with payload:', payload);
 
     return this.http.post(this.getApiUrl('/dynamic/workflows/'), payload)
       .pipe(
