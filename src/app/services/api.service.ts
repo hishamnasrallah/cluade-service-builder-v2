@@ -319,9 +319,13 @@ export class ApiService {
       throw new Error('Base URL not configured. Please configure the API base URL first.');
     }
 
+    // Special handling for workflow container endpoints
+    if (endpoint.startsWith('/dynamic/workflows/')) {
+      return `${baseUrl}${endpoint}`;
+    }
+
     // Use workflow-specific endpoints for all workflow builder operations
     if (useWorkflowApi && endpoint.startsWith('/dynamic/')) {
-      // Remove the /dynamic prefix and prepend /dynamic/workflow
       const cleanEndpoint = endpoint.replace('/dynamic/', '/');
       return `${baseUrl}/dynamic/workflow${cleanEndpoint}`;
     }
