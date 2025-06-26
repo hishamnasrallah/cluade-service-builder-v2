@@ -198,6 +198,7 @@
                 [canvasState]="canvasState"
                 [allElements]="workflow.elements"
                 [selectedElementId]="selectedElementId"
+                [class.connecting]="!!connectingFrom"
                 (elementClick)="selectElement(element.id)"
                 (elementDoubleClick)="editElement(element.id)"
                 (childElementSelected)="selectElement($event)"

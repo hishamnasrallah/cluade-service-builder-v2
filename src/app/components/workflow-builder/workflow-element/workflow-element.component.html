@@ -96,29 +96,34 @@
 
   <!-- Connection Points -->
   <!-- Connection Points -->
+  <!-- Connection Points -->
   <div class="connection-points" *ngIf="!element.parentId">
-    <!-- Input connection points (all sides) -->
+    <!-- Input connection points (all sides) - Show when element can receive and we're connecting -->
     <ng-container *ngIf="elementConfig?.canReceiveConnections">
       <div class="connection-point input input-left"
+           [class.active]="isConnecting"
            (mouseup)="onConnectionEnd($event)"
            (mousedown)="$event.stopPropagation()">
       </div>
       <div class="connection-point input input-right"
+           [class.active]="isConnecting"
            (mouseup)="onConnectionEnd($event)"
            (mousedown)="$event.stopPropagation()">
       </div>
       <div class="connection-point input input-top"
+           [class.active]="isConnecting"
            (mouseup)="onConnectionEnd($event)"
            (mousedown)="$event.stopPropagation()">
       </div>
       <div class="connection-point input input-bottom"
+           [class.active]="isConnecting"
            (mouseup)="onConnectionEnd($event)"
            (mousedown)="$event.stopPropagation()">
       </div>
     </ng-container>
 
-    <!-- Output connection points (all sides) -->
-    <ng-container *ngIf="elementConfig?.canSendConnections">
+    <!-- Output connection points (all sides) - Hide when connecting -->
+    <ng-container *ngIf="elementConfig?.canSendConnections && !isConnecting">
       <div class="connection-point output output-left"
            (mousedown)="onConnectionStart($event)">
       </div>

@@ -357,3 +357,31 @@
   pointer-events: none;
   z-index: 9999;
 }
+
+// Make input points visible when in connecting mode
+.connection-point.input.active {
+  opacity: 1 !important;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+
+  70% {
+    transform: scale(1.1);
+    box-shadow: 0 0 0 6px rgba(76, 175, 80, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+
+// Hide output points when connecting
+.workflow-element.connecting .connection-point.output {
+  display: none !important;
+}

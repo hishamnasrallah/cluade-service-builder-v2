@@ -135,7 +135,7 @@ export class WorkflowElementComponent implements OnInit {
 
     // Don't start drag if clicking on connection points, expand button, or child elements
     if (target.closest('.connection-point') ||
-      target.closest('.expand-button') ||
+      target.closest('.expand-button-svg') ||  // Fixed: was '.expand-button'
       target.closest('.children-container')) {
       return;
     }
@@ -199,7 +199,11 @@ export class WorkflowElementComponent implements OnInit {
   public onConnectionEnd(event: MouseEvent): void {
     event.stopPropagation();
     event.preventDefault();
-    this.connectionEnd.emit(event);
+
+    // Ensure we emit the connection end event
+    if (this.elementConfig?.canReceiveConnections) {
+      this.connectionEnd.emit(event);
+    }
   }
 
   public onRightClick(event: MouseEvent): void {

@@ -690,14 +690,28 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       this.isPanning = false;
       this.canvasWrapperRef.nativeElement.classList.remove('panning');
     }
+
+    // If we're connecting and mouse up on canvas (not on element), cancel connection
+    if (this.connectingFrom) {
+      const target = event.target as HTMLElement;
+      // Only cancel if we're not over a connection point
+      if (!target.classList.contains('connection-point') &&
+        !target.closest('.connection-point')) {
+        setTimeout(() => {
+          if (this.connectingFrom) {
+            this.cancelConnection();
+          }
+        }, 100); // Small delay to allow connection completion
+      }
+    }
   }
 
   onCanvasClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (target === this.canvasWrapperRef.nativeElement || target === this.canvasRef.nativeElement) {
-      // Cancel any active connection
+      // Don't cancel connection immediately on click - let mouseup handle it
       if (this.connectingFrom) {
-        this.cancelConnection();
+        // Connection canceling is now handled in onCanvasMouseUp
         return;
       }
 
