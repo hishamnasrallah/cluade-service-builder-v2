@@ -112,6 +112,19 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     // Set up real-time updates for name field
     this.setupRealTimeUpdates();
   }
+// Add this helper method to the component
+  private toNumber(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    if (typeof value === 'number') {
+      return value;
+    }
+    if (typeof value === 'string' && /^\d+$/.test(value)) {
+      return parseInt(value, 10);
+    }
+    return null;
+  }
 
   private setupRealTimeUpdates(): void {
     // Watch for name changes specifically
@@ -906,28 +919,29 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           service: mappedService
         });
 
-        // Set form values with the properly mapped values
+        // FIXED: Set form values with ALL properties including text fields
         this.propertiesForm.patchValue({
           useExisting: false,
           existingPageId: '',
           service: mappedService || properties.service || '',
           sequence_number: mappedSequenceNumber || properties.sequence_number || '',
           applicant_type: mappedApplicantType || properties.applicant_type || '',
+          name: properties.name || '',
           name_ara: properties.name_ara || '',
+          description: properties.description || '',
           description_ara: properties.description_ara || ''
         });
 
         break;
 
-
-
-
       case ElementType.CATEGORY:
         this.propertiesForm.patchValue({
           useExisting: properties.useExisting || false,
           existingCategoryId: properties.existingCategoryId || '',
+          name: properties.name || '',
           code: properties.code || '',
           name_ara: properties.name_ara || '',
+          description: properties.description || '',
           is_repeatable: properties.is_repeatable || false
         });
         break;
@@ -992,6 +1006,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
     }
   }
+
   // private autoSaveProperties(formValue: any): void {
   //   if (!this.selectedElement) {
   //     console.log('Auto-save cancelled: No element selected');
@@ -1117,30 +1132,30 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   private mapPageProperties(properties: any): Partial<Page> {
     const mapped: Partial<Page> = {
-      name: properties.name,
-      name_ara: properties.name_ara,
-      description: properties.description,
-      description_ara: properties.description_ara,
+      name: properties.name || '',  // Ensure empty string instead of undefined
+      name_ara: properties.name_ara || '',  // Ensure empty string instead of undefined
+      description: properties.description || '',  // Ensure empty string instead of undefined
+      description_ara: properties.description_ara || '',  // Ensure empty string instead of undefined
       active_ind: properties.active_ind !== false,
       position_x: properties.position?.x || 0,
       position_y: properties.position?.y || 0,
       is_expanded: properties.isExpanded || false
     };
 
-    // Convert to numbers, ensuring we have valid values
+    // Convert to numbers, ensuring we have valid values - FIXED: Simplified and made more robust
     const serviceValue = properties.service_id || properties.service;
     if (serviceValue !== undefined && serviceValue !== null && serviceValue !== '') {
-      mapped.service = typeof serviceValue === 'number' ? serviceValue : parseInt(serviceValue, 10);
+      mapped.service = this.toNumber(serviceValue) || undefined;
     }
 
     const sequenceValue = properties.sequence_number_id || properties.sequence_number;
     if (sequenceValue !== undefined && sequenceValue !== null && sequenceValue !== '') {
-      mapped.sequence_number = typeof sequenceValue === 'number' ? sequenceValue : parseInt(sequenceValue, 10);
+      mapped.sequence_number = this.toNumber(sequenceValue) || undefined;
     }
 
     const applicantValue = properties.applicant_type_id || properties.applicant_type;
     if (applicantValue !== undefined && applicantValue !== null && applicantValue !== '') {
-      mapped.applicant_type = typeof applicantValue === 'number' ? applicantValue : parseInt(applicantValue, 10);
+      mapped.applicant_type = this.toNumber(applicantValue) || undefined;
     }
 
     return mapped;
@@ -1453,15 +1468,14 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
             cleaned.applicant_type_id = formValue.applicant_type; // Store as applicant_type_id as well
           }
 
-          // Include other page properties
-          ['name_ara', 'description_ara'].forEach(key => {
-            if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
-              cleaned[key] = formValue[key];
-            }
-          });
+          // FIXED: Include ALL page properties with proper handling
+          cleaned.name = formValue.name || '';
+          cleaned.name_ara = formValue.name_ara || '';
+          cleaned.description = formValue.description || '';
+          cleaned.description_ara = formValue.description_ara || '';
         }
+        console.log('Cleaned properties for PAGE:', cleaned);
         break;
-
 
       case ElementType.CATEGORY:
         if (formValue.useExisting) {
@@ -1470,12 +1484,14 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
             cleaned.existingCategoryId = formValue.existingCategoryId;
           }
         } else {
-          ['code', 'name_ara', 'is_repeatable'].forEach(key => {
-            if (formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
-              cleaned[key] = formValue[key];
-            }
-          });
+          // FIXED: Include all fields explicitly
+          cleaned.name = formValue.name || '';
+          cleaned.name_ara = formValue.name_ara || '';
+          cleaned.code = formValue.code || '';
+          cleaned.description = formValue.description || '';
+          cleaned.is_repeatable = formValue.is_repeatable || false;
         }
+        console.log('Cleaned properties for CATEGORY:', cleaned);
         break;
 
       case ElementType.FIELD:
@@ -1517,7 +1533,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     console.log('Cleaned form value for', this.selectedElement.type, ':', cleaned);
     return cleaned;
   }
-
   resetForm(): void {
     if (this.selectedElement) {
       console.log('Resetting form for element:', this.selectedElement.id);

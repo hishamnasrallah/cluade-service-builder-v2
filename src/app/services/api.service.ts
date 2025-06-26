@@ -1151,6 +1151,7 @@ export class ApiService {
     };
 
     console.log('Saving complete workflow with cleaned data:', cleanedData);
+    console.log('Elements being sent:', cleanedData.elements);
 
     return this.http.post<any>(
       this.getApiUrl(`/dynamic/workflows/${workflowId}/save_complete_workflow/`),
@@ -1171,8 +1172,8 @@ export class ApiService {
       }),
       catchError(this.handleError)
     );
-
   }
+
   private getBackendId(element: any): number | string | null {
     if (!element) return null;
 
@@ -1196,6 +1197,23 @@ export class ApiService {
 
   private cleanElementProperties(element: any): any {
     const props = { ...(element.properties || {}) };
+
+    console.log('Properties before cleaning:', props);
+
+    // FIXED: Ensure text fields are included
+    const textFields = [
+      'name', 'name_ara', 'description', 'description_ara',
+      'code', '_field_name', '_field_display_name', '_field_display_name_ara',
+      '_regex_pattern', '_allowed_characters', '_forbidden_words',
+      '_file_types', '_default_value', 'target_field', 'action'
+    ];
+
+    textFields.forEach(field => {
+      if (props[field] !== undefined && props[field] !== null) {
+        // Keep the value as is, including empty strings
+        props[field] = props[field];
+      }
+    });
 
     // Convert string numbers to actual numbers
     const numericFields = [
@@ -1259,7 +1277,7 @@ export class ApiService {
       }
     });
 
-// Handle single ID fields that might be arrays
+    // Handle single ID fields that might be arrays
     const singleIdFields = [
       'page_id', 'category_id', '_field_id', 'condition_id',
       'service_id', 'sequence_number_id', 'applicant_type_id',
@@ -1288,7 +1306,7 @@ export class ApiService {
       }
     });
 
-// Never send 'id' field for elements
+    // Never send 'id' field for elements
     if ('id' in props) {
       delete props.id;
     }
@@ -1298,9 +1316,10 @@ export class ApiService {
       props.active_ind = true;
     }
 
+    console.log('Properties after cleaning:', props);
+
     return props;
   }
-
 // Clone workflow
   cloneWorkflow(workflowId: string, data: any): Observable<any> {
     return this.http.post(
