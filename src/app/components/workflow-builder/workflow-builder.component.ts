@@ -230,11 +230,33 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
                 panY: response.canvas_state.panY || 100
               };
               console.log('Restored canvas state:', this.canvasState);
+
+              // Also restore view mode if available
+              if (response.canvas_state.viewMode) {
+                this.workflow.viewMode = response.canvas_state.viewMode;
+              }
             } else {
               // If no canvas state, auto-organize for better layout
               setTimeout(() => {
                 this.autoOrganize();
               }, 100);
+            }
+
+// Debug: Log the loaded elements
+            console.log('Loaded workflow elements:', this.workflow.elements);
+            console.log('Pages with children:', this.workflow.elements.filter(el =>
+              el.type === 'page' && el.children && el.children.length > 0
+            ));
+
+// If viewMode is 'expanded', ensure at least some containers are expanded
+            if (this.workflow.viewMode === 'expanded') {
+              const pages = this.workflow.elements.filter(el => el.type === 'page');
+              pages.forEach(page => {
+                if (page.children && page.children.length > 0 && !page.isExpanded) {
+                  console.log(`Auto-expanding page ${page.id} because it has children`);
+                  page.isExpanded = true;
+                }
+              });
             }
 
             // Update route
@@ -1194,26 +1216,6 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         }
       });
 
-      // For pages, ensure we maintain the foreign key relationships
-      if (element.type === ElementType.PAGE) {
-        // Preserve existing foreign key data if not in update
-        if (cleanedProperties.sequence_number === undefined && element.properties.sequence_number !== undefined) {
-          cleanedProperties.sequence_number = element.properties.sequence_number;
-          cleanedProperties.sequence_number_id = element.properties.sequence_number_id || element.properties.sequence_number;
-        }
-        if (cleanedProperties.applicant_type === undefined && element.properties.applicant_type !== undefined) {
-          cleanedProperties.applicant_type = element.properties.applicant_type;
-          cleanedProperties.applicant_type_id = element.properties.applicant_type_id || element.properties.applicant_type;
-        }
-
-        // Also preserve the descriptive fields if they exist
-        ['sequence_number_code', 'sequence_number_name', 'applicant_type_code', 'applicant_type_name'].forEach(field => {
-          if (cleanedProperties[field] === undefined && element.properties[field] !== undefined) {
-            cleanedProperties[field] = element.properties[field];
-          }
-        });
-      }
-
       // Ensure array fields are arrays
       const arrayFields = ['page_ids', 'category_ids', 'service_ids', 'allowed_lookups'];
 
@@ -1268,6 +1270,26 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         }
       });
 
+      // For pages, ensure we maintain the foreign key relationships
+      if (element.type === ElementType.PAGE) {
+        // Preserve existing foreign key data if not in update
+        if (cleanedProperties.sequence_number === undefined && element.properties.sequence_number !== undefined) {
+          cleanedProperties.sequence_number = element.properties.sequence_number;
+          cleanedProperties.sequence_number_id = element.properties.sequence_number_id || element.properties.sequence_number;
+        }
+        if (cleanedProperties.applicant_type === undefined && element.properties.applicant_type !== undefined) {
+          cleanedProperties.applicant_type = element.properties.applicant_type;
+          cleanedProperties.applicant_type_id = element.properties.applicant_type_id || element.properties.applicant_type;
+        }
+
+        // Also preserve the descriptive fields if they exist
+        ['sequence_number_code', 'sequence_number_name', 'applicant_type_code', 'applicant_type_name'].forEach(field => {
+          if (cleanedProperties[field] === undefined && element.properties[field] !== undefined) {
+            cleanedProperties[field] = element.properties[field];
+          }
+        });
+      }
+
       // Update element properties - merge, don't replace
       element.properties = {
         ...element.properties,
@@ -1278,10 +1300,33 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       this.workflow = { ...this.workflow };
 
       console.log('Updated element properties:', element.properties);
-    }
 
-    // Update via workflow service (this will just update local state, no API call)
-    this.workflowService.updateElement(update.id, { properties: update.properties });
+      // ADDED: Force update the workflow service to ensure everything is synced
+      this.workflowService.updateElement(update.id, {
+        properties: element.properties  // Pass the merged properties
+      });
+
+      // ADDED: If we have a parent element, update its counts
+      if (element.parentId) {
+        const parent = this.workflow.elements.find(el => el.id === element.parentId);
+        if (parent && parent.type === ElementType.PAGE) {
+          // Update category and field counts
+          const categories = this.workflow.elements.filter(el =>
+            el.parentId === parent.id && el.type === ElementType.CATEGORY
+          );
+          parent.properties.categoryCount = categories.length;
+
+          let totalFields = 0;
+          categories.forEach(category => {
+            const fields = this.workflow.elements.filter(el =>
+              el.parentId === category.id && el.type === ElementType.FIELD
+            );
+            totalFields += fields.length;
+          });
+          parent.properties.fieldCount = totalFields;
+        }
+      }
+    }
   }
   onConnectionUpdated(update: any): void {
     if (update.action === 'delete' && update.connection) {

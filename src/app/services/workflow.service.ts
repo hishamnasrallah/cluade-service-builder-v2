@@ -788,9 +788,13 @@ export class WorkflowService {
   private createCategory(category: WorkflowElement): Observable<any> {
     const payload = this.mapCategoryProperties(category);
 
+    console.log('Creating category with payload:', payload);
+
     return this.apiService.createCategory(payload).pipe(
       map(response => {
         category.properties.category_id = response.id;
+        // Update the local workflow immediately
+        this.updateWorkflow();
         return response;
       }),
       catchError(error => {
@@ -1207,7 +1211,9 @@ export class WorkflowService {
             name: response.name,
             description: response.description,
             elements: response.elements.map((el: any) => {
-              // For pages, ensure all fields are in properties
+              // Ensure proper structure for all element types
+              const elementPosition = el.position || { x: el.position_x || 100, y: el.position_y || 100 };
+
               if (el.type === 'page') {
                 const pageProperties: any = {};
 
@@ -1228,15 +1234,56 @@ export class WorkflowService {
 
                 return {
                   ...el,
-                  position: el.position || { x: el.position_x || 100, y: el.position_y || 100 },
-                  properties: { ...pageProperties, ...(el.properties || {}) }
+                  position: elementPosition,
+                  properties: { ...pageProperties, ...(el.properties || {}) },
+                  children: el.children || [],
+                  isExpanded: el.is_expanded || el.isExpanded || false,
+                  parentId: el.parent_id || el.parentId || undefined
+                };
+              } else if (el.type === 'category') {
+                return {
+                  ...el,
+                  position: elementPosition,
+                  properties: {
+                    category_id: el.category_id || el.id,
+                    name: el.name || '',
+                    name_ara: el.name_ara || '',
+                    code: el.code || '',
+                    description: el.description || '',
+                    is_repeatable: el.is_repeatable || false,
+                    active_ind: el.active_ind !== false,
+                    ...(el.properties || {})
+                  },
+                  children: el.children || [],
+                  isExpanded: el.is_expanded || el.isExpanded || false,
+                  parentId: el.parent_id || el.parentId || undefined
+                };
+              } else if (el.type === 'field') {
+                return {
+                  ...el,
+                  position: elementPosition,
+                  properties: {
+                    _field_id: el._field_id || el.field_id || el.id,
+                    _field_name: el._field_name || el.field_name || '',
+                    _field_display_name: el._field_display_name || el.field_display_name || '',
+                    _field_display_name_ara: el._field_display_name_ara || el.field_display_name_ara || '',
+                    _field_type: el._field_type || el.field_type || '',
+                    _sequence: el._sequence || el.sequence,
+                    _mandatory: el._mandatory || el.mandatory || false,
+                    _is_hidden: el._is_hidden || el.is_hidden || false,
+                    _is_disabled: el._is_disabled || el.is_disabled || false,
+                    active_ind: el.active_ind !== false,
+                    ...(el.properties || {})
+                  },
+                  parentId: el.parent_id || el.parentId || undefined
                 };
               }
 
-              // For other element types, use as is
+// For other element types, use as is
               return {
                 ...el,
-                position: el.position || { x: el.position_x || 100, y: el.position_y || 100 }
+                position: elementPosition,
+                parentId: el.parent_id || el.parentId || undefined
               };
             }),
             connections: response.connections || [],
@@ -1350,6 +1397,11 @@ export class WorkflowService {
     // Convert pages
 // Convert pages - maintain proper spacing if positions are not saved
     let defaultXPosition = 350;
+
+    console.log('Converting pages from response:', response.pages);
+    console.log('All categories:', response.categories);
+    console.log('All fields:', response.fields);
+
     response.pages?.forEach((page: any, index: number) => {
       const pageElementId = `page-${page.id}`;
       idMapping[`page-${page.id}`] = pageElementId;
@@ -1377,23 +1429,38 @@ export class WorkflowService {
           sequence_number_id: page.sequence_number_id,
           sequence_number_name: page.sequence_number_name,
           applicant_type_id: page.applicant_type_id,
-          applicant_type_name: page.applicant_type_name
+          applicant_type_name: page.applicant_type_name,
+          active_ind: page.active_ind !== false
         },
         connections: [],
-        isExpanded: page.is_expanded || false,
+        isExpanded: page.is_expanded || false,  // Make sure this is set
         children: []
       };
       workflowData.elements.push(pageElement);
 
-// Convert categories
+      // Debug log
+      console.log(`Created page element:`, pageElement);
+
+// Convert categories - fix property name and handle objects
+      console.log(`Looking for categories for page ${page.id}`);
+
       const pageCategories = response.categories?.filter((cat: any) => {
-        // Handle both array and single value cases
-        if (Array.isArray(cat.page)) {
-          return cat.page.includes(page.id);
+        console.log(`Checking category ${cat.id} with pages data:`, cat.pages);
+
+        // The 'pages' field (plural!) is an array of objects with id, name, code
+        if (cat.pages && Array.isArray(cat.pages)) {
+          const belongsToPage = cat.pages.some((p: any) => p.id === page.id);
+          console.log(`Category ${cat.id} belongs to page ${page.id}:`, belongsToPage);
+          return belongsToPage;
         }
-        return cat.page === page.id;
-      });
-      pageCategories?.forEach((category: any) => {
+        return false;
+      }) || [];
+
+      console.log(`Found ${pageCategories.length} categories for page ${page.id}`);
+
+      console.log(`Found ${pageCategories.length} categories for page ${page.id}`);
+
+      pageCategories.forEach((category: any) => {
         const categoryElementId = `category-${category.id}`;
         idMapping[`category-${category.id}`] = categoryElementId;
         idMapping[category.id.toString()] = categoryElementId;
@@ -1411,7 +1478,8 @@ export class WorkflowService {
             name_ara: category.name_ara,
             is_repeatable: category.is_repeatable,
             description: category.description,
-            code: category.code
+            code: category.code,
+            active_ind: category.active_ind !== false
           },
           connections: [],
           parentId: pageElement.id,
@@ -1419,19 +1487,33 @@ export class WorkflowService {
           isExpanded: false
         };
         workflowData.elements.push(categoryElement);
-        pageElement.children!.push(categoryElement.id);
 
-// Convert fields
+        // Ensure parent has children array
+        if (!pageElement.children) {
+          pageElement.children = [];
+        }
+        pageElement.children.push(categoryElement.id);
+
+        console.log(`Added category ${categoryElement.id} to page ${pageElement.id}`);
+
+        // Convert fields - fix property name and handle objects
         const categoryFields = response.fields?.filter((field: any) => {
-          // Handle both _category and categories field names
-          const categories = field._category || field.categories;
-          if (Array.isArray(categories)) {
-            return categories.includes(category.id);
-          }
-          return categories === category.id;
-        });
+          console.log(`Checking field ${field.id} with categories data:`, field.categories);
 
-        categoryFields?.forEach((field: any) => {
+          // The 'categories' field is an array of objects with id, name, code
+          if (field.categories && Array.isArray(field.categories)) {
+            const belongsToCategory = field.categories.some((c: any) => c.id === category.id);
+            console.log(`Field ${field.id} belongs to category ${category.id}:`, belongsToCategory);
+            return belongsToCategory;
+          }
+          return false;
+        }) || [];
+
+        console.log(`Found ${categoryFields.length} fields for category ${category.id}`);
+
+        console.log(`Found ${categoryFields.length} fields for category ${category.id}`);
+
+        categoryFields.forEach((field: any) => {
           const fieldElementId = `field-${field.id}`;
           idMapping[`field-${field.id}`] = fieldElementId;
           idMapping[field.id.toString()] = fieldElementId;
@@ -1445,10 +1527,18 @@ export class WorkflowService {
             },
             properties: this.mapFieldFromBackend(field),
             connections: [],
-            parentId: categoryElement.id
+            parentId: categoryElement.id,
+            children: undefined  // Fields don't have children
           };
           workflowData.elements.push(fieldElement);
-          categoryElement.children!.push(fieldElement.id);
+
+          // Ensure parent has children array
+          if (!categoryElement.children) {
+            categoryElement.children = [];
+          }
+          categoryElement.children.push(fieldElement.id);
+
+          console.log(`Added field ${fieldElement.id} to category ${categoryElement.id}`);
         });
       });
     });

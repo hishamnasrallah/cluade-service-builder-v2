@@ -1491,36 +1491,51 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
 
       case ElementType.CATEGORY:
+        // Always include all category fields, not just when creating new
+        cleaned.name = formValue.name || '';
+        cleaned.name_ara = formValue.name_ara || '';
+        cleaned.code = formValue.code || '';
+        cleaned.description = formValue.description || '';
+        cleaned.is_repeatable = formValue.is_repeatable || false;
+
         if (formValue.useExisting) {
           cleaned.useExisting = true;
           if (formValue.existingCategoryId) {
             cleaned.existingCategoryId = formValue.existingCategoryId;
           }
-        } else {
-          // FIXED: Include all fields explicitly
-          cleaned.name = formValue.name || '';
-          cleaned.name_ara = formValue.name_ara || '';
-          cleaned.code = formValue.code || '';
-          cleaned.description = formValue.description || '';
-          cleaned.is_repeatable = formValue.is_repeatable || false;
         }
+
+        // Include the backend ID if it exists
+        if (this.selectedElement?.properties.category_id) {
+          cleaned.category_id = this.selectedElement.properties.category_id;
+        }
+
         console.log('Cleaned properties for CATEGORY:', cleaned);
         break;
 
       case ElementType.FIELD:
+        // Always include all field properties that have values
+        Object.keys(formValue).forEach(key => {
+          if (key.startsWith('_') && formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
+            cleaned[key] = formValue[key];
+          }
+        });
+
+        // Include non-underscore field properties
+        cleaned.name = formValue.name || formValue._field_display_name || formValue._field_name || '';
+
         if (formValue.useExisting) {
           cleaned.useExisting = true;
           if (formValue.existingFieldId) {
             cleaned.existingFieldId = formValue.existingFieldId;
           }
-        } else {
-          // Include all field properties that have values
-          Object.keys(formValue).forEach(key => {
-            if (key.startsWith('_') && formValue[key] !== null && formValue[key] !== undefined && formValue[key] !== '') {
-              cleaned[key] = formValue[key];
-            }
-          });
         }
+
+        // Include the backend ID if it exists
+        if (this.selectedElement?.properties._field_id) {
+          cleaned._field_id = this.selectedElement.properties._field_id;
+        }
+
         break;
 
       case ElementType.CONDITION:
