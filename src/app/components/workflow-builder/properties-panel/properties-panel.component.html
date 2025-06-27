@@ -531,8 +531,38 @@
               </div>
             </mat-tab>
             <!-- Condition Logic Tab (for Condition) -->
+            <!-- Condition Logic Tab (for Condition) -->
             <mat-tab label="Logic" *ngIf="selectedElement.type === 'condition'">
-              <!-- ... existing condition logic content ... -->
+              <div class="tab-content">
+                <div class="condition-logic-section">
+                  <h4>Condition Rules</h4>
+
+                  <div class="current-conditions" *ngIf="propertiesForm.get('condition_logic')?.value?.length > 0">
+                    <div class="condition-summary" *ngFor="let condition of propertiesForm.get('condition_logic')?.value; let i = index">
+                      <div class="condition-number">{{ i + 1 }}</div>
+                      <div class="condition-text">
+                        <mat-icon>{{ getFieldIcon(condition.field) }}</mat-icon>
+                        <span class="field-name">{{ getFieldDisplayName(condition.field) }}</span>
+                        <span class="operator">{{ getOperatorDisplay(condition.operation) }}</span>
+                        <span class="value">{{ condition.value }}</span>
+                      </div>
+                      <span class="logical-op" *ngIf="i < propertiesForm.get('condition_logic')?.value.length - 1">
+                        {{ condition.logical_operator || 'AND' }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="no-conditions" *ngIf="!propertiesForm.get('condition_logic')?.value?.length">
+                    <mat-icon>rule_folder</mat-icon>
+                    <p>No conditions defined</p>
+                  </div>
+
+                  <button mat-raised-button color="primary" (click)="openConditionBuilder()">
+                    <mat-icon>edit</mat-icon>
+                    {{ propertiesForm.get('condition_logic')?.value?.length > 0 ? 'Edit Conditions' : 'Create Conditions' }}
+                  </button>
+                </div>
+              </div>
             </mat-tab>
 
             <!-- Hierarchy Tab (for container elements) -->

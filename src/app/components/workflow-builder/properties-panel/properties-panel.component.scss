@@ -564,3 +564,115 @@ mat-list {
   gap: 8px;
   margin: 16px 0;
 }
+
+.condition-logic-section {
+  padding: 20px;
+
+  h4 {
+    margin: 0 0 20px 0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 500;
+  }
+}
+
+.current-conditions {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.condition-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  .condition-number {
+    background: #007bff;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .condition-text {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      color: #666;
+    }
+
+    .field-name {
+      font-weight: 500;
+      color: #333;
+    }
+
+    .operator {
+      color: #007bff;
+      font-family: 'Courier New', monospace;
+    }
+
+    .value {
+      color: #28a745;
+      font-weight: 500;
+    }
+  }
+
+  .logical-op {
+    background: #6c757d;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+}
+
+.no-conditions {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.3;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+  }
+}
+
+// Global styles for the dialog
+::ng-deep .condition-builder-dialog {
+  .mat-mdc-dialog-container {
+    padding: 0 !important;
+  }
+}

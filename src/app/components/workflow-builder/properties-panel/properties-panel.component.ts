@@ -34,7 +34,8 @@ import {
   FieldType, Condition
 } from '../../../services/api.service';
 import { ConditionBuilderComponent } from './condition-builder/condition-builder.component';
-
+import { ConditionBuilderDialogComponent } from './condition-builder-dialog/condition-builder-dialog.component';
+import { MatDialog } from '@angular/material/dialog';
 
 @Component({
   selector: 'app-properties-panel',
@@ -54,7 +55,7 @@ import { ConditionBuilderComponent } from './condition-builder/condition-builder
     MatDividerModule,
     MatProgressSpinnerModule,
     MatListModule,
-    // ConditionBuilderComponent
+    ConditionBuilderComponent
   ],
   templateUrl: './properties-panel.component.html',
   styleUrls: ['./properties-panel.component.scss']
@@ -101,7 +102,8 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   constructor(
     private fb: FormBuilder,
     public apiService: ApiService,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private dialog: MatDialog
   ) {
     this.initializeForm();
   }
@@ -1536,6 +1538,87 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       const conditionLogicCopy = JSON.parse(JSON.stringify(conditionLogic));
       this.propertiesForm.patchValue({ condition_logic: conditionLogicCopy });
     }
+  }
+
+  openConditionBuilder(): void {
+    const dialogRef = this.dialog.open(ConditionBuilderDialogComponent, {
+      width: '90vw',
+      maxWidth: '1200px',
+      height: '85vh',
+      maxHeight: '90vh',
+      panelClass: 'condition-builder-dialog',
+      data: {
+        conditionLogic: this.propertiesForm.get('condition_logic')?.value || [],
+        workflow: this.workflow,
+        targetField: this.propertiesForm.get('target_field')?.value,
+        elementName: this.selectedElement?.properties.name || 'Condition'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.onConditionLogicChanged(result);
+      }
+    });
+  }
+
+  getFieldIcon(fieldName: string): string {
+    // Find the field in workflow to get its type
+    const field = this.workflow.elements.find(el =>
+      el.type === ElementType.FIELD &&
+      (el.properties._field_name === fieldName || el.properties.name === fieldName)
+    );
+
+    if (!field) return 'input';
+
+    const fieldType = field.properties._field_type;
+    if (!fieldType) return 'input';
+
+    const iconMap: { [key: string]: string } = {
+      'text': 'text_fields',
+      'number': 'pin',
+      'boolean': 'check_box',
+      'date': 'calendar_today',
+      'choice': 'list',
+      'file': 'attach_file',
+      '1': 'text_fields',  // Map numeric IDs
+      '2': 'pin',
+      '3': 'check_box',
+      '4': 'calendar_today',
+      '5': 'list',
+      '6': 'attach_file'
+    };
+
+    // Convert to string for lookup
+    const fieldTypeStr = String(fieldType).toLowerCase();
+    return iconMap[fieldTypeStr] || 'input';
+  }
+
+  getFieldDisplayName(fieldName: string): string {
+    const field = this.workflow.elements.find(el =>
+      el.type === ElementType.FIELD &&
+      (el.properties._field_name === fieldName || el.properties.name === fieldName)
+    );
+
+    return field?.properties._field_display_name || field?.properties.name || fieldName;
+  }
+
+  getOperatorDisplay(operation: string): string {
+    const operatorMap: { [key: string]: string } = {
+      '=': 'equals',
+      '!=': 'not equals',
+      '>': 'greater than',
+      '<': 'less than',
+      '>=': 'greater than or equal',
+      '<=': 'less than or equal',
+      'contains': 'contains',
+      'startswith': 'starts with',
+      'endswith': 'ends with',
+      'in': 'in',
+      'not in': 'not in'
+    };
+
+    return operatorMap[operation] || operation;
   }
 
   private cleanFormValue(formValue: any): any {

@@ -66,8 +66,33 @@
                   <input matInput
                          formControlName="value"
                          [type]="getValueInputType(getConditionGroup(i).get('operation')?.value)"
+                         [placeholder]="getValuePlaceholder(getConditionGroup(i))"
                          required>
+                  <mat-hint>{{ getValueHint(getConditionGroup(i)) }}</mat-hint>
                   <mat-error>Value is required</mat-error>
+                </mat-form-field>
+
+                <!-- Special input for boolean fields -->
+                <mat-form-field appearance="outline" class="condition-value"
+                                *ngIf="isBooleanField(getConditionGroup(i).get('field')?.value)">
+                  <mat-label>Value</mat-label>
+                  <mat-select formControlName="value" required>
+                    <mat-option [value]="true">True</mat-option>
+                    <mat-option [value]="false">False</mat-option>
+                  </mat-select>
+                  <mat-error>Value is required</mat-error>
+                </mat-form-field>
+
+                <!-- Special input for field comparison -->
+                <mat-form-field appearance="outline" class="condition-value"
+                                *ngIf="shouldShowFieldComparison(getConditionGroup(i).get('operation')?.value)">
+                  <mat-label>Compare with Field</mat-label>
+                  <mat-select formControlName="value" required>
+                    <mat-option *ngFor="let field of availableFields" [value]="field.value">
+                      {{ field.label }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-error>Field selection is required</mat-error>
                 </mat-form-field>
 
                 <!-- Logical Operator (for multiple conditions) -->
@@ -86,6 +111,20 @@
               <div class="condition-preview">
                 <mat-icon>visibility</mat-icon>
                 <span>{{ getConditionPreview(i) }}</span>
+              </div>
+
+              <!-- Visual representation of the condition -->
+              <div class="condition-visual">
+                <div class="visual-field">
+                  <mat-icon>{{ getFieldIcon(getConditionGroup(i).get('field')?.value) }}</mat-icon>
+                  <span>{{ getFieldLabel(getConditionGroup(i).get('field')?.value) }}</span>
+                </div>
+                <div class="visual-operator">
+                  <span>{{ getOperatorSymbol(getConditionGroup(i).get('operation')?.value) }}</span>
+                </div>
+                <div class="visual-value">
+                  <span>{{ formatVisualValue(getConditionGroup(i).get('value')?.value) }}</span>
+                </div>
               </div>
             </mat-card-content>
           </mat-card>

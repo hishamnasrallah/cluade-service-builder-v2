@@ -50,15 +50,66 @@ export class ConditionBuilderComponent implements OnInit {
   testResults: { passed: boolean; details: string }[] = [];
   overallResult = false;
 
-  availableFields = [
-    { value: 'first_name', label: 'First Name' },
-    { value: 'last_name', label: 'Last Name' },
-    { value: 'age', label: 'Age' },
-    { value: 'salary', label: 'Salary' },
-    { value: 'gender', label: 'Gender' },
-    { value: 'has_children', label: 'Has Children' },
-    { value: 'number_of_children', label: 'Number of Children' }
-  ];
+  @Input() set workflow(value: any) {
+    if (value) {
+      this.updateAvailableFields(value);
+    }
+  }
+
+  availableFields: { value: string; label: string; type?: string }[] = [];
+
+  private updateAvailableFields(workflow: any): void {
+    const fields: { value: string; label: string; type?: string }[] = [];
+
+    // Extract all fields from the workflow
+    if (workflow && workflow.elements) {
+      workflow.elements.forEach((element: any) => {
+        if (element.type === 'field') {
+          const fieldName = element.properties._field_name || element.properties.name;
+          const displayName = element.properties._field_display_name || element.properties.name || fieldName;
+          const fieldType = element.properties._field_type || 'text';
+
+          if (fieldName) {
+            fields.push({
+              value: fieldName,
+              label: displayName,
+              type: this.getFieldTypeString(fieldType)
+            });
+          }
+        }
+      });
+    }
+
+    // If no fields found, use some defaults for demonstration
+    if (fields.length === 0) {
+      fields.push(
+        { value: 'field1', label: 'Field 1', type: 'text' },
+        { value: 'field2', label: 'Field 2', type: 'number' },
+        { value: 'field3', label: 'Field 3', type: 'boolean' }
+      );
+    }
+
+    this.availableFields = fields;
+  }
+
+  private getFieldTypeString(fieldType: any): string {
+    if (typeof fieldType === 'object' && fieldType.name) {
+      return fieldType.name.toLowerCase();
+    }
+    if (typeof fieldType === 'number') {
+      // Map common field type IDs to strings
+      const typeMap: { [key: number]: string } = {
+        1: 'text',
+        2: 'number',
+        3: 'boolean',
+        4: 'date',
+        5: 'choice',
+        6: 'file'
+      };
+      return typeMap[fieldType] || 'text';
+    }
+    return String(fieldType).toLowerCase();
+  }
 
   operationGroups = [
     {
@@ -224,6 +275,53 @@ export class ConditionBuilderComponent implements OnInit {
       return 'number';
     }
     return 'text';
+  }
+
+  getValuePlaceholder(conditionGroup: FormGroup): string {
+    const field = conditionGroup.get('field')?.value;
+    const operation = conditionGroup.get('operation')?.value;
+    const fieldInfo = this.availableFields.find(f => f.value === field);
+
+    if (operation === 'matches') {
+      return 'Enter regex pattern (e.g., ^[A-Z].*$)';
+    }
+    if (operation === 'in' || operation === 'not in') {
+      return 'Enter comma-separated values';
+    }
+    if (fieldInfo?.type === 'number') {
+      return 'Enter a number';
+    }
+    if (fieldInfo?.type === 'date') {
+      return 'Select a date';
+    }
+
+    return 'Enter value';
+  }
+
+  getValueHint(conditionGroup: FormGroup): string {
+    const operation = conditionGroup.get('operation')?.value;
+
+    if (operation === 'matches') {
+      return 'Regular expression pattern for matching';
+    }
+    if (operation === 'in' || operation === 'not in') {
+      return 'Multiple values separated by commas';
+    }
+    if (['contains', 'startswith', 'endswith'].includes(operation)) {
+      return 'Case-sensitive text comparison';
+    }
+
+    return '';
+  }
+
+  isBooleanField(fieldName: string): boolean {
+    const field = this.availableFields.find(f => f.value === fieldName);
+    return field?.type === 'boolean';
+  }
+
+  shouldShowFieldComparison(operation: string): boolean {
+    // For mathematical operations, we might want to compare with other fields
+    return ['+', '-', '*', '/', '**'].includes(operation);
   }
 
   private emitChanges(): void {
@@ -406,5 +504,62 @@ export class ConditionBuilderComponent implements OnInit {
 
   trackCondition(index: number, item: any): number {
     return index;
+  }
+
+  getFieldIcon(fieldName: string): string {
+    const field = this.availableFields.find(f => f.value === fieldName);
+    const iconMap: { [key: string]: string } = {
+      'text': 'text_fields',
+      'number': 'pin',
+      'boolean': 'check_box',
+      'date': 'calendar_today',
+      'choice': 'list',
+      'file': 'attach_file'
+    };
+    return iconMap[field?.type || 'text'] || 'input';
+  }
+
+  getFieldLabel(fieldName: string): string {
+    const field = this.availableFields.find(f => f.value === fieldName);
+    return field?.label || fieldName || 'Select Field';
+  }
+
+  getOperatorSymbol(operation: string): string {
+    const symbolMap: { [key: string]: string } = {
+      '=': '=',
+      '!=': '≠',
+      '>': '>',
+      '<': '<',
+      '>=': '≥',
+      '<=': '≤',
+      'contains': 'contains',
+      'startswith': 'starts with',
+      'endswith': 'ends with',
+      'matches': 'matches pattern',
+      'in': 'in list',
+      'not in': 'not in list',
+      '+': '+',
+      '-': '-',
+      '*': '×',
+      '/': '÷',
+      '**': '^'
+    };
+    return symbolMap[operation] || operation;
+  }
+
+  formatVisualValue(value: any): string {
+    if (value === null || value === undefined || value === '') {
+      return 'Enter value';
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'True' : 'False';
+    }
+    if (Array.isArray(value)) {
+      return value.join(', ');
+    }
+    if (typeof value === 'string' && value.includes(',')) {
+      return `[${value}]`;
+    }
+    return String(value);
   }
 }
