@@ -1625,25 +1625,37 @@ export class WorkflowService {
 
         // Map source
         if (conn.source_type === 'start') {
-          sourceId = startId;
+          sourceId = 'start';  // Use the constant start ID
         } else if (conn.source_type === 'end') {
-          sourceId = endId;
+          sourceId = 'end';    // Use the constant end ID
         } else {
-          sourceId = idMapping[conn.source_id.toString()] ||
-            idMapping[`${conn.source_type}-${conn.source_id}`] ||
-            `${conn.source_type}-${conn.source_id}`;
+          // For pages, categories, fields, conditions - map by type and ID
+          const sourceKey = `${conn.source_type}-${conn.source_id}`;
+          sourceId = idMapping[sourceKey];
+
+          if (!sourceId) {
+            console.warn(`Could not find source mapping for ${sourceKey}`);
+            return; // Skip this connection if source not found
+          }
         }
 
         // Map target
         if (conn.target_type === 'end') {
-          targetId = endId;
+          targetId = 'end';    // Use the constant end ID
         } else if (conn.target_type === 'start') {
-          targetId = startId;
+          targetId = 'start';  // Use the constant start ID
         } else {
-          targetId = idMapping[conn.target_id.toString()] ||
-            idMapping[`${conn.target_type}-${conn.target_id}`] ||
-            `${conn.target_type}-${conn.target_id}`;
+          // For pages, categories, fields, conditions - map by type and ID
+          const targetKey = `${conn.target_type}-${conn.target_id}`;
+          targetId = idMapping[targetKey];
+
+          if (!targetId) {
+            console.warn(`Could not find target mapping for ${targetKey}`);
+            return; // Skip this connection if target not found
+          }
         }
+
+        console.log(`Mapping connection: ${conn.source_type}-${conn.source_id} -> ${conn.target_type}-${conn.target_id} as ${sourceId} -> ${targetId}`);
 
         workflowData.connections.push({
           id: conn.id || uuidv4(),
