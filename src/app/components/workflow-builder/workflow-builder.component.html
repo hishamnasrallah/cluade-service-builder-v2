@@ -2,7 +2,7 @@
 <div class="workflow-builder">
   <!-- Top Toolbar -->
   <mat-toolbar class="workflow-toolbar">
-    <button mat-icon-button title="Menu">
+    <button mat-icon-button (click)="toggleLeftSidenav()" title="Menu">
       <mat-icon>menu</mat-icon>
     </button>
 
@@ -86,24 +86,32 @@
   <div class="workflow-content">
     <!-- Left Sidebar - Element Palette -->
     <mat-sidenav-container class="sidenav-container">
-      <mat-sidenav mode="side" opened class="element-palette">
-        <app-element-palette
-          (elementSelected)="onElementSelected($event)"
-          [availableElements]="availableElements">
-        </app-element-palette>
+      <mat-sidenav #leftSidenav mode="side" [opened]="isLeftSidenavOpen" position="start"
+                   class="element-palette-sidenav"
+                   [style.width.px]="leftSidenavWidth">
+        <div class="sidenav-container">
+          <app-element-palette
+            [availableElements]="availableElements"
+            (elementSelected)="onElementSelected($event)">
+          </app-element-palette>
+          <div class="resize-handle"
+               (mousedown)="startResizeLeftSidenav($event)"
+               title="Drag to resize">
+          </div>
+        </div>
       </mat-sidenav>
 
       <!-- Main Canvas Area -->
       <mat-sidenav-content class="canvas-container">
-        <div class="canvas-wrapper"
-             #canvasWrapper
-             [class.hierarchy-mode]="workflow.viewMode === 'expanded'"
+        <div class="canvas-wrapper" #canvasWrapper
+             [class.sidenav-open]="isLeftSidenavOpen"
+             [style.margin-left.px]="isLeftSidenavOpen ? leftSidenavWidth : 0"
+             [class.resizing]="isResizingLeftSidenav"
              (mousedown)="onCanvasMouseDown($event)"
              (mousemove)="onCanvasMouseMove($event)"
              (mouseup)="onCanvasMouseUp($event)"
-             (mouseleave)="onCanvasMouseUp($event)"
-             (wheel)="onCanvasWheel($event)"
-             (click)="onCanvasClick($event)">
+             (click)="onCanvasClick($event)"
+             (wheel)="onCanvasWheel($event)">
 
           <div class="canvas"
                #canvas

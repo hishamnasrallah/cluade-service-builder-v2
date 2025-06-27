@@ -66,6 +66,12 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   @ViewChild('canvas', { static: false }) canvasRef!: ElementRef<HTMLDivElement>;
   @ViewChild('canvasWrapper', { static: false }) canvasWrapperRef!: ElementRef<HTMLDivElement>;
   @ViewChild(PropertiesPanelComponent) propertiesPanel?: PropertiesPanelComponent;
+  @ViewChild('leftSidenav') leftSidenav!: any; // Add this
+
+  // Add these properties
+  isLeftSidenavOpen = false; // Default to closed
+  leftSidenavWidth = 280; // Default width in pixels
+  isResizingLeftSidenav = false;
 
   workflow: WorkflowData = {
     name: 'New Workflow',
@@ -133,7 +139,41 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       }
     });
   }
+  toggleLeftSidenav(): void {
+    this.isLeftSidenavOpen = !this.isLeftSidenavOpen;
+  }
+  startResizeLeftSidenav(event: MouseEvent): void {
+    event.preventDefault();
+    this.isResizingLeftSidenav = true;
 
+    const startX = event.clientX;
+    const startWidth = this.leftSidenavWidth;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!this.isResizingLeftSidenav) return;
+
+      const diff = e.clientX - startX;
+      const newWidth = startWidth + diff;
+
+      // Set min and max width constraints
+      this.leftSidenavWidth = Math.max(200, Math.min(600, newWidth));
+    };
+
+    const onMouseUp = () => {
+      this.isResizingLeftSidenav = false;
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+
+      // Add cursor style during resize
+      document.body.style.cursor = '';
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // Add cursor style during resize
+    document.body.style.cursor = 'col-resize';
+  }
   ngAfterViewInit(): void {
     this.setupKeyboardListeners();
   }
@@ -207,7 +247,8 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   }
 
   private loadWorkflowById(workflowId: string): void {
-    this.snackBar.open('Loading workflow...', '', { duration: 2000 });
+    this.snackBar.open('Loading workflow...', '', { duration: 2000 }
+    );
 
     // First get the workflow data directly to access canvas state
     this.apiService.getWorkflow(workflowId).subscribe({
@@ -229,7 +270,20 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
                 panX: response.canvas_state.panX || 100,
                 panY: response.canvas_state.panY || 100
               };
+
+              // Restore sidenav state
+              if (response.canvas_state.leftSidenavOpen !== undefined) {
+                this.isLeftSidenavOpen = response.canvas_state.leftSidenavOpen;
+              }
+              if (response.canvas_state.leftSidenavWidth) {
+                this.leftSidenavWidth = response.canvas_state.leftSidenavWidth;
+              }
+
               console.log('Restored canvas state:', this.canvasState);
+              console.log('Restored sidenav state:', {
+                open: this.isLeftSidenavOpen,
+                width: this.leftSidenavWidth
+              });
 
               // Also restore view mode if available
               if (response.canvas_state.viewMode) {
@@ -242,13 +296,13 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
               }, 100);
             }
 
-// Debug: Log the loaded elements
+            // Debug: Log the loaded elements
             console.log('Loaded workflow elements:', this.workflow.elements);
             console.log('Pages with children:', this.workflow.elements.filter(el =>
               el.type === 'page' && el.children && el.children.length > 0
             ));
 
-// If viewMode is 'expanded', ensure at least some containers are expanded
+            // If viewMode is 'expanded', ensure at least some containers are expanded
             if (this.workflow.viewMode === 'expanded') {
               const pages = this.workflow.elements.filter(el => el.type === 'page');
               pages.forEach(page => {
@@ -443,7 +497,9 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         viewMode: this.workflow.viewMode || 'collapsed',
         expandedElementId: this.workflow.expandedElementId || null,
         selectedElementId: this.selectedElementId || null,
-        canvasSize: this.canvasSize
+        canvasSize: this.canvasSize,
+        leftSidenavOpen: this.isLeftSidenavOpen,
+        leftSidenavWidth: this.leftSidenavWidth
       },
       // Add deleted elements tracking
       deleted_elements: {}
