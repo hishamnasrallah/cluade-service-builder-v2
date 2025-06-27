@@ -884,19 +884,47 @@ export class WorkflowService {
   private mapPageProperties(element: WorkflowElement): any {
     const properties = element.properties;
 
-    return {
-      name: properties['name'],
-      name_ara: properties['name_ara'],
-      description: properties['description'],
-      description_ara: properties['description_ara'],
-      service: this.toNumber(properties['service'] || properties['service_id']),
-      sequence_number: this.toNumber(properties['sequence_number'] || properties['sequence_number_id']),
-      applicant_type: this.toNumber(properties['applicant_type'] || properties['applicant_type_id']),
+    const mapped: any = {
+      name: properties['name'] !== undefined ? properties['name'] : '',
+      name_ara: properties['name_ara'] !== undefined ? properties['name_ara'] : '',
+      description: properties['description'] !== undefined ? properties['description'] : '',
+      description_ara: properties['description_ara'] !== undefined ? properties['description_ara'] : '',
       active_ind: properties['active_ind'] !== false,
       position_x: element.position?.x || 0,
       position_y: element.position?.y || 0,
-      is_expanded: element.isExpanded || false
+      is_expanded: element.isExpanded || false,
+      workflow: this.workflowId ? this.toNumber(this.workflowId) : undefined
     };
+
+    // Handle service
+    const serviceValue = properties['service_id'] !== undefined ? properties['service_id'] : properties['service'];
+    if (serviceValue !== undefined && serviceValue !== null && serviceValue !== '') {
+      const numericValue = this.toNumber(serviceValue);
+      if (numericValue > 0) {
+        mapped.service = numericValue;
+      }
+    }
+
+    // Handle sequence_number
+    const sequenceValue = properties['sequence_number_id'] !== undefined ? properties['sequence_number_id'] : properties['sequence_number'];
+    if (sequenceValue !== undefined && sequenceValue !== null && sequenceValue !== '') {
+      const numericValue = this.toNumber(sequenceValue);
+      if (numericValue > 0) {
+        mapped.sequence_number = numericValue;
+      }
+    }
+
+    // Handle applicant_type
+    const applicantValue = properties['applicant_type_id'] !== undefined ? properties['applicant_type_id'] : properties['applicant_type'];
+    if (applicantValue !== undefined && applicantValue !== null && applicantValue !== '') {
+      const numericValue = this.toNumber(applicantValue);
+      if (numericValue > 0) {
+        mapped.applicant_type = numericValue;
+      }
+    }
+
+    console.log('Mapped page properties in workflow service:', mapped);
+    return mapped;
   }
 
   private mapCategoryProperties(category: WorkflowElement): any {
@@ -1178,10 +1206,39 @@ export class WorkflowService {
             id: response.id,
             name: response.name,
             description: response.description,
-            elements: response.elements.map((el: any) => ({
-              ...el,
-              position: el.position || { x: el.position_x || 100, y: el.position_y || 100 }
-            })),
+            elements: response.elements.map((el: any) => {
+              // For pages, ensure all fields are in properties
+              if (el.type === 'page') {
+                const pageProperties: any = {};
+
+                // Copy all page-specific fields to properties
+                const pageFields = [
+                  'page_id', 'name', 'name_ara', 'description', 'description_ara',
+                  'service', 'service_id', 'service_name', 'service_code',
+                  'sequence_number', 'sequence_number_id', 'sequence_number_name', 'sequence_number_code',
+                  'applicant_type', 'applicant_type_id', 'applicant_type_name', 'applicant_type_code',
+                  'is_hidden_page', 'active_ind'
+                ];
+
+                pageFields.forEach(field => {
+                  if (el[field] !== undefined) {
+                    pageProperties[field] = el[field];
+                  }
+                });
+
+                return {
+                  ...el,
+                  position: el.position || { x: el.position_x || 100, y: el.position_y || 100 },
+                  properties: { ...pageProperties, ...(el.properties || {}) }
+                };
+              }
+
+              // For other element types, use as is
+              return {
+                ...el,
+                position: el.position || { x: el.position_x || 100, y: el.position_y || 100 }
+              };
+            }),
             connections: response.connections || [],
             viewMode: response.canvas_state?.viewMode || 'collapsed',
             expandedElementId: response.canvas_state?.expandedElementId,

@@ -1209,9 +1209,10 @@ export class ApiService {
     ];
 
     textFields.forEach(field => {
-      if (props[field] !== undefined && props[field] !== null) {
+      if (props[field] !== undefined) {
         // Keep the value as is, including empty strings
-        props[field] = props[field];
+        // Don't skip null values - convert them to empty strings for text fields
+        props[field] = props[field] === null ? '' : props[field];
       }
     });
 

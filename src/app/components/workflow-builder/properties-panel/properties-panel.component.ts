@@ -127,25 +127,31 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private setupRealTimeUpdates(): void {
-    // Watch for name changes specifically
-    this.propertiesForm.get('name')?.valueChanges
+    // Watch for all form changes, not just name
+    this.propertiesForm.valueChanges
       .pipe(
         takeUntil(this.destroy$),
         debounceTime(300)
       )
-      .subscribe((name) => {
-        if (this.selectedElement && name !== this.selectedElement.properties.name) {
-          // Update the element name in real-time
-          const update = {
-            id: this.selectedElement.id,
-            properties: {
-              ...this.selectedElement.properties,
-              name: name
-            }
-          };
+      .subscribe((formValue) => {
+        if (this.selectedElement && this.propertiesForm.valid) {
+          // Get the cleaned form values
+          const cleanedProperties = this.cleanFormValue(formValue);
 
-          // Emit the update to refresh the UI
-          this.elementUpdated.emit(update);
+          // Check if there are actual changes
+          const hasChanges = Object.keys(cleanedProperties).some(key =>
+            cleanedProperties[key] !== this.selectedElement!.properties[key]
+          );
+
+          if (hasChanges) {
+            console.log('Form value changed, emitting update:', cleanedProperties);
+
+            // Emit the update
+            this.elementUpdated.emit({
+              id: this.selectedElement.id,
+              properties: cleanedProperties
+            });
+          }
         }
       });
   }
@@ -846,6 +852,17 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       case ElementType.PAGE:
         // Log the properties to debug
         console.log('Setting page properties:', properties);
+
+        // Ensure all text fields are initialized even if empty
+        const pageDefaults = {
+          name: '',
+          name_ara: '',
+          description: '',
+          description_ara: '',
+          service: '',
+          sequence_number: '',
+          applicant_type: ''
+        };
         console.log('Available lookups:', {
           services: this.services.length,
           flowSteps: this.flowSteps.length,
@@ -920,17 +937,20 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         });
 
         // FIXED: Set form values with ALL properties including text fields
-        this.propertiesForm.patchValue({
+        const formValues = {
           useExisting: false,
           existingPageId: '',
           service: mappedService || properties.service || '',
           sequence_number: mappedSequenceNumber || properties.sequence_number || '',
           applicant_type: mappedApplicantType || properties.applicant_type || '',
-          name: properties.name || '',
-          name_ara: properties.name_ara || '',
-          description: properties.description || '',
-          description_ara: properties.description_ara || ''
-        });
+          name: properties.name !== undefined ? properties.name : '',
+          name_ara: properties.name_ara !== undefined ? properties.name_ara : '',
+          description: properties.description !== undefined ? properties.description : '',
+          description_ara: properties.description_ara !== undefined ? properties.description_ara : ''
+        };
+
+        console.log('Setting form values for page:', formValues);
+        this.propertiesForm.patchValue(formValues);
 
         break;
 
@@ -1130,35 +1150,22 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     return of({ success: true });
   }
 
-  private mapPageProperties(properties: any): Partial<Page> {
-    const mapped: Partial<Page> = {
-      name: properties.name || '',  // Ensure empty string instead of undefined
-      name_ara: properties.name_ara || '',  // Ensure empty string instead of undefined
-      description: properties.description || '',  // Ensure empty string instead of undefined
-      description_ara: properties.description_ara || '',  // Ensure empty string instead of undefined
-      active_ind: properties.active_ind !== false,
-      position_x: properties.position?.x || 0,
-      position_y: properties.position?.y || 0,
-      is_expanded: properties.isExpanded || false
+  private mapPageProperties(element: WorkflowElement): any {
+    const properties = element.properties;
+
+    return {
+      name: properties['name'],
+      name_ara: properties['name_ara'],
+      description: properties['description'],
+      description_ara: properties['description_ara'],
+      service: this.toNumber(properties['service'] || properties['service_id']),
+      sequence_number: this.toNumber(properties['sequence_number'] || properties['sequence_number_id']),
+      applicant_type: this.toNumber(properties['applicant_type'] || properties['applicant_type_id']),
+      active_ind: properties['active_ind'] !== false,
+      position_x: element.position?.x || 0,
+      position_y: element.position?.y || 0,
+      is_expanded: element.isExpanded || false
     };
-
-    // Convert to numbers, ensuring we have valid values - FIXED: Simplified and made more robust
-    const serviceValue = properties.service_id || properties.service;
-    if (serviceValue !== undefined && serviceValue !== null && serviceValue !== '') {
-      mapped.service = this.toNumber(serviceValue) || undefined;
-    }
-
-    const sequenceValue = properties.sequence_number_id || properties.sequence_number;
-    if (sequenceValue !== undefined && sequenceValue !== null && sequenceValue !== '') {
-      mapped.sequence_number = this.toNumber(sequenceValue) || undefined;
-    }
-
-    const applicantValue = properties.applicant_type_id || properties.applicant_type;
-    if (applicantValue !== undefined && applicantValue !== null && applicantValue !== '') {
-      mapped.applicant_type = this.toNumber(applicantValue) || undefined;
-    }
-
-    return mapped;
   }
 
   private mapCategoryProperties(properties: any): Partial<Category> {
@@ -1448,32 +1455,38 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     // Include element-specific properties
     switch (this.selectedElement.type) {
       case ElementType.PAGE:
+        // Always include basic fields regardless of useExisting
+        cleaned.name = formValue.name || '';
+        cleaned.name_ara = formValue.name_ara || '';
+        cleaned.description = formValue.description || '';
+        cleaned.description_ara = formValue.description_ara || '';
+
         if (formValue.useExisting) {
           cleaned.useExisting = true;
           if (formValue.existingPageId) {
             cleaned.existingPageId = formValue.existingPageId;
           }
-        } else {
-          // Store the actual selected values from dropdowns
-          if (formValue.service !== null && formValue.service !== undefined && formValue.service !== '') {
-            cleaned.service = formValue.service;
-            cleaned.service_id = formValue.service; // Store as service_id as well
-          }
-          if (formValue.sequence_number !== null && formValue.sequence_number !== undefined && formValue.sequence_number !== '') {
-            cleaned.sequence_number = formValue.sequence_number;
-            cleaned.sequence_number_id = formValue.sequence_number; // Store as sequence_number_id as well
-          }
-          if (formValue.applicant_type !== null && formValue.applicant_type !== undefined && formValue.applicant_type !== '') {
-            cleaned.applicant_type = formValue.applicant_type;
-            cleaned.applicant_type_id = formValue.applicant_type; // Store as applicant_type_id as well
-          }
-
-          // FIXED: Include ALL page properties with proper handling
-          cleaned.name = formValue.name || '';
-          cleaned.name_ara = formValue.name_ara || '';
-          cleaned.description = formValue.description || '';
-          cleaned.description_ara = formValue.description_ara || '';
         }
+
+        // Always include these fields (not just when !useExisting)
+        if (formValue.service !== null && formValue.service !== undefined && formValue.service !== '') {
+          cleaned.service = formValue.service;
+          cleaned.service_id = formValue.service;
+        }
+        if (formValue.sequence_number !== null && formValue.sequence_number !== undefined && formValue.sequence_number !== '') {
+          cleaned.sequence_number = formValue.sequence_number;
+          cleaned.sequence_number_id = formValue.sequence_number;
+        }
+        if (formValue.applicant_type !== null && formValue.applicant_type !== undefined && formValue.applicant_type !== '') {
+          cleaned.applicant_type = formValue.applicant_type;
+          cleaned.applicant_type_id = formValue.applicant_type;
+        }
+
+        // Include the backend ID if it exists
+        if (this.selectedElement?.properties.page_id) {
+          cleaned.page_id = this.selectedElement.properties.page_id;
+        }
+
         console.log('Cleaned properties for PAGE:', cleaned);
         break;
 

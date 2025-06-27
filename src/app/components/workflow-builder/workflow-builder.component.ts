@@ -351,22 +351,45 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
       this.propertiesPanel.clearAllCache();
     }
     // Prepare data for saving - ensure all elements have their current positions and all properties
-    const elementsWithPositions = this.workflow.elements.map(element => ({
-      ...element,
-      position: element.position || { x: 0, y: 0 },
-      position_x: element.position?.x || 0,
-      position_y: element.position?.y || 0,
-      relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
-      relative_position_y: element.parentId ? (element.position?.y || 0) : undefined,
-      is_expanded: element.isExpanded || false,
-      parent_id: element.parentId || null,
-      children: element.children || [],
-      properties: {
-        ...element.properties,
-        // Ensure active_ind is always sent - use bracket notation
-        active_ind: element.properties['active_ind'] !== false
+    const elementsWithPositions = this.workflow.elements.map(element => {
+      const baseElement = {
+        ...element,
+        position: element.position || { x: 0, y: 0 },
+        position_x: element.position?.x || 0,
+        position_y: element.position?.y || 0,
+        relative_position_x: element.parentId ? (element.position?.x || 0) : undefined,
+        relative_position_y: element.parentId ? (element.position?.y || 0) : undefined,
+        is_expanded: element.isExpanded || false,
+        parent_id: element.parentId || null,
+        children: element.children || []
+      };
+
+      // For pages, ensure all fields are properly in properties
+      if (element.type === ElementType.PAGE) {
+        const pageProperties = { ...element.properties };
+
+        // Ensure active_ind is set
+        if (pageProperties['active_ind'] === undefined) {
+          pageProperties['active_ind'] = true;
+        }
+
+        // Ensure service is set from workflow if not in properties
+        if (!pageProperties.service && !pageProperties.service_id && this.workflow.metadata?.service_id) {
+          pageProperties.service = this.workflow.metadata.service_id;
+          pageProperties.service_id = this.workflow.metadata.service_id;
+        }
+
+        baseElement.properties = pageProperties;
+      } else {
+        // For other elements, just ensure active_ind
+        baseElement.properties = {
+          ...element.properties,
+          active_ind: element.properties['active_ind'] !== false
+        };
       }
-    }));
+
+      return baseElement;
+    });
 
     const saveData = {
       name: this.workflow.name,
@@ -399,8 +422,13 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
         expandedElementId: this.workflow.expandedElementId || null,
         selectedElementId: this.selectedElementId || null,
         canvasSize: this.canvasSize
-      }
+      },
+      // Add deleted elements tracking
+      deleted_elements: {}
     };
+
+// Log what we're sending for debugging
+    console.log('Saving workflow with elements:', saveData.elements.filter(el => el.type === 'page'));
 
     console.log('Saving workflow with data:', saveData);
 
@@ -1124,70 +1152,137 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     // Update the element immediately in the workflow (no API call)
     const element = this.workflow.elements.find(el => el.id === update.id);
     if (element) {
-      // Update element properties
+      // Create a properly cleaned properties object
+      const cleanedProperties = { ...update.properties };
+
+      // Convert string IDs to numbers
+      const numericFields = [
+        'service', 'service_id', 'sequence_number', 'sequence_number_id',
+        'applicant_type', 'applicant_type_id', '_field_type', 'field_type_id',
+        '_lookup', 'lookup_id', 'parent_field_id', '_parent_field',
+        'page_id', 'category_id', '_field_id', 'condition_id',
+        '_sequence', '_max_length', '_min_length', '_value_greater_than',
+        '_value_less_than', '_max_file_size', '_image_max_width',
+        '_image_max_height', '_precision', '_max_selections', '_min_selections',
+        'target_field_id'
+      ];
+
+      numericFields.forEach(field => {
+        if (cleanedProperties[field] !== undefined && cleanedProperties[field] !== null && cleanedProperties[field] !== '') {
+          const value = cleanedProperties[field];
+          if (typeof value === 'string' && /^\d+$/.test(value)) {
+            cleanedProperties[field] = parseInt(value, 10);
+          } else if (typeof value === 'number') {
+            cleanedProperties[field] = value;
+          }
+        } else if (cleanedProperties[field] === '') {
+          cleanedProperties[field] = null;
+        }
+      });
+
+      // Ensure boolean fields are properly converted
+      const booleanFields = [
+        '_mandatory', '_is_hidden', '_is_disabled', 'is_repeatable',
+        '_integer_only', '_positive_only', '_future_only', '_past_only',
+        '_default_boolean', '_unique', '_coordinates_format', '_uuid_format',
+        'useExisting', 'is_hidden_page', 'active_ind'
+      ];
+
+      booleanFields.forEach(field => {
+        if (cleanedProperties[field] !== undefined) {
+          cleanedProperties[field] = cleanedProperties[field] === true;
+        }
+      });
+
+      // For pages, ensure we maintain the foreign key relationships
+      if (element.type === ElementType.PAGE) {
+        // Preserve existing foreign key data if not in update
+        if (cleanedProperties.sequence_number === undefined && element.properties.sequence_number !== undefined) {
+          cleanedProperties.sequence_number = element.properties.sequence_number;
+          cleanedProperties.sequence_number_id = element.properties.sequence_number_id || element.properties.sequence_number;
+        }
+        if (cleanedProperties.applicant_type === undefined && element.properties.applicant_type !== undefined) {
+          cleanedProperties.applicant_type = element.properties.applicant_type;
+          cleanedProperties.applicant_type_id = element.properties.applicant_type_id || element.properties.applicant_type;
+        }
+
+        // Also preserve the descriptive fields if they exist
+        ['sequence_number_code', 'sequence_number_name', 'applicant_type_code', 'applicant_type_name'].forEach(field => {
+          if (cleanedProperties[field] === undefined && element.properties[field] !== undefined) {
+            cleanedProperties[field] = element.properties[field];
+          }
+        });
+      }
+
+      // Ensure array fields are arrays
+      const arrayFields = ['page_ids', 'category_ids', 'service_ids', 'allowed_lookups'];
+
+      arrayFields.forEach(field => {
+        if (cleanedProperties[field] !== undefined) {
+          if (!Array.isArray(cleanedProperties[field])) {
+            cleanedProperties[field] = cleanedProperties[field] ? [cleanedProperties[field]] : [];
+          }
+          // Convert array elements to numbers if they are numeric strings
+          cleanedProperties[field] = cleanedProperties[field]
+            .filter((val: any) => val !== null && val !== undefined && val !== '')
+            .map((val: any) => {
+              if (typeof val === 'string' && /^\d+$/.test(val)) {
+                return parseInt(val, 10);
+              }
+              return val;
+            });
+
+          // Remove the field if it's an empty array and it's an ID field
+          if (cleanedProperties[field].length === 0 && (field === 'id' || field.endsWith('_id'))) {
+            delete cleanedProperties[field];
+          }
+        }
+      });
+
+      // Handle single ID fields that might be arrays
+      const singleIdFields = [
+        'page_id', 'category_id', '_field_id', 'condition_id',
+        'service_id', 'sequence_number_id', 'applicant_type_id',
+        'field_type_id', 'lookup_id', 'parent_field_id', 'target_field_id'
+      ];
+
+      singleIdFields.forEach(field => {
+        if (cleanedProperties[field] !== undefined) {
+          if (Array.isArray(cleanedProperties[field])) {
+            // If it's an array, take the first valid value
+            const validValues = cleanedProperties[field].filter((val: any) =>
+              val !== null && val !== undefined && val !== ''
+            );
+            if (validValues.length > 0) {
+              cleanedProperties[field] = typeof validValues[0] === 'string' && /^\d+$/.test(validValues[0])
+                ? parseInt(validValues[0], 10)
+                : validValues[0];
+            } else {
+              delete cleanedProperties[field];
+            }
+          } else if (cleanedProperties[field] === '' || cleanedProperties[field] === null) {
+            delete cleanedProperties[field];
+          } else if (typeof cleanedProperties[field] === 'string' && /^\d+$/.test(cleanedProperties[field])) {
+            cleanedProperties[field] = parseInt(cleanedProperties[field], 10);
+          }
+        }
+      });
+
+      // Update element properties - merge, don't replace
       element.properties = {
         ...element.properties,
-        ...update.properties
+        ...cleanedProperties
       };
 
       // Trigger change detection to update the UI
       this.workflow = { ...this.workflow };
+
+      console.log('Updated element properties:', element.properties);
     }
 
-    // Clean properties for future save
-    const cleanedProperties = { ...update.properties };
-
-    // Convert string IDs to numbers
-    const numericFields = [
-      'service', 'service_id', 'sequence_number', 'sequence_number_id',
-      'applicant_type', 'applicant_type_id', '_field_type', 'field_type_id',
-      '_lookup', 'lookup_id', 'parent_field_id', '_parent_field',
-      'page_id', 'category_id', '_field_id', 'condition_id',
-      '_sequence', '_max_length', '_min_length', '_value_greater_than',
-      '_value_less_than', '_max_file_size', '_image_max_width',
-      '_image_max_height', '_precision', '_max_selections', '_min_selections'
-    ];
-
-    numericFields.forEach(field => {
-      if (cleanedProperties[field] !== undefined && cleanedProperties[field] !== null && cleanedProperties[field] !== '') {
-        const value = cleanedProperties[field];
-        if (typeof value === 'string' && /^\d+$/.test(value)) {
-          cleanedProperties[field] = parseInt(value, 10);
-        } else if (typeof value === 'number') {
-          cleanedProperties[field] = value;
-        }
-      } else if (cleanedProperties[field] === '') {
-        cleanedProperties[field] = null;
-      }
-    });
-
-    // Ensure boolean fields are properly converted
-    const booleanFields = [
-      '_mandatory', '_is_hidden', '_is_disabled', 'is_repeatable',
-      '_integer_only', '_positive_only', '_future_only', '_past_only',
-      '_default_boolean', '_unique', '_coordinates_format', '_uuid_format',
-      'useExisting', 'is_hidden_page', 'active_ind'
-    ];
-
-    booleanFields.forEach(field => {
-      if (cleanedProperties[field] !== undefined) {
-        cleanedProperties[field] = cleanedProperties[field] === true;
-      }
-    });
-
-    // Ensure array fields are arrays
-    const arrayFields = ['page_ids', 'category_ids', 'service_ids', 'allowed_lookups'];
-
-    arrayFields.forEach(field => {
-      if (cleanedProperties[field] !== undefined && !Array.isArray(cleanedProperties[field])) {
-        cleanedProperties[field] = cleanedProperties[field] ? [cleanedProperties[field]] : [];
-      }
-    });
-
     // Update via workflow service (this will just update local state, no API call)
-    this.workflowService.updateElement(update.id, { properties: cleanedProperties });
+    this.workflowService.updateElement(update.id, { properties: update.properties });
   }
-
   onConnectionUpdated(update: any): void {
     if (update.action === 'delete' && update.connection) {
       this.workflowService.removeConnection(update.connection.id);
