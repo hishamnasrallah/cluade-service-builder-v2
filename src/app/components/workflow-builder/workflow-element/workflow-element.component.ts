@@ -46,7 +46,7 @@ export class WorkflowElementComponent implements OnInit {
   @Output() connectionStart = new EventEmitter<MouseEvent>();
   @Output() connectionEnd = new EventEmitter<MouseEvent>();
   @Output() deleteElement = new EventEmitter<void>();
-  @Output() dragStart = new EventEmitter<void>();
+  @Output() dragStart = new EventEmitter<string>();
   @Output() dragEnd = new EventEmitter<void>();
   @Output() expandToggled = new EventEmitter<string>();
   @Output() childElementSelected = new EventEmitter<string>();
@@ -105,7 +105,11 @@ export class WorkflowElementComponent implements OnInit {
     if (!this.element) return '#2196F3';
     if (this.element.isExpanded) {
       const color = this.elementConfig?.color || '#2196F3';
-      return color + '26'; // 15% opacity
+      // Use rgba for better transparency control
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, 0.15)`; // 15% opacity
     }
     return this.elementConfig?.color || '#2196F3';
   }
@@ -144,7 +148,7 @@ export class WorkflowElementComponent implements OnInit {
     this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.elementStartPos = { ...this.element.position };
 
-    this.dragStart.emit();
+    this.dragStart.emit(this.element.id);
 
     // Add global listeners
     document.addEventListener('mousemove', this.onMouseMove);
@@ -205,7 +209,14 @@ export class WorkflowElementComponent implements OnInit {
       this.connectionEnd.emit(event);
     }
   }
-
+  public onElementBodyMouseUp(event: MouseEvent): void {
+    // Check if we're in connecting mode and this element can receive connections
+    if (this.isConnecting && this.elementConfig?.canReceiveConnections && !this.element.parentId) {
+      event.stopPropagation();
+      event.preventDefault();
+      this.connectionEnd.emit(event);
+    }
+  }
   public onRightClick(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();

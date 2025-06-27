@@ -1,3 +1,4 @@
+<!-- NEW CODE -->
 <div class="workflow-element"
      #elementRef
      [attr.data-element-id]="element.id"
@@ -6,6 +7,7 @@
      [class.container]="canContainChildren"
      [class.dragging]="isDragging"
      [class.not-draggable]="element.parentId"
+     [class.connection-target]="isConnecting && elementConfig?.canReceiveConnections"
      [class]="element.type"
      [style.width.px]="getElementWidth()"
      [style.height.px]="getElementHeight()"
@@ -14,6 +16,7 @@
      [style.cursor]="element.parentId ? 'default' : 'move'"
      [style.z-index]="getZIndex()"
      (mousedown)="onMouseDown($event)"
+     (mouseup)="onElementBodyMouseUp($event)"
      (click)="onElementClick($event)"
      (dblclick)="onElementDoubleClick($event)"
      (contextmenu)="onRightClick($event)">

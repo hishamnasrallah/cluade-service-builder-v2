@@ -105,7 +105,6 @@
       <mat-sidenav-content class="canvas-container">
         <div class="canvas-wrapper" #canvasWrapper
              [class.sidenav-open]="isLeftSidenavOpen"
-             [style.margin-left.px]="isLeftSidenavOpen ? leftSidenavWidth : 0"
              [class.resizing]="isResizingLeftSidenav"
              (mousedown)="onCanvasMouseDown($event)"
              (mousemove)="onCanvasMouseMove($event)"
@@ -170,15 +169,35 @@
 
                 <!-- Visible connection lines -->
                 <path [attr.d]="getConnectionPath(connection)"
-                      stroke="#666"
-                      stroke-width="2"
+                      [attr.stroke]="hoveredConnectionId === connection.id ? '#FF9800' : '#666'"
+                      [attr.stroke-width]="hoveredConnectionId === connection.id ? '3' : '2'"
                       fill="none"
                       marker-end="url(#arrowhead-auto)"
                       [class.selected]="selectedConnectionId === connection.id"
+                      [class.hovered]="hoveredConnectionId === connection.id"
                       class="connection-line">
                 </path>
-              </ng-container>
 
+                <!-- Preview of split connections -->
+                <g *ngIf="hoveredConnectionId === connection.id && connectionSplitPreview">
+                  <path [attr.d]="getSplitPreviewPath('source')"
+                        stroke="#4CAF50"
+                        stroke-width="2"
+                        stroke-dasharray="5,5"
+                        fill="none"
+                        opacity="0.6"
+                        class="split-preview">
+                  </path>
+                  <path [attr.d]="getSplitPreviewPath('target')"
+                        stroke="#4CAF50"
+                        stroke-width="2"
+                        stroke-dasharray="5,5"
+                        fill="none"
+                        opacity="0.6"
+                        class="split-preview">
+                  </path>
+                </g>
+              </ng-container>
               <!-- Temporary connection line while dragging -->
               <path *ngIf="tempConnection"
                     [attr.d]="tempConnection"
@@ -215,7 +234,7 @@
                 (connectionStart)="startConnection(element.id, $event)"
                 (connectionEnd)="endConnection(element.id)"
                 (deleteElement)="deleteElement(element.id)"
-                (dragStart)="onElementDragStart()"
+                (dragStart)="onElementDragStart($event)"
                 (dragEnd)="onElementDragEnd()"
                 (expandToggled)="onElementExpandToggled($event)">
               </app-workflow-element>

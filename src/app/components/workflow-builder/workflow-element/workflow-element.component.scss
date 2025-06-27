@@ -32,6 +32,7 @@
   animation: fadeIn 0.3s ease-out;
   z-index: 1;
   cursor: default; /* Prevent drag cursor in children area */
+  background-color: transparent !important; // Ensure transparent background
 }
 .element-container {
   position: absolute;
@@ -384,4 +385,24 @@
 // Hide output points when connecting
 .workflow-element.connecting .connection-point.output {
   display: none !important;
+}
+.workflow-element.connection-target {
+  border: 2px dashed #4CAF50;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  animation: pulse-border 1s infinite;
+}
+
+@keyframes pulse-border {
+  0% {
+    border-color: #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  }
+  50% {
+    border-color: #81C784;
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.8);
+  }
+  100% {
+    border-color: #4CAF50;
+    box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  }
 }

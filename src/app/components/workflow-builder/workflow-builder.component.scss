@@ -113,6 +113,7 @@ mat-button-toggle-group {
   margin-top: -150px;
   transform-origin: 0 0;
   pointer-events: none;
+  background-color: transparent !important; // Ensure transparent
 }
 
 .connections-layer {
@@ -151,6 +152,7 @@ mat-button-toggle-group {
   position: absolute;
   z-index: 2;
   pointer-events: all;
+  background-color: transparent !important; // Ensure transparent
 }
 
 // Drop zone hint
@@ -322,6 +324,9 @@ mat-button-toggle-group {
 }
 // Add these styles
 .element-palette-sidenav {
+  background-color: rgba(245, 245, 245, 0.95) !important; // Semi-transparent
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+
   .sidenav-container {
     position: relative;
     height: 100%;
@@ -367,7 +372,7 @@ mat-button-toggle-group {
     linear-gradient(90deg, rgba(200,200,200,0.2) 1px, transparent 1px);
   background-size: 20px 20px;
   user-select: none;
-  transition: margin-left 0.3s ease;
+  // Remove the transition
 
   &.panning {
     cursor: grabbing;
@@ -379,9 +384,8 @@ mat-button-toggle-group {
       linear-gradient(90deg, rgba(200,200,200,0.15) 1px, transparent 1px);
     background-size: 25px 25px;
   }
-  &.sidenav-open {
-    // This will be set dynamically in the template
-  }
+
+  // Remove sidenav-open styles
 }
 
 

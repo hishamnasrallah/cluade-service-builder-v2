@@ -97,11 +97,17 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
   // Connection state
   connectingFrom?: string;
   tempConnection?: string;
+  hoveredConnectionId?: string;
+  connectionSplitPreview?: { sourceId: string; targetId: string };
 
   // Pan state
   isPanning = false;
   lastPanPoint = { x: 0, y: 0 };
   isDraggingElement = false;
+
+  // Track element being dragged for connection splitting
+  draggedElementId?: string;
+  originalPosition?: Position;
 
   private destroy$ = new Subject<void>();
   private keydownHandler?: (event: KeyboardEvent) => void;
@@ -853,9 +859,132 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
           canvasPos.y
         );
       }
+    } else if (this.isDraggingElement) {
+      // Check if we're hovering over a connection
+      this.checkConnectionHover(event.clientX, event.clientY);
     }
   }
+  private checkConnectionHover(mouseX: number, mouseY: number): void {
+    if (!this.isDraggingElement || !this.draggedElementId) return;
 
+    const canvasPos = this.screenToCanvas(mouseX, mouseY);
+
+    // Check each connection
+    for (const connection of this.getTopLevelConnections()) {
+      if (this.isPointNearConnection(canvasPos, connection)) {
+        this.hoveredConnectionId = connection.id;
+        // Create preview of split
+        const draggedElement = this.workflow.elements.find(el => el.id === this.draggedElementId);
+        if (draggedElement && this.canElementSplitConnection(draggedElement, connection)) {
+          this.connectionSplitPreview = {
+            sourceId: connection.sourceId,
+            targetId: connection.targetId
+          };
+        }
+        return;
+      }
+    }
+
+    this.hoveredConnectionId = undefined;
+    this.connectionSplitPreview = undefined;
+  }
+
+  private isPointNearConnection(point: { x: number; y: number }, connection: any): boolean {
+    const path = this.getConnectionPath(connection);
+    // Parse the SVG path and check if point is near the line
+    // This is a simplified version - you might want to use a more sophisticated algorithm
+    const threshold = 20; // pixels
+
+    const sourceElement = this.workflow.elements.find(el => el.id === connection.sourceId);
+    const targetElement = this.workflow.elements.find(el => el.id === connection.targetId);
+
+    if (!sourceElement || !targetElement) return false;
+
+    const sourceDims = this.getElementDimensions(sourceElement);
+    const targetDims = this.getElementDimensions(targetElement);
+
+    // Simple line-point distance calculation
+    const x1 = sourceElement.position.x + sourceDims.width;
+    const y1 = sourceElement.position.y + sourceDims.height / 2;
+    const x2 = targetElement.position.x;
+    const y2 = targetElement.position.y + targetDims.height / 2;
+
+    const distance = this.pointToLineDistance(point.x, point.y, x1, y1, x2, y2);
+    return distance < threshold;
+  }
+
+  private pointToLineDistance(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+    const A = px - x1;
+    const B = py - y1;
+    const C = x2 - x1;
+    const D = y2 - y1;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+
+    if (lenSq !== 0) {
+      param = dot / lenSq;
+    }
+
+    let xx, yy;
+
+    if (param < 0) {
+      xx = x1;
+      yy = y1;
+    } else if (param > 1) {
+      xx = x2;
+      yy = y2;
+    } else {
+      xx = x1 + param * C;
+      yy = y1 + param * D;
+    }
+
+    const dx = px - xx;
+    const dy = py - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  private canElementSplitConnection(element: WorkflowElement, connection: any): boolean {
+    // Check if the element type can be inserted between the source and target
+    const sourceElement = this.workflow.elements.find(el => el.id === connection.sourceId);
+    const targetElement = this.workflow.elements.find(el => el.id === connection.targetId);
+
+    if (!sourceElement || !targetElement) return false;
+
+    // For now, only allow pages to split connections between start/end or other pages
+    if (element.type === ElementType.PAGE) {
+      return !element.parentId && // Must be top-level
+        (sourceElement.type === ElementType.START || sourceElement.type === ElementType.PAGE) &&
+        (targetElement.type === ElementType.END || targetElement.type === ElementType.PAGE);
+    }
+
+    return false;
+  }
+
+  private splitConnection(connectionId: string, insertElementId: string): void {
+    const connection = this.workflow.connections.find(conn => conn.id === connectionId);
+    const insertElement = this.workflow.elements.find(el => el.id === insertElementId);
+
+    if (!connection || !insertElement) return;
+
+    try {
+      // Remove the original connection
+      this.workflowService.removeConnection(connectionId);
+
+      // Add two new connections
+      this.workflowService.addConnection(connection.sourceId, insertElementId);
+      this.workflowService.addConnection(insertElementId, connection.targetId);
+
+      this.snackBar.open('Connection split successfully', 'Close', { duration: 2000 });
+    } catch (error) {
+      this.snackBar.open((error as Error).message, 'Close', { duration: 3000 });
+      // Restore original position if splitting failed
+      if (this.originalPosition) {
+        this.workflowService.updateElement(insertElementId, { position: this.originalPosition });
+      }
+    }
+  }
   onCanvasMouseUp(event: MouseEvent): void {
     if (this.isPanning) {
       this.isPanning = false;
@@ -1026,12 +1155,27 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
     }
   }
 
-  onElementDragStart(): void {
+  onElementDragStart(elementId: string): void {
     this.isDraggingElement = true;
+    this.draggedElementId = elementId;
+    const element = this.workflow.elements.find(el => el.id === elementId);
+    if (element) {
+      this.originalPosition = { ...element.position };
+    }
   }
 
   onElementDragEnd(): void {
     this.isDraggingElement = false;
+
+    // Check if we're hovering over a connection
+    if (this.hoveredConnectionId && this.draggedElementId) {
+      this.splitConnection(this.hoveredConnectionId, this.draggedElementId);
+    }
+
+    this.draggedElementId = undefined;
+    this.originalPosition = undefined;
+    this.hoveredConnectionId = undefined;
+    this.connectionSplitPreview = undefined;
   }
 
   // Connection Management
@@ -1453,5 +1597,40 @@ export class WorkflowBuilderComponent implements OnInit, OnDestroy, AfterViewIni
 
     // Default z-index
     return 10;
+  }
+
+  getSplitPreviewPath(type: 'source' | 'target'): string {
+    if (!this.connectionSplitPreview || !this.draggedElementId) return '';
+
+    const draggedElement = this.workflow.elements.find(el => el.id === this.draggedElementId);
+    if (!draggedElement) return '';
+
+    const draggedDims = this.getElementDimensions(draggedElement);
+
+    if (type === 'source') {
+      const sourceElement = this.workflow.elements.find(el => el.id === this.connectionSplitPreview?.sourceId);
+      if (!sourceElement) return '';
+
+      const sourceDims = this.getElementDimensions(sourceElement);
+
+      return this.createCurvedPath(
+        sourceElement.position.x + sourceDims.width,
+        sourceElement.position.y + sourceDims.height / 2,
+        draggedElement.position.x,
+        draggedElement.position.y + draggedDims.height / 2
+      );
+    } else {
+      const targetElement = this.workflow.elements.find(el => el.id === this.connectionSplitPreview?.targetId);
+      if (!targetElement) return '';
+
+      const targetDims = this.getElementDimensions(targetElement);
+
+      return this.createCurvedPath(
+        draggedElement.position.x + draggedDims.width,
+        draggedElement.position.y + draggedDims.height / 2,
+        targetElement.position.x,
+        targetElement.position.y + targetDims.height / 2
+      );
+    }
   }
 }
