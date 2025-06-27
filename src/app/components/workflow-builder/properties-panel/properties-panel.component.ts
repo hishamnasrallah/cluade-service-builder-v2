@@ -109,6 +109,16 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   ngOnInit(): void {
     console.log('Properties panel initialized');
 
+    // Load field types immediately for fields
+    if (!this.apiService.isConfigured()) {
+      console.warn('API not configured');
+    } else {
+      // Pre-load field types
+      this.loadLookupDataAsync().catch(error => {
+        console.warn('Failed to pre-load lookup data:', error);
+      });
+    }
+
     // Set up real-time updates for name field
     this.setupRealTimeUpdates();
   }
@@ -154,6 +164,18 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           }
         }
       });
+
+    // Watch specifically for field type changes to update validation visibility
+    this.propertiesForm.get('_field_type')?.valueChanges
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((fieldTypeValue) => {
+        console.log('Field type changed to:', fieldTypeValue);
+        // Force change detection to update validation sections
+        setTimeout(() => {
+          // This will trigger Angular to re-evaluate the shouldShow methods
+        }, 0);
+      });
+
   }
 // Hierarchy navigation methods
   // @ts-ignore
@@ -225,18 +247,30 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   // Compare function for mat-select to properly compare values
   compareByValue(value1: any, value2: any): boolean {
     // Handle null/undefined
-    if (!value1 && !value2) return true;
-    if (!value1 || !value2) return false;
+    if (value1 === null && value2 === null) return true;
+    if (value1 === undefined && value2 === undefined) return true;
+    if (value1 === null || value1 === undefined || value2 === null || value2 === undefined) return false;
 
-    // Convert both to numbers if possible for comparison
-    const v1 = typeof value1 === 'string' && /^\d+$/.test(value1) ? parseInt(value1, 10) : value1;
-    const v2 = typeof value2 === 'string' && /^\d+$/.test(value2) ? parseInt(value2, 10) : value2;
+    // Extract ID if object
+    const extractValue = (val: any): any => {
+      if (val && typeof val === 'object' && 'id' in val) {
+        return val.id;
+      }
+      return val;
+    };
+
+    const extracted1 = extractValue(value1);
+    const extracted2 = extractValue(value2);
+
+    // Convert both to numbers if they look like numbers
+    const v1 = (typeof extracted1 === 'string' && /^\d+$/.test(extracted1)) ? parseInt(extracted1, 10) : extracted1;
+    const v2 = (typeof extracted2 === 'string' && /^\d+$/.test(extracted2)) ? parseInt(extracted2, 10) : extracted2;
 
     // Direct comparison
     if (v1 === v2) return true;
 
     // Try string comparison as fallback
-    return value1.toString() === value2.toString();
+    return String(v1) === String(v2);
   }
   // Find the correct lookup ID by matching ID, code, or name
   private findLookupValue(
@@ -299,33 +333,72 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
 // Validation helper methods
   shouldShowTextValidation(): boolean {
-    const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['text', 'textarea', 'email', 'url', 'phone', 'password', 'rich_text', 'slug'].includes(fieldType?.toString());
+    const fieldTypeValue = this.propertiesForm.get('_field_type')?.value;
+
+    // Get the field type object if we have the ID
+    const fieldType = this.fieldTypes.find(ft => ft.id === fieldTypeValue);
+    const fieldTypeCode = fieldType?.code?.toLowerCase() || '';
+    const fieldTypeName = fieldType?.name?.toLowerCase() || '';
+
+    console.log('Checking text validation for field type:', fieldTypeValue, fieldTypeCode, fieldTypeName);
+
+    // Check by code or name
+    return ['text', 'textarea', 'email', 'url', 'phone', 'password', 'rich_text', 'slug'].includes(fieldTypeCode) ||
+      ['text', 'textarea', 'email', 'url', 'phone', 'password', 'rich text', 'slug'].includes(fieldTypeName);
   }
 
   shouldShowNumberValidation(): boolean {
-    const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['number', 'decimal', 'percentage', 'range', 'currency', 'rating'].includes(fieldType?.toString());
+    const fieldTypeValue = this.propertiesForm.get('_field_type')?.value;
+
+    const fieldType = this.fieldTypes.find(ft => ft.id === fieldTypeValue);
+    const fieldTypeCode = fieldType?.code?.toLowerCase() || '';
+    const fieldTypeName = fieldType?.name?.toLowerCase() || '';
+
+    return ['number', 'decimal', 'percentage', 'range', 'currency', 'rating'].includes(fieldTypeCode) ||
+      ['number', 'decimal', 'percentage', 'range', 'currency', 'rating'].includes(fieldTypeName);
   }
 
   shouldShowDateValidation(): boolean {
-    const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['date', 'datetime'].includes(fieldType?.toString());
+    const fieldTypeValue = this.propertiesForm.get('_field_type')?.value;
+
+    const fieldType = this.fieldTypes.find(ft => ft.id === fieldTypeValue);
+    const fieldTypeCode = fieldType?.code?.toLowerCase() || '';
+    const fieldTypeName = fieldType?.name?.toLowerCase() || '';
+
+    return ['date', 'datetime'].includes(fieldTypeCode) ||
+      ['date', 'datetime', 'date time'].includes(fieldTypeName);
   }
 
   shouldShowFileValidation(): boolean {
-    const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['file', 'image'].includes(fieldType?.toString());
+    const fieldTypeValue = this.propertiesForm.get('_field_type')?.value;
+
+    const fieldType = this.fieldTypes.find(ft => ft.id === fieldTypeValue);
+    const fieldTypeCode = fieldType?.code?.toLowerCase() || '';
+    const fieldTypeName = fieldType?.name?.toLowerCase() || '';
+
+    return ['file', 'image'].includes(fieldTypeCode) ||
+      ['file', 'image', 'file upload'].includes(fieldTypeName);
   }
 
   shouldShowChoiceValidation(): boolean {
-    const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return ['choice', 'multi_choice'].includes(fieldType?.toString());
+    const fieldTypeValue = this.propertiesForm.get('_field_type')?.value;
+
+    const fieldType = this.fieldTypes.find(ft => ft.id === fieldTypeValue);
+    const fieldTypeCode = fieldType?.code?.toLowerCase() || '';
+    const fieldTypeName = fieldType?.name?.toLowerCase() || '';
+
+    return ['choice', 'multi_choice', 'select', 'multi_select'].includes(fieldTypeCode) ||
+      ['choice', 'multi choice', 'select', 'multi select', 'dropdown'].includes(fieldTypeName);
   }
 
   shouldShowBooleanValidation(): boolean {
-    const fieldType = this.propertiesForm.get('_field_type')?.value;
-    return fieldType?.toString() === 'boolean';
+    const fieldTypeValue = this.propertiesForm.get('_field_type')?.value;
+
+    const fieldType = this.fieldTypes.find(ft => ft.id === fieldTypeValue);
+    const fieldTypeCode = fieldType?.code?.toLowerCase() || '';
+    const fieldTypeName = fieldType?.name?.toLowerCase() || '';
+
+    return fieldTypeCode === 'boolean' || fieldTypeName === 'boolean' || fieldTypeName === 'checkbox';
   }
 
   getFieldType(): string {
@@ -801,6 +874,23 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
       this.autoSaveTimeout = undefined;
     }
 
+    // For fields, ensure field types are loaded first
+    if (this.selectedElement.type === ElementType.FIELD && this.fieldTypes.length === 0) {
+      console.log('Loading field types before updating form...');
+      this.loadLookupDataAsync().then(() => {
+        this.continueUpdateFormForElement();
+      }).catch(() => {
+        // Continue anyway even if loading fails
+        this.continueUpdateFormForElement();
+      });
+    } else {
+      this.continueUpdateFormForElement();
+    }
+  }
+
+  private continueUpdateFormForElement(): void {
+    if (!this.selectedElement) return;
+
     // Check if we have cached values for this element
     const cachedValues = this.formCache[this.selectedElement.id];
     if (cachedValues) {
@@ -967,8 +1057,18 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
 
       case ElementType.FIELD:
-        // Use explicit field type ID if available
-        const fieldTypeValue = properties.field_type_id || properties._field_type || '';
+        // Ensure field type is a number for proper comparison
+        let fieldTypeValue = properties.field_type_id || properties._field_type || '';
+
+        // Convert to number if it's a string number
+        if (fieldTypeValue && typeof fieldTypeValue === 'string' && /^\d+$/.test(fieldTypeValue)) {
+          fieldTypeValue = parseInt(fieldTypeValue, 10);
+        } else if (typeof fieldTypeValue === 'object' && fieldTypeValue.id) {
+          // Handle case where it might be an object
+          fieldTypeValue = fieldTypeValue.id;
+        }
+
+        console.log('Setting field type value:', fieldTypeValue, 'from properties:', properties);
 
         this.propertiesForm.patchValue({
           useExisting: properties.useExisting || false,
@@ -977,7 +1077,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
           _field_display_name: properties._field_display_name || '',
           _field_display_name_ara: properties._field_display_name_ara || '',
           _field_type: fieldTypeValue,
-          _sequence: properties._sequence || '',
+          _sequence: properties._sequence !== undefined ? properties._sequence : '',
           _mandatory: properties._mandatory || false,
           _is_hidden: properties._is_hidden || false,
           _is_disabled: properties._is_disabled || false,

@@ -298,7 +298,10 @@
 
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Field Type</mat-label>
-                        <mat-select formControlName="_field_type" required (openedChange)="onFieldTypeDropdownOpen($event)">
+                        <mat-select formControlName="_field_type"
+                                    required
+                                    [compareWith]="compareByValue"
+                                    (openedChange)="onFieldTypeDropdownOpen($event)">
                           <mat-option *ngFor="let type of fieldTypes" [value]="type.id">
                             {{ type.name }} ({{ type.name_ara }})
                           </mat-option>
