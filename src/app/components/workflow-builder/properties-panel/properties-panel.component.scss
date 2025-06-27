@@ -84,9 +84,16 @@
   overflow-y: auto;
   padding: 20px;
   background: white;
+  min-height: 0; /* Critical for flex overflow */
 }
 
 // Form styles
+form {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .form-group {
   margin-bottom: 20px;
 }
@@ -517,8 +524,22 @@ mat-list {
 
 // Update tab styles for hierarchy
 ::ng-deep .mat-mdc-tab-group {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .mat-mdc-tab-body-wrapper {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .mat-mdc-tab-body {
+    height: 100%;
+  }
+
   .mat-mdc-tab-body-content {
-    overflow: visible !important;
+    height: 100%;
+    overflow-y: auto !important;
   }
 
   .tab-content {
