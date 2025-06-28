@@ -1,6 +1,6 @@
 // components/workflow-builder/properties-panel/condition-builder/condition-builder.component.ts
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges,
+  ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormArray, FormGroup, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,13 +13,26 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 
 import { ConditionLogic } from '../../../../models/workflow.models';
+import {MatButtonToggle, MatButtonToggleGroup} from '@angular/material/button-toggle';
+
+interface ConditionItem {
+  type: 'simple' | 'group';
+  field?: string;
+  operation?: string;
+  value?: any;
+  conditions?: ConditionItem[];
+  logical_operator?: 'and' | 'or';
+}
 
 @Component({
   selector: 'app-condition-builder',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -34,29 +47,37 @@ import { ConditionLogic } from '../../../../models/workflow.models';
     MatChipsModule,
     MatDividerModule,
     MatTooltipModule,
-    DragDropModule
+    MatRadioModule,
+    MatExpansionModule,
+    DragDropModule,
+    MatButtonToggleGroup,
+    MatButtonToggle
   ],
-  templateUrl: './condition-builder.component.html',
-  styleUrls: ['./condition-builder.component.scss']
+  templateUrl: './condition-builder.component.html', // Ensure this path is correct
+  styleUrls: ['./condition-builder.component.scss']  // Ensure this path is correct
 })
-export class ConditionBuilderComponent implements OnInit {
+export class ConditionBuilderComponent implements OnInit, OnChanges {
   @Input() conditionLogic: ConditionLogic[] = [];
+  @Input() workflow: any = null;
+  @Input() isNested: boolean = false;
   @Output() conditionChanged = new EventEmitter<ConditionLogic[]>();
 
-  conditionsForm!: FormGroup;
-  jsonText = '';
-  jsonError = '';
-  testValues: { [key: string]: any } = {};
-  testResults: { passed: boolean; details: string }[] = [];
-  overallResult = false;
+  public conditionsForm!: FormGroup;
+  public jsonText = '';
+  public jsonError = '';
+  public testValues: { [key: string]: any } = {};
+  public testResults: { passed: boolean; details: string }[] = [];
+  public overallResult = false;
+  public conditionItems: ConditionItem[] = [];
 
-  @Input() set workflow(value: any) {
-    if (value) {
-      this.updateAvailableFields(value);
-    }
-  }
+  public availableFields: { value: string; label: string; type?: string }[] = [];
 
-  availableFields: { value: string; label: string; type?: string }[] = [];
+  // Value type options
+  valueTypes = [
+    { value: 'static', label: 'Static Value' },
+    { value: 'field', label: 'Field Reference' },
+    { value: 'expression', label: 'Expression' }
+  ];
 
   private updateAvailableFields(workflow: any): void {
     const fields: { value: string; label: string; type?: string }[] = [];
@@ -196,13 +217,271 @@ export class ConditionBuilderComponent implements OnInit {
     }
   ];
 
-  constructor(private fb: FormBuilder) {
+  // Advanced examples
+  advancedExamples = [
+    {
+      title: 'Field Addition',
+      data: [
+        {
+          field: 'field1',
+          operation: '+',
+          value: { field: 'field2' }
+        },
+        {
+          operation: '=',
+          field: 'field3',
+          value: { field: 'field1' }
+        }
+      ]
+    },
+    {
+      title: 'OR Group',
+      data: [
+        {
+          operation: 'or',
+          conditions: [
+            { field: 'first_name', operation: '=', value: 'Hisham' },
+            { field: 'last_name', operation: 'startswith', value: 'Nasr' }
+          ]
+        }
+      ]
+    },
+    {
+      title: 'Complex AND Group',
+      data: [
+        {
+          operation: 'and',
+          conditions: [
+            { field: 'first_name', operation: 'startswith', value: 'nasr' },
+            { field: 'last_name', operation: '=', value: { field: 'email' } },
+            { field: 'email', operation: 'contains', value: '@asd.com' }
+          ]
+        }
+      ]
+    }
+  ];
+
+  constructor(
+    private fb: FormBuilder,
+    private cdr: ChangeDetectorRef
+  ) {
     this.initializeForm();
   }
 
   ngOnInit(): void {
     this.loadConditionsFromInput();
     this.updateJsonText();
+    if (this.workflow) {
+      this.updateAvailableFields(this.workflow);
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['workflow'] && changes['workflow'].currentValue) {
+      this.updateAvailableFields(changes['workflow'].currentValue);
+    }
+    if (changes['conditionLogic']) {
+      this.loadConditionsFromInput();
+      this.updateJsonText();
+    }
+  }
+
+  private loadConditionsFromInput(): void {
+    this.conditionItems = this.transformConditionsToItems(this.conditionLogic);
+  }
+
+  private transformConditionsToItems(conditions: any[]): ConditionItem[] {
+    if (!conditions || conditions.length === 0) return [];
+
+    return conditions.map(condition => {
+      // Check if it's a group condition (has 'conditions' array)
+      if (condition.conditions && Array.isArray(condition.conditions)) {
+        return {
+          type: 'group',
+          operation: condition.operation || 'and',
+          conditions: this.transformConditionsToItems(condition.conditions)
+        };
+      }
+
+      // Simple condition
+      return {
+        type: 'simple',
+        field: condition.field,
+        operation: condition.operation,
+        value: condition.value,
+        logical_operator: condition.logical_operator
+      };
+    });
+  }
+
+  // Make this method public so template can access it
+  transformItemsToConditions(items: ConditionItem[]): any[] {
+    return items.map((item, index) => {
+      if (item.type === 'group') {
+        return {
+          operation: item.operation,
+          conditions: this.transformItemsToConditions(item.conditions || [])
+        };
+      }
+
+      // Simple condition
+      const condition: any = {
+        field: item.field,
+        operation: item.operation,
+        value: item.value
+      };
+
+      // Add logical operator if not the last item
+      if (index < items.length - 1 && item.logical_operator) {
+        condition.logical_operator = item.logical_operator;
+      }
+
+      return condition;
+    });
+  }
+
+  addSimpleCondition(): void {
+    this.conditionItems.push({
+      type: 'simple',
+      field: '',
+      operation: '=',
+      value: '',
+      logical_operator: 'and'
+    });
+    this.updateConditions();
+  }
+
+  addGroupCondition(): void {
+    this.conditionItems.push({
+      type: 'group',
+      operation: 'and',
+      conditions: []
+    });
+    this.updateConditions();
+  }
+
+  removeCondition(index: number): void {
+    this.conditionItems.splice(index, 1);
+    this.updateConditions();
+  }
+
+  getValueType(item: ConditionItem): string {
+    if (item.value && typeof item.value === 'object' && 'field' in item.value) {
+      return 'field';
+    }
+    return 'static';
+  }
+
+  onValueTypeChange(index: number, type: string): void {
+    const item = this.conditionItems[index];
+    if (type === 'field') {
+      item.value = { field: '' };
+    } else {
+      item.value = '';
+    }
+    this.updateConditions();
+  }
+
+  onFieldReferenceChange(index: number, fieldName: string): void {
+    const item = this.conditionItems[index];
+    item.value = { field: fieldName };
+    this.updateConditions();
+  }
+
+  getOperationsForField(fieldName: string | undefined): any[] {
+    if (!fieldName) return this.operationGroups;
+
+    const field = this.availableFields.find(f => f.value === fieldName);
+    const fieldType = field?.type || 'text';
+
+    const allOperations = [...this.operationGroups];
+
+    // Filter operations based on field type
+    if (fieldType === 'boolean') {
+      return allOperations.filter(group => group.label === 'Comparison')
+        .map(group => ({
+          ...group,
+          operations: group.operations.filter(op => ['=', '!='].includes(op.value))
+        }));
+    }
+
+    if (fieldType === 'number') {
+      return allOperations.filter(group => ['Comparison', 'Math', 'Set'].includes(group.label));
+    }
+
+    if (fieldType === 'text') {
+      return allOperations.filter(group => ['Comparison', 'Text', 'Set'].includes(group.label));
+    }
+
+    return allOperations;
+  }
+
+  getFieldType(fieldName: string | undefined): string {
+    if (!fieldName) return 'text';
+    const field = this.availableFields.find(f => f.value === fieldName);
+    return field?.type || 'text';
+  }
+
+  getFieldIcon(type?: string): string {
+    const iconMap: { [key: string]: string } = {
+      'text': 'text_fields',
+      'number': 'pin',
+      'boolean': 'check_box',
+      'date': 'calendar_today',
+      'choice': 'list',
+      'file': 'attach_file'
+    };
+    return iconMap[type || 'text'] || 'input';
+  }
+
+  getFieldLabel(fieldName: string | undefined): string {
+    if (!fieldName) return 'Select Field';
+    const field = this.availableFields.find(f => f.value === fieldName);
+    return field?.label || fieldName || 'Select Field';
+  }
+
+  getInputType(fieldName: string | undefined): string {
+    if (!fieldName) return 'text';
+    const field = this.availableFields.find(f => f.value === fieldName);
+    if (field?.type === 'number') return 'number';
+    if (field?.type === 'date') return 'date';
+    return 'text';
+  }
+
+  // Add missing method
+  isListOperation(operation: string | undefined): boolean {
+    if (!operation) return false;
+    return ['in', 'not in'].includes(operation);
+  }
+
+  onNestedConditionChanged(index: number, conditions: any[]): void {
+    const item = this.conditionItems[index];
+    if (item.type === 'group') {
+      // Don't transform back to items - keep as conditions
+      // to avoid circular transformation
+      item.conditions = conditions.map(c => ({
+        type: c.conditions ? 'group' : 'simple',
+        ...c
+      }));
+    }
+    this.updateConditions();
+  }
+  getGroupConditions(item: ConditionItem): any[] {
+    if (!item.conditions) return [];
+    // Return already transformed conditions to avoid calling transformation in template
+    return this.transformItemsToConditions(item.conditions);
+  }
+
+  updateConditions(): void {
+    const conditions = this.transformItemsToConditions(this.conditionItems);
+    this.conditionChanged.emit(conditions);
+    this.updateJsonText();
+    this.cdr.markForCheck();
+  }
+
+  loadExample(example: any): void {
+    this.conditionItems = this.transformConditionsToItems(example.data);
+    this.updateConditions();
   }
 
   private initializeForm(): void {
@@ -224,23 +503,8 @@ export class ConditionBuilderComponent implements OnInit {
     });
   }
 
-  private loadConditionsFromInput(): void {
-    this.conditionsArray.clear();
-
-    if (this.conditionLogic && this.conditionLogic.length > 0) {
-      this.conditionLogic.forEach(condition => {
-        this.conditionsArray.push(this.createConditionGroup(condition));
-      });
-    }
-  }
-
   addCondition(): void {
     this.conditionsArray.push(this.createConditionGroup());
-    this.emitChanges();
-  }
-
-  removeCondition(index: number): void {
-    this.conditionsArray.removeAt(index);
     this.emitChanges();
   }
 
@@ -277,10 +541,10 @@ export class ConditionBuilderComponent implements OnInit {
     return 'text';
   }
 
-  getValuePlaceholder(conditionGroup: FormGroup): string {
-    const field = conditionGroup.get('field')?.value;
-    const operation = conditionGroup.get('operation')?.value;
-    const fieldInfo = this.availableFields.find(f => f.value === field);
+  // Update to work with ConditionItem instead of FormGroup
+  getValuePlaceholder(item: ConditionItem): string {
+    const operation = item.operation || '';
+    const fieldInfo = this.availableFields.find(f => f.value === item.field);
 
     if (operation === 'matches') {
       return 'Enter regex pattern (e.g., ^[A-Z].*$)';
@@ -298,8 +562,9 @@ export class ConditionBuilderComponent implements OnInit {
     return 'Enter value';
   }
 
-  getValueHint(conditionGroup: FormGroup): string {
-    const operation = conditionGroup.get('operation')?.value;
+  // Update to work with ConditionItem instead of FormGroup
+  getValueHint(item: ConditionItem): string {
+    const operation = item.operation || '';
 
     if (operation === 'matches') {
       return 'Regular expression pattern for matching';
@@ -314,7 +579,8 @@ export class ConditionBuilderComponent implements OnInit {
     return '';
   }
 
-  isBooleanField(fieldName: string): boolean {
+  isBooleanField(fieldName: string | undefined): boolean {
+    if (!fieldName) return false;
     const field = this.availableFields.find(f => f.value === fieldName);
     return field?.type === 'boolean';
   }
@@ -330,9 +596,10 @@ export class ConditionBuilderComponent implements OnInit {
     this.updateJsonText();
   }
 
+  // Update to work with conditionItems
   private updateJsonText(): void {
     try {
-      const conditions = this.conditionsArray.value;
+      const conditions = this.transformItemsToConditions(this.conditionItems);
       this.jsonText = JSON.stringify(conditions, null, 2);
       this.jsonError = '';
     } catch (error) {
@@ -371,10 +638,7 @@ export class ConditionBuilderComponent implements OnInit {
     try {
       const parsed = JSON.parse(this.jsonText);
       if (Array.isArray(parsed)) {
-        this.conditionsArray.clear();
-        parsed.forEach(condition => {
-          this.conditionsArray.push(this.createConditionGroup(condition));
-        });
+        this.conditionItems = this.transformConditionsToItems(parsed);
         this.emitChanges();
         this.jsonError = '';
       } else {
@@ -385,44 +649,59 @@ export class ConditionBuilderComponent implements OnInit {
     }
   }
 
-  loadExample(example: any): void {
-    this.conditionsArray.clear();
-    example.data.forEach((condition: ConditionLogic) => {
-      this.conditionsArray.push(this.createConditionGroup(condition));
-    });
-    this.emitChanges();
-  }
-
   getUniqueFields(): { value: string; label: string }[] {
-    const usedFields = new Set(
-      this.conditionsArray.value.map((c: any) => c.field).filter(Boolean)
-    );
+    const usedFields = new Set<string>();
+
+    // Collect fields from conditionItems instead of conditionsArray
+    const collectFields = (items: ConditionItem[]) => {
+      items.forEach(item => {
+        if (item.type === 'simple' && item.field) {
+          usedFields.add(item.field);
+        } else if (item.type === 'group' && item.conditions) {
+          collectFields(item.conditions);
+        }
+      });
+    };
+
+    collectFields(this.conditionItems);
+
     return this.availableFields.filter(field => usedFields.has(field.value));
   }
 
   evaluateTestConditions(): void {
     this.testResults = [];
-    const conditions = this.conditionsArray.value;
+    const conditions = this.transformItemsToConditions(this.conditionItems);
 
-    conditions.forEach((condition: ConditionLogic, index: number) => {
-      const result = this.evaluateCondition(condition);
-      this.testResults.push(result);
-    });
+    const evaluateConditionList = (condList: any[]): void => {
+      condList.forEach((condition: any) => {
+        if (condition.conditions) {
+          // It's a group condition
+          evaluateConditionList(condition.conditions);
+        } else {
+          // It's a simple condition
+          const result = this.evaluateCondition(condition);
+          this.testResults.push(result);
+        }
+      });
+    };
+
+    evaluateConditionList(conditions);
 
     // Calculate overall result
     this.overallResult = this.calculateOverallResult(conditions);
   }
 
   private evaluateCondition(condition: ConditionLogic): { passed: boolean; details: string } {
-    const fieldValue = this.testValues[condition.field];
+    const fieldName = condition.field || '';
+    const fieldValue = this.testValues[fieldName];
     const conditionValue = condition.value;
     let passed = false;
     let details = '';
 
-    if (fieldValue === undefined || fieldValue === '') {
+    if (!fieldName || fieldValue === undefined || fieldValue === '') {
       return {
         passed: false,
-        details: `Field '${condition.field}' has no test value`
+        details: `Field '${fieldName || 'undefined'}' has no test value`
       };
     }
 
@@ -460,12 +739,12 @@ export class ConditionBuilderComponent implements OnInit {
           passed = regex.test(String(fieldValue));
           break;
         case 'in':
-          const inArray = Array.isArray(conditionValue) ? conditionValue : [conditionValue];
-          passed = inArray.includes(fieldValue);
+          const inArray = String(conditionValue).split(',').map(v => v.trim());
+          passed = inArray.includes(String(fieldValue));
           break;
         case 'not in':
-          const notInArray = Array.isArray(conditionValue) ? conditionValue : [conditionValue];
-          passed = !notInArray.includes(fieldValue);
+          const notInArray = String(conditionValue).split(',').map(v => v.trim());
+          passed = !notInArray.includes(String(fieldValue));
           break;
         default:
           passed = false;
@@ -483,48 +762,67 @@ export class ConditionBuilderComponent implements OnInit {
     return { passed, details };
   }
 
-  private calculateOverallResult(conditions: ConditionLogic[]): boolean {
+  private calculateOverallResult(conditions: any[]): boolean {
     if (conditions.length === 0) return true;
 
-    let result = this.testResults[0]?.passed || false;
+    let resultIndex = 0;
 
-    for (let i = 1; i < conditions.length; i++) {
-      const condition = conditions[i - 1];
-      const currentResult = this.testResults[i]?.passed || false;
+    const evaluateGroup = (condList: any[]): boolean => {
+      if (condList.length === 0) return true;
 
-      if (condition.logical_operator === 'or') {
-        result = result || currentResult;
-      } else { // default to 'and'
-        result = result && currentResult;
+      let result = true;
+      let currentGroupResult = true;
+
+      for (let i = 0; i < condList.length; i++) {
+        const condition = condList[i];
+
+        if (condition.conditions) {
+          // It's a group
+          currentGroupResult = evaluateGroup(condition.conditions);
+
+          if (condition.operation === 'not') {
+            currentGroupResult = !currentGroupResult;
+          } else if (condition.operation === 'or') {
+            let orResult = false;
+            for (const subCond of condition.conditions) {
+              if (subCond.conditions) {
+                orResult = orResult || evaluateGroup([subCond]);
+              } else {
+                orResult = orResult || (this.testResults[resultIndex++]?.passed || false);
+              }
+            }
+            currentGroupResult = orResult;
+          }
+        } else {
+          // It's a simple condition
+          currentGroupResult = this.testResults[resultIndex++]?.passed || false;
+        }
+
+        if (i === 0) {
+          result = currentGroupResult;
+        } else {
+          const prevCondition = condList[i - 1];
+          if (prevCondition.logical_operator === 'or') {
+            result = result || currentGroupResult;
+          } else {
+            result = result && currentGroupResult;
+          }
+        }
       }
-    }
 
-    return result;
+      return result;
+    };
+
+    return evaluateGroup(conditions);
   }
 
   trackCondition(index: number, item: any): number {
     return index;
   }
 
-  getFieldIcon(fieldName: string): string {
-    const field = this.availableFields.find(f => f.value === fieldName);
-    const iconMap: { [key: string]: string } = {
-      'text': 'text_fields',
-      'number': 'pin',
-      'boolean': 'check_box',
-      'date': 'calendar_today',
-      'choice': 'list',
-      'file': 'attach_file'
-    };
-    return iconMap[field?.type || 'text'] || 'input';
-  }
+  getOperatorSymbol(operation: string | undefined): string {
+    if (!operation) return '';
 
-  getFieldLabel(fieldName: string): string {
-    const field = this.availableFields.find(f => f.value === fieldName);
-    return field?.label || fieldName || 'Select Field';
-  }
-
-  getOperatorSymbol(operation: string): string {
     const symbolMap: { [key: string]: string } = {
       '=': '=',
       '!=': '≠',
@@ -547,19 +845,31 @@ export class ConditionBuilderComponent implements OnInit {
     return symbolMap[operation] || operation;
   }
 
-  formatVisualValue(value: any): string {
+  // Update to work with ConditionItem
+  formatVisualValue(item: ConditionItem): string {
+    const value = item.value;
+
     if (value === null || value === undefined || value === '') {
       return 'Enter value';
     }
+
+    // Handle field reference
+    if (typeof value === 'object' && 'field' in value && value.field) {
+      return this.getFieldLabel(value.field);
+    }
+
     if (typeof value === 'boolean') {
       return value ? 'True' : 'False';
     }
+
     if (Array.isArray(value)) {
       return value.join(', ');
     }
-    if (typeof value === 'string' && value.includes(',')) {
+
+    if (typeof value === 'string' && this.isListOperation(item.operation)) {
       return `[${value}]`;
     }
+
     return String(value);
   }
 }

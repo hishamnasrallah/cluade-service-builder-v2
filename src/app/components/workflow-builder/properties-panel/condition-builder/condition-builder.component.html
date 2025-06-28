@@ -1,148 +1,218 @@
-<div class="condition-builder">
+<!-- Ensure this template is associated with ConditionBuilderComponent -->
+<div class="condition-builder" *ngIf="conditionItems">
   <mat-tab-group animationDuration="200ms">
     <!-- Visual Builder Tab -->
     <mat-tab label="Visual Builder">
       <div class="visual-builder">
         <div class="builder-header">
           <h4>Condition Rules</h4>
-          <button mat-icon-button (click)="addCondition()" color="primary" matTooltip="Add Rule">
-            <mat-icon>add</mat-icon>
-          </button>
+          <div class="header-actions">
+            <button mat-button (click)="addSimpleCondition()" matTooltip="Add Simple Rule">
+              <mat-icon>add</mat-icon>
+              Add Rule
+            </button>
+            <button mat-button (click)="addGroupCondition()" matTooltip="Add Group">
+              <mat-icon>folder</mat-icon>
+              Add Group
+            </button>
+          </div>
         </div>
 
-        <div class="conditions-list"
-             cdkDropList
-             (cdkDropListDropped)="onConditionDrop($event)">
+        <div class="conditions-container">
+          <ng-container *ngFor="let item of conditionItems; let i = index">
+            <div class="condition-item" [class.group]="item.type === 'group'">
 
-          <mat-card *ngFor="let condition of conditionsArray.controls; let i = index; trackBy: trackCondition"
-                    class="condition-card"
-                    cdkDrag>
+              <!-- Group Condition -->
+              <mat-expansion-panel *ngIf="item.type === 'group'" [expanded]="true">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon>folder</mat-icon>
+                    {{ item.operation?.toUpperCase() }} Group
+                  </mat-panel-title>
+                  <mat-panel-description>
+                    {{ item.conditions?.length || 0 }} conditions
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
 
-            <mat-card-header>
-              <div class="condition-header">
-                <span class="condition-number">{{ i + 1 }}</span>
-                <span class="drag-handle" cdkDragHandle>
-                      <mat-icon>drag_indicator</mat-icon>
-                    </span>
-                <span class="spacer"></span>
-                <button mat-icon-button
-                        (click)="removeCondition(i)"
-                        color="warn"
-                        matTooltip="Remove Rule">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </div>
-            </mat-card-header>
+                <div class="group-content">
+                  <div class="group-operator">
+                    <mat-radio-group [(ngModel)]="item.operation" (change)="updateConditions()">
+                      <mat-radio-button value="and">AND</mat-radio-button>
+                      <mat-radio-button value="or">OR</mat-radio-button>
+                      <mat-radio-button value="not">NOT</mat-radio-button>
+                    </mat-radio-group>
+                  </div>
 
-            <mat-card-content [formGroup]="getConditionGroup(i)">
-              <div class="condition-content">
-                <!-- Field Selection -->
-                <mat-form-field appearance="outline" class="condition-field">
-                  <mat-label>Field</mat-label>
-                  <mat-select formControlName="field" required>
-                    <mat-option *ngFor="let field of availableFields" [value]="field.value">
-                      {{ field.label }}
-                    </mat-option>
-                  </mat-select>
-                  <mat-error>Field is required</mat-error>
-                </mat-form-field>
+                  <div class="nested-conditions">
+                    <ng-container *ngIf="item.conditions">
+                      <app-condition-builder
+                        [conditionLogic]="getGroupConditions(item)"
+                        [workflow]="workflow"
+                        [isNested]="true"
+                        (conditionChanged)="onNestedConditionChanged(i, $event)">
+                      </app-condition-builder>
+                    </ng-container>
+                  </div>
 
-                <!-- Operation Selection -->
-                <mat-form-field appearance="outline" class="condition-operation">
-                  <mat-label>Operation</mat-label>
-                  <mat-select formControlName="operation" required>
-                    <mat-optgroup *ngFor="let group of operationGroups" [label]="group.label">
-                      <mat-option *ngFor="let op of group.operations" [value]="op.value">
-                        {{ op.label }}
-                      </mat-option>
-                    </mat-optgroup>
-                  </mat-select>
-                  <mat-error>Operation is required</mat-error>
-                </mat-form-field>
-
-                <!-- Value Input -->
-                <mat-form-field appearance="outline" class="condition-value">
-                  <mat-label>Value</mat-label>
-                  <input matInput
-                         formControlName="value"
-                         [type]="getValueInputType(getConditionGroup(i).get('operation')?.value)"
-                         [placeholder]="getValuePlaceholder(getConditionGroup(i))"
-                         required>
-                  <mat-hint>{{ getValueHint(getConditionGroup(i)) }}</mat-hint>
-                  <mat-error>Value is required</mat-error>
-                </mat-form-field>
-
-                <!-- Special input for boolean fields -->
-                <mat-form-field appearance="outline" class="condition-value"
-                                *ngIf="isBooleanField(getConditionGroup(i).get('field')?.value)">
-                  <mat-label>Value</mat-label>
-                  <mat-select formControlName="value" required>
-                    <mat-option [value]="true">True</mat-option>
-                    <mat-option [value]="false">False</mat-option>
-                  </mat-select>
-                  <mat-error>Value is required</mat-error>
-                </mat-form-field>
-
-                <!-- Special input for field comparison -->
-                <mat-form-field appearance="outline" class="condition-value"
-                                *ngIf="shouldShowFieldComparison(getConditionGroup(i).get('operation')?.value)">
-                  <mat-label>Compare with Field</mat-label>
-                  <mat-select formControlName="value" required>
-                    <mat-option *ngFor="let field of availableFields" [value]="field.value">
-                      {{ field.label }}
-                    </mat-option>
-                  </mat-select>
-                  <mat-error>Field selection is required</mat-error>
-                </mat-form-field>
-
-                <!-- Logical Operator (for multiple conditions) -->
-                <mat-form-field appearance="outline"
-                                class="logical-operator"
-                                *ngIf="i < conditionsArray.length - 1">
-                  <mat-label>Then</mat-label>
-                  <mat-select formControlName="logical_operator">
-                    <mat-option value="and">AND</mat-option>
-                    <mat-option value="or">OR</mat-option>
-                  </mat-select>
-                </mat-form-field>
-              </div>
-
-              <!-- Condition Preview -->
-              <div class="condition-preview">
-                <mat-icon>visibility</mat-icon>
-                <span>{{ getConditionPreview(i) }}</span>
-              </div>
-
-              <!-- Visual representation of the condition -->
-              <div class="condition-visual">
-                <div class="visual-field">
-                  <mat-icon>{{ getFieldIcon(getConditionGroup(i).get('field')?.value) }}</mat-icon>
-                  <span>{{ getFieldLabel(getConditionGroup(i).get('field')?.value) }}</span>
+                  <button mat-icon-button (click)="removeCondition(i)" color="warn" class="remove-btn">
+                    <mat-icon>delete</mat-icon>
+                  </button>
                 </div>
-                <div class="visual-operator">
-                  <span>{{ getOperatorSymbol(getConditionGroup(i).get('operation')?.value) }}</span>
-                </div>
-                <div class="visual-value">
-                  <span>{{ formatVisualValue(getConditionGroup(i).get('value')?.value) }}</span>
-                </div>
-              </div>
-            </mat-card-content>
-          </mat-card>
+              </mat-expansion-panel>
+
+              <!-- Simple Condition -->
+              <mat-card *ngIf="item.type === 'simple'" class="condition-card">
+                <mat-card-content>
+                  <div class="condition-row">
+                    <span class="condition-number">{{ i + 1 }}</span>
+
+                    <!-- Field Selection -->
+                    <mat-form-field appearance="outline" class="field-select">
+                      <mat-label>Field</mat-label>
+                      <mat-select [(ngModel)]="item.field" (selectionChange)="updateConditions()">
+                        <mat-option *ngFor="let field of availableFields" [value]="field.value">
+                          <mat-icon>{{ getFieldIcon(field.type) }}</mat-icon>
+                          {{ field.label }}
+                        </mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <!-- Operation Selection -->
+                    <mat-form-field appearance="outline" class="operation-select">
+                      <mat-label>Operation</mat-label>
+                      <mat-select [(ngModel)]="item.operation" (selectionChange)="updateConditions()">
+                        <mat-optgroup *ngFor="let group of getOperationsForField(item.field)" [label]="group.label">
+                          <mat-option *ngFor="let op of group.operations" [value]="op.value">
+                            {{ op.label }}
+                          </mat-option>
+                        </mat-optgroup>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <!-- Value Type Toggle -->
+                    <mat-button-toggle-group
+                      [value]="getValueType(item)"
+                      (change)="onValueTypeChange(i, $event.value)"
+                      class="value-type-toggle">
+                      <mat-button-toggle value="static" matTooltip="Static Value">
+                        <mat-icon>text_fields</mat-icon>
+                      </mat-button-toggle>
+                      <mat-button-toggle value="field" matTooltip="Field Reference">
+                        <mat-icon>link</mat-icon>
+                      </mat-button-toggle>
+                    </mat-button-toggle-group>
+
+                    <!-- Value Input -->
+                    <div class="value-input">
+                      <!-- Static Value - Text -->
+                      <mat-form-field *ngIf="getValueType(item) === 'static' && !isBooleanField(item.field) && !isListOperation(item.operation)" appearance="outline">
+                        <mat-label>Value</mat-label>
+                        <input matInput
+                               [(ngModel)]="item.value"
+                               (change)="updateConditions()"
+                               [type]="getInputType(item.field)"
+                               [placeholder]="getValuePlaceholder(item)">
+                        <mat-hint>{{ getValueHint(item) }}</mat-hint>
+                      </mat-form-field>
+
+                      <!-- Static Value - Boolean -->
+                      <mat-form-field *ngIf="getValueType(item) === 'static' && isBooleanField(item.field)" appearance="outline">
+                        <mat-label>Value</mat-label>
+                        <mat-select [(ngModel)]="item.value" (selectionChange)="updateConditions()">
+                          <mat-option [value]="true">True</mat-option>
+                          <mat-option [value]="false">False</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+
+                      <!-- Static Value - List (for IN/NOT IN operations) -->
+                      <mat-form-field *ngIf="getValueType(item) === 'static' && isListOperation(item.operation)" appearance="outline">
+                        <mat-label>Values</mat-label>
+                        <textarea matInput
+                                  [(ngModel)]="item.value"
+                                  (change)="updateConditions()"
+                                  rows="2"
+                                  placeholder="Enter comma-separated values">
+                        </textarea>
+                        <mat-hint>Multiple values separated by commas</mat-hint>
+                      </mat-form-field>
+
+                      <!-- Field Reference -->
+                      <mat-form-field *ngIf="getValueType(item) === 'field'" appearance="outline">
+                        <mat-label>Compare with Field</mat-label>
+                        <mat-select
+                          [value]="item.value?.field"
+                          (selectionChange)="onFieldReferenceChange(i, $event.value)">
+                          <mat-option *ngFor="let field of availableFields" [value]="field.value">
+                            <mat-icon>{{ getFieldIcon(field.type) }}</mat-icon>
+                            {{ field.label }}
+                          </mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+
+                    <!-- Remove Button -->
+                    <button mat-icon-button (click)="removeCondition(i)" color="warn">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+
+                  <!-- Visual Preview -->
+                  <div class="condition-visual">
+                    <div class="visual-field">
+                      <mat-icon>{{ getFieldIcon(getFieldType(item.field)) }}</mat-icon>
+                      <span>{{ getFieldLabel(item.field) }}</span>
+                    </div>
+                    <div class="visual-operator">
+                      <span>{{ getOperatorSymbol(item.operation) }}</span>
+                    </div>
+                    <div class="visual-value" [class.field-ref]="getValueType(item) === 'field'">
+                      <mat-icon *ngIf="getValueType(item) === 'field'">link</mat-icon>
+                      <span>{{ formatVisualValue(item) }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Logical Operator (between conditions) -->
+                  <div class="logical-operator" *ngIf="i < conditionItems.length - 1 && !isNested">
+                    <mat-select [(ngModel)]="item.logical_operator" (selectionChange)="updateConditions()">
+                      <mat-option value="and">AND</mat-option>
+                      <mat-option value="or">OR</mat-option>
+                    </mat-select>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </ng-container>
+
+          <!-- Empty State -->
+          <div class="empty-state" *ngIf="conditionItems.length === 0">
+            <mat-icon>rule_folder</mat-icon>
+            <p>No conditions defined</p>
+            <div class="empty-actions">
+              <button mat-raised-button color="primary" (click)="addSimpleCondition()">
+                <mat-icon>add</mat-icon>
+                Add First Condition
+              </button>
+              <button mat-button (click)="loadExample(advancedExamples[0])">
+                Load Example
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- Add Condition Button -->
-        <div class="add-condition" *ngIf="conditionsArray.length === 0">
-          <button mat-raised-button color="primary" (click)="addCondition()">
-            <mat-icon>add</mat-icon>
-            Add First Condition
-          </button>
-          <p>No conditions defined. Add a condition to get started.</p>
+        <!-- Quick Examples -->
+        <div class="quick-examples" *ngIf="!isNested">
+          <h5>Quick Examples:</h5>
+          <div class="example-chips">
+            <mat-chip *ngFor="let example of advancedExamples" (click)="loadExample(example)">
+              {{ example.title }}
+            </mat-chip>
+          </div>
         </div>
       </div>
     </mat-tab>
 
     <!-- JSON Editor Tab -->
-    <mat-tab label="JSON Editor">
+    <mat-tab label="JSON Editor" *ngIf="!isNested">
       <div class="json-editor">
         <div class="json-header">
           <h4>JSON Configuration</h4>
@@ -168,8 +238,8 @@
                     [(ngModel)]="jsonText"
                     (blur)="onJsonChange()"
                     rows="15"
-                    placeholder='[{"field": "field_name", "operation": "=", "value": "some_value", "logical_operator": "and"}]'>
-              </textarea>
+                    placeholder='[{"field": "field_name", "operation": "=", "value": "some_value"}]'>
+          </textarea>
           <mat-hint>Enter condition logic as JSON array</mat-hint>
           <mat-error *ngIf="jsonError">{{ jsonError }}</mat-error>
         </mat-form-field>
@@ -193,7 +263,7 @@
     </mat-tab>
 
     <!-- Test Tab -->
-    <mat-tab label="Test">
+    <mat-tab label="Test" *ngIf="!isNested">
       <div class="condition-tester">
         <h4>Test Conditions</h4>
         <p>Enter test values to see if your conditions evaluate correctly.</p>
@@ -205,7 +275,8 @@
             <mat-label>{{ field.label }}</mat-label>
             <input matInput
                    [(ngModel)]="testValues[field.value]"
-                   (input)="evaluateTestConditions()">
+                   (input)="evaluateTestConditions()"
+                   [type]="getInputType(field.value)">
           </mat-form-field>
         </div>
 
@@ -219,8 +290,8 @@
               {{ result.passed ? 'check_circle' : 'cancel' }}
             </mat-icon>
             <span [class.success]="result.passed" [class.failed]="!result.passed">
-                  {{ result.passed ? 'PASS' : 'FAIL' }}
-                </span>
+              {{ result.passed ? 'PASS' : 'FAIL' }}
+            </span>
             <span class="result-details">{{ result.details }}</span>
           </div>
 
@@ -230,8 +301,8 @@
               {{ overallResult ? 'check_circle' : 'cancel' }}
             </mat-icon>
             <span [class.success]="overallResult" [class.failed]="!overallResult">
-                  {{ overallResult ? 'CONDITIONS MET' : 'CONDITIONS NOT MET' }}
-                </span>
+              {{ overallResult ? 'CONDITIONS MET' : 'CONDITIONS NOT MET' }}
+            </span>
           </div>
         </div>
       </div>
