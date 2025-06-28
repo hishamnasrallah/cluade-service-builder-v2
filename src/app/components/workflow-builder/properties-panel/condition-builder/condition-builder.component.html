@@ -51,7 +51,15 @@
                         [isNested]="true"
                         (conditionChanged)="onNestedConditionChanged(i, $event)">
                       </app-condition-builder>
+
+                      <div class="group-actions" style="margin-top: 16px; text-align: center;">
+                        <button mat-raised-button color="primary" (click)="addRuleToGroup(i)">
+                          <mat-icon>add</mat-icon>
+                          Add Rule to Group
+                        </button>
+                      </div>
                     </ng-container>
+
                   </div>
 
                   <button mat-icon-button (click)="removeCondition(i)" color="warn" class="remove-btn">

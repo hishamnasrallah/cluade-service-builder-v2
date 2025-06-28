@@ -1,6 +1,6 @@
 // components/workflow-builder/properties-panel/condition-builder/condition-builder.component.ts
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges,
-  ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';import { CommonModule } from '@angular/common';
+  ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy } from '@angular/core';import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormArray, FormGroup, Validators } from '@angular/forms';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -27,6 +27,8 @@ interface ConditionItem {
   value?: any;
   conditions?: ConditionItem[];
   logical_operator?: 'and' | 'or';
+  _cachedConditions?: any[];
+  _transformationId?: string;
 }
 
 @Component({
@@ -285,7 +287,29 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
       this.updateJsonText();
     }
   }
-
+  addRuleToGroup(groupIndex: number): void {
+    const groupItem = this.conditionItems[groupIndex];
+    if (groupItem.type === 'group') {
+      if (!groupItem.conditions) {
+        groupItem.conditions = [];
+      }
+      groupItem.conditions.push({
+        type: 'simple',
+        field: '',
+        operation: '=',
+        value: '',
+        logical_operator: 'and'
+      });
+      // Clear cache to force re-transformation
+      delete groupItem._cachedConditions;
+      delete groupItem._transformationId;
+      this.updateConditions();
+    }
+  }
+  ngOnDestroy(): void {
+    // Clear all caches on destroy
+    this.clearTransformationCaches(this.conditionItems);
+  }
   private loadConditionsFromInput(): void {
     this.conditionItems = this.transformConditionsToItems(this.conditionLogic);
   }
@@ -457,27 +481,54 @@ export class ConditionBuilderComponent implements OnInit, OnChanges {
   onNestedConditionChanged(index: number, conditions: any[]): void {
     const item = this.conditionItems[index];
     if (item.type === 'group') {
-      // Don't transform back to items - keep as conditions
-      // to avoid circular transformation
-      item.conditions = conditions.map(c => ({
-        type: c.conditions ? 'group' : 'simple',
-        ...c
-      }));
+      // Transform the emitted conditions back to ConditionItem format
+      item.conditions = this.transformConditionsToItems(conditions);
     }
     this.updateConditions();
   }
+
   getGroupConditions(item: ConditionItem): any[] {
     if (!item.conditions) return [];
-    // Return already transformed conditions to avoid calling transformation in template
-    return this.transformItemsToConditions(item.conditions);
+    // Store the transformed conditions to avoid recalculating in template
+    if (!item._cachedConditions || item._transformationId !== this.getTransformationId(item.conditions)) {
+      item._cachedConditions = this.transformItemsToConditions(item.conditions);
+      item._transformationId = this.getTransformationId(item.conditions);
+    }
+    return item._cachedConditions;
   }
 
+  private getTransformationId(conditions: ConditionItem[]): string {
+    return JSON.stringify(conditions.map(c => ({
+      type: c.type,
+      field: c.field,
+      operation: c.operation,
+      value: c.value,
+      conditionsLength: c.conditions?.length || 0
+    })));
+  }
+
+
   updateConditions(): void {
+    // Clear all caches before transformation
+    this.clearTransformationCaches(this.conditionItems);
     const conditions = this.transformItemsToConditions(this.conditionItems);
     this.conditionChanged.emit(conditions);
     this.updateJsonText();
     this.cdr.markForCheck();
   }
+
+  private clearTransformationCaches(items: ConditionItem[]): void {
+    items.forEach(item => {
+      if (item.type === 'group') {
+        delete item._cachedConditions;
+        delete item._transformationId;
+        if (item.conditions) {
+          this.clearTransformationCaches(item.conditions);
+        }
+      }
+    });
+  }
+
 
   loadExample(example: any): void {
     this.conditionItems = this.transformConditionsToItems(example.data);
