@@ -89,6 +89,7 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   flowSteps: LookupItem[] = [];
   applicantTypes: LookupItem[] = [];
   fieldTypes: FieldType[] = [];
+  availableFieldsForConditions: { value: string; label: string; type?: string }[] = [];
 
   // Existing Data
   existingPages: Page[] = [];
@@ -123,8 +124,12 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
 
     // Set up real-time updates for name field
     this.setupRealTimeUpdates();
+
+    // Update available fields when workflow changes
+    this.updateAvailableFieldsForConditions();
   }
-// Add this helper method to the component
+
+  // Add this helper method to the component
   private toNumber(value: any): number | null {
     if (value === null || value === undefined || value === '') {
       return null;
@@ -591,6 +596,11 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['workflow']) {
+      // Update available fields when workflow changes
+      this.updateAvailableFieldsForConditions();
+    }
+
     if (changes['selectedElement']) {
       // Save current form values to cache before switching
       if (this.currentElementId && this.propertiesForm.valid) {
@@ -1113,10 +1123,25 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
         break;
 
       case ElementType.CONDITION:
+        // For conditions, ensure we have the target_field_id
+        let targetFieldId = properties.target_field_id || '';
+
+        // If we only have target_field (name), try to find the ID
+        if (!targetFieldId && properties.target_field) {
+          const targetField = this.workflow.elements.find(el =>
+            el.type === ElementType.FIELD &&
+            (el.properties._field_name === properties.target_field ||
+              el.properties.name === properties.target_field)
+          );
+          if (targetField?.properties._field_id) {
+            targetFieldId = targetField.properties._field_id;
+          }
+        }
+
         this.propertiesForm.patchValue({
           condition_id: properties.condition_id || '',
           target_field: properties.target_field || '',
-          target_field_id: properties.target_field_id || '',
+          target_field_id: targetFieldId,
           condition_logic: properties.condition_logic || []
         });
         break;
@@ -1451,6 +1476,51 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  private updateAvailableFieldsForConditions(): void {
+    const fields: { value: string; label: string; type?: string }[] = [];
+
+    // Extract all fields from the workflow
+    if (this.workflow && this.workflow.elements) {
+      this.workflow.elements.forEach((element) => {
+        if (element.type === ElementType.FIELD) {
+          const fieldId = element.properties._field_id;
+          const fieldName = element.properties._field_name || element.properties.name;
+          const displayName = element.properties._field_display_name || element.properties.name || fieldName || 'Unnamed Field';
+          const fieldType = element.properties._field_type || 'text';
+
+          if (fieldId) {
+            fields.push({
+              value: fieldId.toString(), // Use field ID as value
+              label: displayName,
+              type: this.getFieldTypeString(fieldType)
+            });
+          }
+        }
+      });
+    }
+
+    this.availableFieldsForConditions = fields;
+  }
+
+  private getFieldTypeString(fieldType: any): string {
+    if (typeof fieldType === 'object' && fieldType.name) {
+      return fieldType.name.toLowerCase();
+    }
+    if (typeof fieldType === 'number') {
+      // Map common field type IDs to strings
+      const typeMap: { [key: number]: string } = {
+        1: 'text',
+        2: 'number',
+        3: 'boolean',
+        4: 'date',
+        5: 'choice',
+        6: 'file'
+      };
+      return typeMap[fieldType] || 'text';
+    }
+    return String(fieldType).toLowerCase();
+  }
+
   private updateValidators(): void {
     if (!this.selectedElement) return;
 
@@ -1562,38 +1632,6 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     });
   }
 
-  getFieldIcon(fieldName: string): string {
-    // Find the field in workflow to get its type
-    const field = this.workflow.elements.find(el =>
-      el.type === ElementType.FIELD &&
-      (el.properties._field_name === fieldName || el.properties.name === fieldName)
-    );
-
-    if (!field) return 'input';
-
-    const fieldType = field.properties._field_type;
-    if (!fieldType) return 'input';
-
-    const iconMap: { [key: string]: string } = {
-      'text': 'text_fields',
-      'number': 'pin',
-      'boolean': 'check_box',
-      'date': 'calendar_today',
-      'choice': 'list',
-      'file': 'attach_file',
-      '1': 'text_fields',  // Map numeric IDs
-      '2': 'pin',
-      '3': 'check_box',
-      '4': 'calendar_today',
-      '5': 'list',
-      '6': 'attach_file'
-    };
-
-    // Convert to string for lookup
-    const fieldTypeStr = String(fieldType).toLowerCase();
-    return iconMap[fieldTypeStr] || 'input';
-  }
-
   getFieldDisplayName(fieldName: string): string {
     const field = this.workflow.elements.find(el =>
       el.type === ElementType.FIELD &&
@@ -1601,6 +1639,18 @@ export class PropertiesPanelComponent implements OnInit, OnChanges, OnDestroy {
     );
 
     return field?.properties._field_display_name || field?.properties.name || fieldName;
+  }
+
+  getFieldIcon(type?: string): string {
+    const iconMap: { [key: string]: string } = {
+      'text': 'text_fields',
+      'number': 'pin',
+      'boolean': 'check_box',
+      'date': 'calendar_today',
+      'choice': 'list',
+      'file': 'attach_file'
+    };
+    return iconMap[type || 'text'] || 'input';
   }
 
   getOperatorDisplay(operation: string): string {

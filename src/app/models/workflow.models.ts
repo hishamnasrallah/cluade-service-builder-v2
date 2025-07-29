@@ -510,12 +510,28 @@ export class WorkflowService {
       }
     }
 
+// Initialize properties based on element type
+    let initialProperties = { name: type.charAt(0).toUpperCase() + type.slice(1), ...properties };
+
+    // For conditions, ensure condition_logic is initialized as empty array
+    if (type === ElementType.CONDITION) {
+      initialProperties = {
+        ...initialProperties,
+        condition_logic: properties.condition_logic || [],
+        target_field: properties.target_field || '',
+        target_field_id: properties.target_field_id || null
+      };
+    }
+
     const element: WorkflowElement = {
       id: uuidv4(),
       type,
       position,
-      properties: { name: type.charAt(0).toUpperCase() + type.slice(1), ...properties },
-      connections: []
+      properties: initialProperties,
+      connections: [],
+      // parentId,
+      children: canContainChildren(type) ? [] : undefined,
+      isExpanded: false
     };
 
     this.currentWorkflow.elements.push(element);

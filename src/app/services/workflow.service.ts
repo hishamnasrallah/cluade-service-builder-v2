@@ -996,22 +996,11 @@ export class WorkflowService {
   }
 
   private mapConditionProperties(condition: WorkflowElement): any {
-    let targetFieldId = this.toNumber(condition.properties['target_field_id']);
-
-    if (!targetFieldId && condition.properties['target_field']) {
-      const targetField = this.currentWorkflow.elements.find(el =>
-        el.type === ElementType.FIELD &&
-        (el.properties['_field_name'] === condition.properties['target_field'] ||
-          el.properties['name'] === condition.properties['target_field'])
-      );
-
-      if (targetField?.properties['_field_id']) {
-        targetFieldId = targetField.properties['_field_id'];
-      }
-    }
+    // Use target_field_id directly if available
+    const targetFieldId = this.toNumber(condition.properties['target_field_id']);
 
     return {
-      target_field: targetFieldId,
+      target_field: targetFieldId || 0, // API expects field ID as target_field
       condition_logic: condition.properties['condition_logic'] || [],
       active_ind: condition.properties['active_ind'] !== false,
       position_x: condition.position?.x || 0,
