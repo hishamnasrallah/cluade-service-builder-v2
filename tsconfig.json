@@ -1,5 +1,3 @@
-/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
-/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
 {
   "compileOnSave": false,
   "compilerOptions": {
@@ -23,12 +21,34 @@
     "lib": [
       "ES2022",
       "dom"
-    ]
+    ],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true
   },
+  "include": [
+    "src/main.ts",
+    "src/app/app.component.ts",
+    "src/app/components/approval-flow-builder/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "src/app/components/mapper-builder/**/*",
+    "src/app/components/field-rule-tester/**/*",
+    "src/app/guards/unsaved-changes.guard.ts",
+    "**/*.module.ts",
+    "**/index.ts"
+  ],
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
     "strictInjectionParameters": true,
     "strictInputAccessModifiers": true,
-    "strictTemplates": true
+    "strictTemplates": true,
+    "skipTemplateCodegen": false,
+    "skipMetadataEmit": false,
+    "fullTemplateTypeCheck": true,
+    "strictMetadataEmit": false
   }
 }

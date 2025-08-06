@@ -41,7 +41,7 @@ export const appConfig: ApplicationConfig = {
     MapperValidationService,
     KeyboardShortcutsService,
     UndoRedoHistoryComponent,
-    MapperSearchService,
+    // MapperSearchService,
     StatePresistanceService
   ]
 };
